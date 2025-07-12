@@ -63,11 +63,11 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				gold: {
-					400: '#fbbf24',
-					500: '#f59e0b',
-					600: '#d97706'
-				}
+				'klaud-teal': 'hsl(var(--klaud-teal))',
+				'klaud-dark': 'hsl(var(--klaud-dark))',
+				'klaud-card': 'hsl(var(--klaud-card))',
+				'klaud-text': 'hsl(var(--klaud-text))',
+				'klaud-muted': 'hsl(var(--klaud-muted))'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

@@ -1,335 +1,287 @@
-
 import { useState } from 'react';
-import { ShoppingCart, Search, Filter, Star, Heart, Plus } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 
+// Import AI-generated images
+import hookah1 from '@/assets/hookah-1.jpg';
+import hookah2 from '@/assets/hookah-2.jpg';
+import hookah3 from '@/assets/hookah-3.jpg';
+import appleFlavor from '@/assets/apple-flavor.jpg';
+import mintFlavor from '@/assets/mint-flavor.jpg';
+import berryFlavor from '@/assets/berry-flavor.jpg';
+
 const Index = () => {
+  const [selectedHookah, setSelectedHookah] = useState<number | null>(null);
+  const [selectedFlavors, setSelectedFlavors] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [cartItems, setCartItems] = useState<number[]>([]);
-  const [wishlist, setWishlist] = useState<number[]>([]);
 
-  const categories = [
-    { id: 'all', name: 'All Products', count: 24 },
-    { id: 'traditional', name: 'Traditional', count: 8 },
-    { id: 'modern', name: 'Modern', count: 10 },
-    { id: 'premium', name: 'Premium', count: 6 }
-  ];
-
-  const products = [
+  // Recommended mixes data
+  const recommendedMixes = [
     {
       id: 1,
-      name: 'Royal Sultan Traditional',
-      category: 'traditional',
-      price: 299,
-      originalPrice: 349,
-      rating: 4.8,
-      reviews: 124,
-      image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop&crop=center',
-      description: 'Handcrafted traditional hookah with intricate brass details',
-      inStock: true,
-      isNew: false,
-      tags: ['brass', 'handcrafted', 'large']
+      name: 'Rich Forest',
+      price: '70 Lei',
+      category: 'Fresh',
+      mainImage: hookah1,
+      flavors: [appleFlavor, mintFlavor, berryFlavor],
+      bgColor: 'bg-teal-500'
     },
     {
       id: 2,
-      name: 'Crystal Elite Modern',
-      category: 'modern',
-      price: 449,
-      originalPrice: 499,
-      rating: 4.9,
-      reviews: 89,
-      image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
-      description: 'Contemporary design with LED lighting and crystal base',
-      inStock: true,
-      isNew: true,
-      tags: ['LED', 'crystal', 'modern']
+      name: 'Balkan Mix',
+      price: '70 Lei',
+      category: 'Fresh',
+      mainImage: hookah2,
+      flavors: [mintFlavor, appleFlavor, berryFlavor],
+      bgColor: 'bg-teal-500'
     },
     {
       id: 3,
-      name: 'Pharaoh Gold Premium',
-      category: 'premium',
-      price: 699,
-      originalPrice: 799,
-      rating: 5.0,
-      reviews: 45,
-      image: 'https://images.unsplash.com/photo-1578318749666-94c1dd75f3e7?w=400&h=400&fit=crop&crop=center',
-      description: 'Luxury gold-plated hookah with Egyptian hieroglyphs',
-      inStock: true,
-      isNew: false,
-      tags: ['gold', 'luxury', 'egyptian']
-    },
-    {
-      id: 4,
-      name: 'Mystic Blue Traditional',
-      category: 'traditional',
-      price: 189,
-      originalPrice: 229,
-      rating: 4.6,
-      reviews: 203,
-      image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
-      description: 'Classic blue ceramic base with silver accents',
-      inStock: false,
-      isNew: false,
-      tags: ['ceramic', 'blue', 'classic']
-    },
-    {
-      id: 5,
-      name: 'Neon Fusion Modern',
-      category: 'modern',
-      price: 359,
-      originalPrice: 399,
-      rating: 4.7,
-      reviews: 156,
-      image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop&crop=center',
-      description: 'RGB lighting with smartphone app control',
-      inStock: true,
-      isNew: true,
-      tags: ['RGB', 'app-control', 'futuristic']
-    },
-    {
-      id: 6,
-      name: 'Diamond Empress Premium',
-      category: 'premium',
-      price: 899,
-      originalPrice: 999,
-      rating: 4.9,
-      reviews: 67,
-      image: 'https://images.unsplash.com/photo-1578318749666-94c1dd75f3e7?w=400&h=400&fit=crop&crop=center',
-      description: 'Swarovski crystal embellishments with platinum finish',
-      inStock: true,
-      isNew: false,
-      tags: ['swarovski', 'platinum', 'exclusive']
+      name: 'Cactus Blast',
+      price: '70 Lei',
+      category: 'Fresh',
+      mainImage: hookah3,
+      flavors: [berryFlavor, mintFlavor, appleFlavor],
+      bgColor: 'bg-teal-500'
     }
   ];
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Hookah products data
+  const hookahs = [
+    { id: 1, name: 'Maklaud X', price: '70 Lei', image: hookah1 },
+    { id: 2, name: 'Project Helios', price: '90 Lei', image: hookah2 },
+    { id: 3, name: 'Maklaud Odyssey', price: '90 Lei', image: hookah3 },
+    { id: 4, name: 'Maklaud Skytech', price: '90 Lei', image: hookah1 },
+    { id: 5, name: 'Maklaud Dragon', price: '120 Lei', image: hookah2 },
+    { id: 6, name: 'Maklaud Rose', price: '120 Lei', image: hookah3 }
+  ];
 
-  const addToCart = (productId: number) => {
-    setCartItems(prev => [...prev, productId]);
+  // Flavor data
+  const flavors = [
+    { id: 1, name: 'Aloe Drink', image: appleFlavor },
+    { id: 2, name: 'American Beer', image: berryFlavor },
+    { id: 3, name: 'Ananas Shock', image: mintFlavor },
+    { id: 4, name: 'Aperol Spritz', image: appleFlavor },
+    { id: 5, name: 'Apple Hook', image: appleFlavor },
+    { id: 6, name: 'Apple Shock', image: appleFlavor },
+    { id: 7, name: 'Apple Squirt', image: appleFlavor },
+    { id: 8, name: 'Banana', image: berryFlavor },
+    { id: 9, name: 'Banana Milkshake', image: berryFlavor },
+    { id: 10, name: 'Banana Way', image: berryFlavor },
+    { id: 11, name: 'Barberry Shock', image: berryFlavor },
+    { id: 12, name: 'Basil Blast', image: mintFlavor },
+    { id: 13, name: 'Blueberry', image: berryFlavor },
+    { id: 14, name: 'Bubble Gum', image: mintFlavor },
+    { id: 15, name: 'Cherry', image: berryFlavor },
+    { id: 16, name: 'Coconut', image: appleFlavor },
+    { id: 17, name: 'Cola', image: berryFlavor },
+    { id: 18, name: 'Grape', image: berryFlavor }
+  ];
+
+  const filteredFlavors = flavors.filter(flavor =>
+    flavor.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleFlavorSelect = (flavorId: number) => {
+    if (selectedFlavors.includes(flavorId)) {
+      setSelectedFlavors(prev => prev.filter(id => id !== flavorId));
+    } else if (selectedFlavors.length < 3) {
+      setSelectedFlavors(prev => [...prev, flavorId]);
+    } else {
+      toast({
+        title: "Maximum flavors reached",
+        description: "You can select up to 3 flavors only.",
+      });
+    }
+  };
+
+  const addMixToCart = (mixId: number) => {
     toast({
-      title: "Added to Cart",
-      description: "Item has been added to your cart successfully!",
+      title: "Added to cart",
+      description: "Mix has been added to your cart!",
     });
   };
 
-  const toggleWishlist = (productId: number) => {
-    setWishlist(prev => 
-      prev.includes(productId) 
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    );
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-klaud-dark text-klaud-text">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-black/50 backdrop-blur-md border-b border-gold-500/20">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">
-                HookahRoyale
-              </h1>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search hookahs..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64 bg-white/10 border-white/20 text-white placeholder:text-gray-400"
-                />
-              </div>
-              
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 relative">
-                <Heart className="h-5 w-5" />
-                {wishlist.length > 0 && (
-                  <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center bg-red-500">
-                    {wishlist.length}
-                  </Badge>
-                )}
-              </Button>
-              
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 relative">
-                <ShoppingCart className="h-5 w-5" />
-                {cartItems.length > 0 && (
-                  <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center bg-amber-500">
-                    {cartItems.length}
-                  </Badge>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
+      <header className="flex items-center justify-between p-4 border-b border-border">
+        <Button variant="ghost" size="icon" className="text-klaud-text">
+          <Menu className="h-6 w-6" />
+        </Button>
+        
+        <h1 className="text-2xl font-bold tracking-wider">KLAUD</h1>
+        
+        <div className="w-10" />
       </header>
 
-      {/* Hero Section */}
-      <section className="relative py-20 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-900/50 to-blue-900/50" />
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center max-w-4xl mx-auto">
-            <h2 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 bg-clip-text text-transparent animate-fade-in">
-              Premium Hookah Collection
-            </h2>
-            <p className="text-xl text-gray-300 mb-8 animate-fade-in">
-              Discover the finest selection of traditional and modern hookahs, crafted for the ultimate smoking experience
-            </p>
-            <Button size="lg" className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white px-8 py-3 text-lg animate-scale-in">
-              Explore Collection
-            </Button>
-          </div>
-        </div>
-        
-        {/* Floating Elements */}
-        <div className="absolute top-20 left-10 w-20 h-20 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full opacity-20 animate-pulse" />
-        <div className="absolute bottom-20 right-10 w-32 h-32 bg-gradient-to-r from-purple-400 to-pink-500 rounded-full opacity-10 animate-pulse" />
-      </section>
-
-      {/* Filters */}
-      <section className="py-8 border-b border-white/10">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center space-x-2">
-              <Filter className="h-5 w-5 text-gray-400" />
-              <span className="text-gray-300">Categories:</span>
-              <div className="flex flex-wrap gap-2">
-                {categories.map(category => (
-                  <Button
-                    key={category.id}
-                    variant={selectedCategory === category.id ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedCategory(category.id)}
-                    className={selectedCategory === category.id 
-                      ? "bg-gradient-to-r from-amber-500 to-orange-600 text-white" 
-                      : "border-white/20 text-gray-300 hover:bg-white/10"
-                    }
-                  >
-                    {category.name} ({category.count})
-                  </Button>
-                ))}
-              </div>
-            </div>
-            
-            <div className="text-gray-400">
-              Showing {filteredProducts.length} products
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Products Grid */}
-      <section className="py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredProducts.map(product => (
-              <Card key={product.id} className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300 group hover:scale-105">
+      <div className="container mx-auto px-4 py-6 space-y-8">
+        {/* Recommended Mixes */}
+        <section>
+          <h2 className="text-xl font-semibold mb-6">Recommended Mixes</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {recommendedMixes.map((mix) => (
+              <Card key={mix.id} className="bg-klaud-card border-border overflow-hidden">
                 <CardContent className="p-0">
-                  <div className="relative overflow-hidden rounded-t-lg">
+                  <div className={`${mix.bgColor} p-4 text-center relative`}>
                     <img 
-                      src={product.image} 
-                      alt={product.name}
-                      className="w-full h-64 object-cover group-hover:scale-110 transition-transform duration-500"
+                      src={mix.mainImage} 
+                      alt={mix.name}
+                      className="w-24 h-28 object-cover mx-auto rounded"
                     />
+                    <h3 className="text-white font-semibold mt-2">{mix.name}</h3>
                     
-                    {/* Overlays */}
-                    <div className="absolute top-4 left-4 flex flex-col gap-2">
-                      {product.isNew && (
-                        <Badge className="bg-green-500 text-white">NEW</Badge>
-                      )}
-                      {!product.inStock && (
-                        <Badge className="bg-red-500 text-white">OUT OF STOCK</Badge>
-                      )}
-                      {product.originalPrice > product.price && (
-                        <Badge className="bg-amber-500 text-white">
-                          -{Math.round((1 - product.price / product.originalPrice) * 100)}%
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-4 right-4 bg-black/50 text-white hover:bg-black/70"
-                      onClick={() => toggleWishlist(product.id)}
-                    >
-                      <Heart 
-                        className={`h-4 w-4 ${wishlist.includes(product.id) ? 'fill-red-500 text-red-500' : ''}`} 
-                      />
-                    </Button>
-                  </div>
-                  
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline" className="border-amber-500/50 text-amber-400">
-                        {product.category}
-                      </Badge>
-                      <div className="flex items-center space-x-1">
-                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                        <span className="text-sm text-gray-300">{product.rating}</span>
-                        <span className="text-xs text-gray-500">({product.reviews})</span>
-                      </div>
-                    </div>
-                    
-                    <h3 className="text-xl font-semibold text-white mb-2">{product.name}</h3>
-                    <p className="text-gray-400 text-sm mb-4">{product.description}</p>
-                    
-                    <div className="flex flex-wrap gap-1 mb-4">
-                      {product.tags.map(tag => (
-                        <Badge key={tag} variant="secondary" className="text-xs bg-white/10 text-gray-300">
-                          {tag}
-                        </Badge>
+                    {/* Flavor indicators */}
+                    <div className="flex justify-center gap-1 mt-2">
+                      {mix.flavors.map((flavor, index) => (
+                        <img 
+                          key={index}
+                          src={flavor}
+                          alt="flavor"
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
                       ))}
                     </div>
                   </div>
-                </CardContent>
-                
-                <CardFooter className="p-6 pt-0 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-2xl font-bold text-amber-400">${product.price}</span>
-                    {product.originalPrice > product.price && (
-                      <span className="text-lg text-gray-500 line-through">${product.originalPrice}</span>
-                    )}
-                  </div>
                   
-                  <Button
-                    onClick={() => addToCart(product.id)}
-                    disabled={!product.inStock}
-                    className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    {product.inStock ? 'Add to Cart' : 'Out of Stock'}
-                  </Button>
-                </CardFooter>
+                  <div className="p-4 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-bold text-klaud-text">{mix.price}</span>
+                      <span className="text-sm text-klaud-muted">Category</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-klaud-muted">{mix.category}</span>
+                      <Button 
+                        size="sm" 
+                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                        onClick={() => addMixToCart(mix.id)}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
               </Card>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer */}
-      <footer className="bg-black/50 border-t border-white/10 py-12">
-        <div className="container mx-auto px-4">
-          <div className="text-center">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent mb-4">
-              HookahRoyale
-            </h3>
-            <p className="text-gray-400 mb-4">Premium hookah experience delivered to your doorstep</p>
-            <p className="text-gray-500 text-sm">© 2024 HookahRoyale. All rights reserved.</p>
+        {/* Step 1: Choose Hookah */}
+        <section>
+          <h2 className="text-xl font-semibold mb-6">Step 1: Choose Hookah</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {hookahs.map((hookah) => (
+              <Card 
+                key={hookah.id} 
+                className={`bg-klaud-card border-border cursor-pointer transition-all ${
+                  selectedHookah === hookah.id ? 'ring-2 ring-primary' : ''
+                }`}
+                onClick={() => setSelectedHookah(hookah.id)}
+              >
+                <CardContent className="p-4 text-center">
+                  <img 
+                    src={hookah.image} 
+                    alt={hookah.name}
+                    className="w-full h-24 object-cover mx-auto mb-2 rounded"
+                  />
+                  <h3 className="text-sm font-medium text-klaud-text mb-1">{hookah.name}</h3>
+                  <p className="text-lg font-bold text-amber-400">{hookah.price}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </div>
-      </footer>
+        </section>
+
+        {/* Step 2: Choose up to three flavors */}
+        <section>
+          <h2 className="text-xl font-semibold mb-4">Step 2: Choose up to three flavors</h2>
+          
+          {/* Search bar */}
+          <div className="relative mb-6">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-klaud-muted h-4 w-4" />
+            <Input
+              placeholder="Search for flavors here..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 bg-muted border-border text-klaud-text placeholder:text-klaud-muted"
+            />
+          </div>
+
+          {/* Selected flavors indicator */}
+          {selectedFlavors.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm text-klaud-muted mb-2">
+                Selected flavors: {selectedFlavors.length}/3
+              </p>
+            </div>
+          )}
+
+          {/* Flavors grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {filteredFlavors.map((flavor) => (
+              <Card 
+                key={flavor.id} 
+                className={`bg-klaud-card border-border cursor-pointer transition-all ${
+                  selectedFlavors.includes(flavor.id) ? 'ring-2 ring-primary' : ''
+                }`}
+                onClick={() => handleFlavorSelect(flavor.id)}
+              >
+                <CardContent className="p-4 text-center">
+                  <div className="relative">
+                    <img 
+                      src={flavor.image} 
+                      alt={flavor.name}
+                      className="w-full h-16 object-cover mx-auto mb-2 rounded"
+                    />
+                    {selectedFlavors.includes(flavor.id) && (
+                      <div className="absolute inset-0 bg-primary/20 rounded flex items-center justify-center">
+                        <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                          <span className="text-primary-foreground text-sm font-bold">
+                            {selectedFlavors.indexOf(flavor.id) + 1}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <h3 className="text-xs font-medium text-klaud-text">{flavor.name}</h3>
+                  <div className="mt-2">
+                    <div className="w-4 h-4 bg-primary rounded-full mx-auto opacity-50" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        {/* Order Summary */}
+        {(selectedHookah || selectedFlavors.length > 0) && (
+          <section className="mt-8">
+            <Card className="bg-klaud-card border-border">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Your Selection</h3>
+                {selectedHookah && (
+                  <p className="text-klaud-muted mb-2">
+                    Hookah: {hookahs.find(h => h.id === selectedHookah)?.name}
+                  </p>
+                )}
+                {selectedFlavors.length > 0 && (
+                  <p className="text-klaud-muted mb-4">
+                    Flavors: {selectedFlavors.map(id => 
+                      flavors.find(f => f.id === id)?.name
+                    ).join(', ')}
+                  </p>
+                )}
+                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                  Add Custom Mix to Cart
+                </Button>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+      </div>
     </div>
   );
 };
