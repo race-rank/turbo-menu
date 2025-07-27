@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Menu, Search } from 'lucide-react';
+import { Menu, Search, ShoppingCart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 
-// Import AI-generated images
 import hookah1 from '@/assets/hookah-1.jpg';
 import hookah2 from '@/assets/hookah-2.jpg';
 import hookah3 from '@/assets/hookah-3.jpg';
@@ -14,11 +15,12 @@ import mintFlavor from '@/assets/mint-flavor.jpg';
 import berryFlavor from '@/assets/berry-flavor.jpg';
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { addItem, getItemCount } = useCart();
   const [selectedHookah, setSelectedHookah] = useState<number | null>(null);
   const [selectedFlavors, setSelectedFlavors] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Recommended mixes data
   const recommendedMixes = [
     {
       id: 1,
@@ -49,7 +51,6 @@ const Index = () => {
     }
   ];
 
-  // Hookah products data
   const hookahs = [
     { id: 1, name: 'Maklaud X', price: '70 Lei', image: hookah1 },
     { id: 2, name: 'Project Helios', price: '90 Lei', image: hookah2 },
@@ -59,7 +60,6 @@ const Index = () => {
     { id: 6, name: 'Maklaud Rose', price: '120 Lei', image: hookah3 }
   ];
 
-  // Flavor data
   const flavors = [
     { id: 1, name: 'Aloe Drink', image: appleFlavor },
     { id: 2, name: 'American Beer', image: berryFlavor },
@@ -99,27 +99,84 @@ const Index = () => {
   };
 
   const addMixToCart = (mixId: number) => {
-    toast({
-      title: "Added to cart",
-      description: "Mix has been added to your cart!",
-    });
+    const mix = recommendedMixes.find(m => m.id === mixId);
+    if (mix) {
+      addItem({
+        id: `mix-${mixId}`,
+        type: 'mix',
+        name: mix.name,
+        price: parseInt(mix.price.replace(' Lei', '')),
+        image: mix.mainImage
+      });
+      toast({
+        title: "Added to cart",
+        description: `${mix.name} has been added to your cart!`,
+      });
+    }
   };
+
+  const addCustomMixToCart = () => {
+    if (!selectedHookah || selectedFlavors.length === 0) {
+      toast({
+        title: "Incomplete selection",
+        description: "Please select a hookah and at least one flavor.",
+      });
+      return;
+    }
+
+    const selectedHookahData = hookahs.find(h => h.id === selectedHookah);
+    const selectedFlavorNames = selectedFlavors.map(id => 
+      flavors.find(f => f.id === id)?.name
+    ).filter(Boolean);
+
+    if (selectedHookahData) {
+      addItem({
+        id: `custom-${Date.now()}`,
+        type: 'custom',
+        name: 'Custom Mix',
+        price: parseInt(selectedHookahData.price.replace(' Lei', '')),
+        image: selectedHookahData.image,
+        hookah: selectedHookahData.name,
+        flavors: selectedFlavorNames as string[]
+      });
+      
+      toast({
+        title: "Added to cart",
+        description: "Custom mix has been added to your cart!",
+      });
+      
+      // Reset selections
+      setSelectedHookah(null);
+      setSelectedFlavors([]);
+    }
+  };
+
+  const navigateToCart = () => {
+    navigate('/cart');
+  };
+
+  const cartItemCount = getItemCount();
 
   return (
     <div className="min-h-screen bg-klaud-dark text-klaud-text">
-      {/* Header */}
       <header className="flex items-center justify-between p-4 border-b border-border">
         <Button variant="ghost" size="icon" className="text-klaud-text">
           <Menu className="h-6 w-6" />
         </Button>
         
-        <h1 className="text-2xl font-bold tracking-wider">KLAUD</h1>
+        <h1 className="text-2xl font-bold tracking-wider">TURBO</h1>
         
-        <div className="w-10" />
+        <Button variant="ghost" size="icon" className="text-klaud-text relative" onClick={navigateToCart}>
+          <ShoppingCart className="h-6 w-6" />
+          {cartItemCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              {cartItemCount}
+            </span>
+          )}
+        </Button>
       </header>
 
       <div className="container mx-auto px-4 py-6 space-y-8">
-        {/* Recommended Mixes */}
         <section>
           <h2 className="text-xl font-semibold mb-6">Recommended Mixes</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -134,7 +191,6 @@ const Index = () => {
                     />
                     <h3 className="text-white font-semibold mt-2">{mix.name}</h3>
                     
-                    {/* Flavor indicators */}
                     <div className="flex justify-center gap-1 mt-2">
                       {mix.flavors.map((flavor, index) => (
                         <img 
@@ -169,7 +225,6 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Step 1: Choose Hookah */}
         <section>
           <h2 className="text-xl font-semibold mb-6">Step 1: Choose Hookah</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -195,11 +250,9 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Step 2: Choose up to three flavors */}
         <section>
           <h2 className="text-xl font-semibold mb-4">Step 2: Choose up to three flavors</h2>
           
-          {/* Search bar */}
           <div className="relative mb-6">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-klaud-muted h-4 w-4" />
             <Input
@@ -210,7 +263,6 @@ const Index = () => {
             />
           </div>
 
-          {/* Selected flavors indicator */}
           {selectedFlavors.length > 0 && (
             <div className="mb-4">
               <p className="text-sm text-klaud-muted mb-2">
@@ -219,7 +271,6 @@ const Index = () => {
             </div>
           )}
 
-          {/* Flavors grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {filteredFlavors.map((flavor) => (
               <Card 
@@ -256,7 +307,6 @@ const Index = () => {
           </div>
         </section>
 
-        {/* Order Summary */}
         {(selectedHookah || selectedFlavors.length > 0) && (
           <section className="mt-8">
             <Card className="bg-klaud-card border-border">
@@ -274,7 +324,7 @@ const Index = () => {
                     ).join(', ')}
                   </p>
                 )}
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" onClick={addCustomMixToCart}>
                   Add Custom Mix to Cart
                 </Button>
               </CardContent>
