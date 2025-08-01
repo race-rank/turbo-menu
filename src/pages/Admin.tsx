@@ -1,61 +1,69 @@
 import { useState, useEffect } from 'react';
-import { Check, X, MoreHorizontal, RefreshCw, Filter } from 'lucide-react';
+import { Bell, MoreHorizontal, RefreshCw, Filter } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { toast } from '@/hooks/use-toast';
-import { formatDistanceToNow } from 'date-fns';
-
 import {
   getAdminOrders,
+  getAdminNotifications,
   updateOrderStatus,
-  OrderDetails,
-  getAdminNotifications
+  OrderDetails
 } from '@/services/orderService';
+import { toast } from '@/hooks/use-toast';
 
 const Admin = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('pending');
-  const [pendingOrders, setPendingOrders] = useState<OrderDetails[]>([]);
-  const [confirmedOrders, setConfirmedOrders] = useState<OrderDetails[]>([]);
-  const [completedOrders, setCompletedOrders] = useState<OrderDetails[]>([]);
+  const [orders, setOrders] = useState<OrderDetails[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('all');
 
-  // Function to load orders based on status
+  // Status options for the orders
+  const statusOptions = [
+    { value: 'pending', label: 'Pending', color: 'bg-yellow-500' },
+    { value: 'confirmed', label: 'Confirmed', color: 'bg-blue-500' },
+    { value: 'preparing', label: 'Preparing', color: 'bg-purple-500' },
+    { value: 'ready', label: 'Ready', color: 'bg-green-500' },
+    { value: 'completed', label: 'Completed', color: 'bg-gray-500' }
+  ];
+
+  // Function to format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
+  // Load orders based on active tab
   const loadOrders = async () => {
     setIsLoading(true);
     try {
-      const response = await getAdminOrders();
-      
-      // Group orders by status
-      const pending = response.orders.filter(order => order.status === 'pending');
-      const confirmed = response.orders.filter(order => ['confirmed', 'preparing', 'ready'].includes(order.status));
-      const completed = response.orders.filter(order => order.status === 'completed');
-      
-      setPendingOrders(pending);
-      setConfirmedOrders(confirmed);
-      setCompletedOrders(completed);
-      
+      const status = activeTab !== 'all' ? activeTab : undefined;
+      const response = await getAdminOrders(status);
+      setOrders(response.orders);
     } catch (error) {
       console.error('Failed to load orders:', error);
       toast({
-        title: "Failed to load orders",
-        description: "Please try refreshing the page.",
-        variant: "destructive",
+        title: "Error",
+        description: "Failed to load orders. Please try again.",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Function to load notifications
+  // Load notifications
   const loadNotifications = async () => {
     try {
       const response = await getAdminNotifications();
@@ -65,375 +73,208 @@ const Admin = () => {
     }
   };
 
-  // Function to handle order status updates
-  const handleStatusUpdate = async (orderId: string, status: string) => {
+  // Handle status change
+  const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
-      await updateOrderStatus(orderId, status);
-      
+      await updateOrderStatus(orderId, newStatus);
       toast({
-        title: "Status updated",
-        description: `Order ${orderId.split('-')[1]} has been ${status}`,
+        title: "Status Updated",
+        description: `Order ${orderId} status changed to ${newStatus}`,
       });
-      
-      // Reload orders to reflect changes
       loadOrders();
-      
     } catch (error) {
-      console.error('Failed to update order status:', error);
+      console.error('Failed to update status:', error);
       toast({
-        title: "Status update failed",
-        description: "Please try again.",
-        variant: "destructive",
+        title: "Error",
+        description: "Failed to update order status.",
+        variant: "destructive"
       });
     }
   };
 
-  // Load orders on initial render and when activeTab changes
+  // Load initial data
   useEffect(() => {
     loadOrders();
     loadNotifications();
-    
-    // Set up polling for new orders every 30 seconds
+
+    // Poll for updates every 30 seconds
     const interval = setInterval(() => {
       loadOrders();
       loadNotifications();
     }, 30000);
-    
+
     return () => clearInterval(interval);
-  }, []);
-
-  // Function to format currency
-  const formatCurrency = (amount: number) => `${amount} Lei`;
-
-  // Function to render status badge
-  const renderStatusBadge = (status: string) => {
-    let color = "";
-    switch (status) {
-      case 'pending': color = "bg-yellow-500"; break;
-      case 'confirmed': color = "bg-blue-500"; break;
-      case 'preparing': color = "bg-purple-500"; break;
-      case 'ready': color = "bg-green-500"; break;
-      case 'completed': color = "bg-gray-500"; break;
-      default: color = "bg-gray-500";
-    }
-    
-    return <Badge className={`${color} text-white`}>{status}</Badge>;
-  };
+  }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-klaud-dark text-klaud-text p-6">
-      <header className="mb-8">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <Button variant="outline" onClick={() => loadOrders()} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-        <p className="text-klaud-muted mt-2">Manage orders and view statistics</p>
-      </header>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Main content - orders */}
-        <div className="lg:col-span-3">
-          <Tabs defaultValue="pending" value={activeTab} onValueChange={setActiveTab}>
-            <div className="flex justify-between items-center mb-6">
-              <TabsList className="bg-klaud-card">
-                <TabsTrigger value="pending" className="data-[state=active]:bg-amber-600">
-                  Pending
-                  {pendingOrders.length > 0 && (
-                    <span className="ml-2 bg-amber-600 text-white rounded-full h-5 min-w-[20px] px-1 text-xs flex items-center justify-center">
-                      {pendingOrders.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="confirmed" className="data-[state=active]:bg-primary">
-                  In Progress
-                  {confirmedOrders.length > 0 && (
-                    <span className="ml-2 bg-primary text-white rounded-full h-5 min-w-[20px] px-1 text-xs flex items-center justify-center">
-                      {confirmedOrders.length}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="completed">
-                  History
-                </TabsTrigger>
-              </TabsList>
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filter
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>All Orders</DropdownMenuItem>
-                  <DropdownMenuItem>Last 24 Hours</DropdownMenuItem>
-                  <DropdownMenuItem>This Week</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <TabsContent value="pending" className="mt-0">
-              <div className="space-y-4">
-                {isLoading ? (
-                  <Card className="bg-klaud-card border-border">
-                    <CardContent className="p-6 flex justify-center">
-                      <RefreshCw className="h-8 w-8 animate-spin text-klaud-muted" />
-                    </CardContent>
-                  </Card>
-                ) : pendingOrders.length === 0 ? (
-                  <Card className="bg-klaud-card border-border">
-                    <CardContent className="p-6 text-center text-klaud-muted">
-                      No pending orders at the moment.
-                    </CardContent>
-                  </Card>
-                ) : (
-                  pendingOrders.map((order) => (
-                    <Card key={order.orderId} className="bg-klaud-card border-border">
-                      <CardContent className="p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="text-lg font-semibold">Order #{order.orderId.split('-')[1]}</h3>
-                            <p className="text-klaud-muted text-sm">
-                              {formatDistanceToNow(new Date(order.timestamp), { addSuffix: true })}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-green-600 hover:bg-green-700 text-white border-none"
-                              onClick={() => handleStatusUpdate(order.orderId, 'confirmed')}
-                            >
-                              <Check className="h-4 w-4 mr-1" />
-                              Confirm
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-red-600 hover:bg-red-700 text-white border-none"
-                              onClick={() => handleStatusUpdate(order.orderId, 'completed')}
-                            >
-                              <X className="h-4 w-4 mr-1" />
-                              Dismiss
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        <div className="border-t border-border pt-4 mt-4">
-                          <h4 className="text-sm font-medium mb-2">Items:</h4>
-                          <ul className="space-y-2">
-                            {order.items.map((item, index) => (
-                              <li key={index} className="flex justify-between items-center">
-                                <div className="flex items-center">
-                                  <span className="text-sm">
-                                    {item.quantity}x {item.name}
-                                    {item.type === 'custom' && (
-                                      <span className="text-klaud-muted ml-2 text-xs">
-                                        ({item.hookah} - {item.flavors?.join(', ')})
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
-                                <span className="text-amber-400">{formatCurrency(item.price * item.quantity)}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          
-                          <div className="flex justify-between items-center mt-4 pt-4 border-t border-border">
-                            <span className="font-semibold">Total:</span>
-                            <span className="font-semibold text-amber-400 text-lg">{formatCurrency(order.total)}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="confirmed" className="mt-0">
-              <div className="space-y-4">
-                {isLoading ? (
-                  <Card className="bg-klaud-card border-border">
-                    <CardContent className="p-6 flex justify-center">
-                      <RefreshCw className="h-8 w-8 animate-spin text-klaud-muted" />
-                    </CardContent>
-                  </Card>
-                ) : confirmedOrders.length === 0 ? (
-                  <Card className="bg-klaud-card border-border">
-                    <CardContent className="p-6 text-center text-klaud-muted">
-                      No orders in progress.
-                    </CardContent>
-                  </Card>
-                ) : (
-                  confirmedOrders.map((order) => (
-                    <Card key={order.orderId} className="bg-klaud-card border-border">
-                      <CardContent className="p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="text-lg font-semibold">Order #{order.orderId.split('-')[1]}</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              {renderStatusBadge(order.status)}
-                              <span className="text-klaud-muted text-sm">
-                                {formatDistanceToNow(new Date(order.timestamp), { addSuffix: true })}
-                              </span>
-                            </div>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button size="sm" variant="outline">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleStatusUpdate(order.orderId, 'preparing')}>
-                                Mark as Preparing
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleStatusUpdate(order.orderId, 'ready')}>
-                                Mark as Ready
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleStatusUpdate(order.orderId, 'completed')}>
-                                Mark as Completed
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        
-                        <div className="border-t border-border pt-4 mt-4">
-                          <h4 className="text-sm font-medium mb-2">Items:</h4>
-                          <ul className="space-y-2">
-                            {order.items.map((item, index) => (
-                              <li key={index} className="flex justify-between items-center">
-                                <div className="flex items-center">
-                                  <span className="text-sm">
-                                    {item.quantity}x {item.name}
-                                    {item.type === 'custom' && (
-                                      <span className="text-klaud-muted ml-2 text-xs">
-                                        ({item.hookah} - {item.flavors?.join(', ')})
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
-                                <span className="text-amber-400">{formatCurrency(item.price * item.quantity)}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          
-                          <div className="flex justify-between items-center mt-4 pt-4 border-t border-border">
-                            <span className="font-semibold">Total:</span>
-                            <span className="font-semibold text-amber-400 text-lg">{formatCurrency(order.total)}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="completed" className="mt-0">
-              <div className="space-y-4">
-                {isLoading ? (
-                  <Card className="bg-klaud-card border-border">
-                    <CardContent className="p-6 flex justify-center">
-                      <RefreshCw className="h-8 w-8 animate-spin text-klaud-muted" />
-                    </CardContent>
-                  </Card>
-                ) : completedOrders.length === 0 ? (
-                  <Card className="bg-klaud-card border-border">
-                    <CardContent className="p-6 text-center text-klaud-muted">
-                      No order history available.
-                    </CardContent>
-                  </Card>
-                ) : (
-                  completedOrders.map((order) => (
-                    <Card key={order.orderId} className="bg-klaud-card border-border opacity-75">
-                      <CardContent className="p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="text-lg font-semibold">Order #{order.orderId.split('-')[1]}</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              {renderStatusBadge(order.status)}
-                              <span className="text-klaud-muted text-sm">
-                                {formatDistanceToNow(new Date(order.timestamp), { addSuffix: true })}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="border-t border-border pt-4 mt-4">
-                          <div className="flex justify-between items-center">
-                            <span>{order.items.length} items</span>
-                            <span className="text-amber-400">{formatCurrency(order.total)}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
+    <div className="min-h-screen bg-klaud-dark text-klaud-text">
+      <header className="flex items-center justify-between p-4 border-b border-border">
+        <h1 className="text-2xl font-bold tracking-wider">TURBO ADMIN</h1>
         
-        {/* Sidebar - notifications and stats */}
-        <div className="lg:col-span-1">
-          <Card className="bg-klaud-card border-border">
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {notifications.length}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
               {notifications.length === 0 ? (
-                <p className="text-klaud-muted text-sm">No recent activity</p>
+                <div className="p-4 text-center text-klaud-muted">
+                  No new notifications
+                </div>
               ) : (
-                <div className="space-y-4">
-                  {notifications.slice(0, 5).map((notification) => (
-                    <div key={notification.id} className="border-b border-border pb-3 last:border-0">
-                      <p className="text-sm">
-                        {notification.type === 'new-order' && 'New order received'}
-                        {notification.type === 'status-change' && `Order status changed to ${notification.data.status}`}
-                      </p>
-                      <p className="text-xs text-klaud-muted">
-                        {formatDistanceToNow(new Date(notification.timestamp), { addSuffix: true })}
-                      </p>
-                    </div>
+                <div className="max-h-[400px] overflow-auto">
+                  {notifications.map((notif) => (
+                    <DropdownMenuItem key={notif.id} className="p-3 border-b border-border">
+                      {notif.type === 'new-order' && (
+                        <div>
+                          <p className="font-medium">New Order: {notif.data.orderId}</p>
+                          <p className="text-xs text-klaud-muted">{formatDate(notif.timestamp)}</p>
+                        </div>
+                      )}
+                      {notif.type === 'status-change' && (
+                        <div>
+                          <p className="font-medium">Status Change: {notif.data.orderId}</p>
+                          <p className="text-xs">{notif.data.previousStatus} → {notif.data.status}</p>
+                          <p className="text-xs text-klaud-muted">{formatDate(notif.timestamp)}</p>
+                        </div>
+                      )}
+                    </DropdownMenuItem>
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
-          <Card className="bg-klaud-card border-border mt-6">
-            <CardHeader>
-              <CardTitle>Statistics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-klaud-muted">Pending Orders</span>
-                  <span className="font-semibold">{pendingOrders.length}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-klaud-muted">In Progress</span>
-                  <span className="font-semibold">{confirmedOrders.length}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-klaud-muted">Completed Today</span>
-                  <span className="font-semibold">
-                    {completedOrders.filter(order => {
-                      const today = new Date();
-                      const orderDate = new Date(order.timestamp);
-                      return today.toDateString() === orderDate.toDateString();
-                    }).length}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <Button 
+            variant="ghost" 
+            size="icon"
+            onClick={() => {
+              loadOrders();
+              loadNotifications();
+              toast({
+                title: "Refreshed",
+                description: "Order data has been updated."
+              });
+            }}
+          >
+            <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-6">
+        <Tabs 
+          defaultValue="all" 
+          value={activeTab} 
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <TabsList className="bg-klaud-card">
+              <TabsTrigger value="all">All Orders</TabsTrigger>
+              <TabsTrigger value="pending">Pending</TabsTrigger>
+              <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
+              <TabsTrigger value="preparing">Preparing</TabsTrigger>
+              <TabsTrigger value="ready">Ready</TabsTrigger>
+              <TabsTrigger value="completed">Completed</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value={activeTab} className="mt-0">
+            {isLoading ? (
+              <div className="text-center py-12">
+                <p className="text-klaud-muted">Loading orders...</p>
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-klaud-muted text-lg mb-4">No orders found</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {orders.map((order) => (
+                  <Card key={order.orderId} className="bg-klaud-card border-border">
+                    <CardContent className="p-4">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="font-bold">{order.orderId}</h3>
+                            <span className={`px-2 py-1 text-xs rounded-full text-white ${
+                              statusOptions.find(s => s.value === order.status)?.color || 'bg-gray-500'
+                            }`}>
+                              {order.status}
+                            </span>
+                          </div>
+                          <p className="text-sm text-klaud-muted">
+                            {formatDate(order.timestamp)}
+                          </p>
+                          <p className="font-semibold mt-2">
+                            {order.items.length} items · {order.total} Lei
+                          </p>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-0">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                Update Status <MoreHorizontal className="ml-2 h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {statusOptions.map((status) => (
+                                <DropdownMenuItem 
+                                  key={status.value}
+                                  disabled={order.status === status.value}
+                                  onClick={() => handleStatusChange(order.orderId, status.value)}
+                                >
+                                  Set to {status.label}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              // Show order details in a modal or expand in-place
+                              console.log("Order details:", order);
+                              // This would be better implemented with a modal component
+                              alert(`Order ${order.orderId} contains ${order.items.length} items.`);
+                            }}
+                          >
+                            View Details
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {/* Order Items Summary (could be collapsible) */}
+                      <div className="mt-4 border-t border-border pt-4">
+                        <h4 className="text-sm font-medium mb-2">Items:</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {order.items.map((item, index) => (
+                            <div key={index} className="flex items-center gap-2 text-sm">
+                              <span>• {item.quantity}x</span>
+                              <span className="flex-1">{item.name}</span>
+                              <span className="font-medium">{item.price} Lei</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

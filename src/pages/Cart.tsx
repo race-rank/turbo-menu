@@ -5,12 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { submitOrder } from '@/services/orderService';
-import { useState } from 'react';
 
 const Cart = () => {
   const navigate = useNavigate();
   const { state, removeItem, updateQuantity, clearCart } = useCart();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigateBack = () => {
     navigate('/');
@@ -37,53 +35,39 @@ const Cart = () => {
   };
 
   const handleOrderSubmission = async () => {
-    if (state.items.length === 0) {
-      toast({
-        title: "Cart is empty",
-        description: "Please add items to your cart before submitting an order.",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    
     try {
+      // Generate a simple customer ID for now
+      const customerId = `customer-${Math.random().toString(36).substr(2, 9)}`;
+      
       const orderData = {
         items: state.items,
         total: state.total,
         customerInfo: {
-          id: `customer-${Date.now()}`,
-          // In a real app, these would come from user input or authentication
-          name: 'Anonymous Customer',
-          table: 'Table 1'
+          id: customerId
         }
       };
-
-      const submittedOrder = await submitOrder(orderData);
       
-      // Clear the cart after successful submission
+      await submitOrder(orderData);
+      
       clearCart();
       
-      // Show success message with order ID
       toast({
         title: "Order complete!",
-        description: `Order ${submittedOrder.orderId} is being reviewed. Someone will contact you soon.`,
+        description: "Someone is actively reviewing it.",
         duration: 5000,
       });
-
-      // Navigate back to main page after a short delay
+      
       setTimeout(() => {
         navigate('/');
       }, 2000);
       
     } catch (error) {
+      console.error('Error submitting order:', error);
       toast({
-        title: "Order failed",
-        description: error instanceof Error ? error.message : "Please try again.",
+        title: "Order submission failed",
+        description: "Please try again or contact support.",
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -94,7 +78,7 @@ const Cart = () => {
           <ArrowLeft className="h-6 w-6" />
         </Button>
         
-        <h1 className="text-2xl font-bold tracking-wider">TURBO</h1>
+        <h1 className="text-2xl font-bold tracking-wider">CART</h1>
         
         <div className="w-10" />
       </header>
@@ -175,15 +159,13 @@ const Cart = () => {
                   <Button 
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                     onClick={handleOrderSubmission}
-                    disabled={isSubmitting}
                   >
-                    {isSubmitting ? 'Submitting Order...' : 'Submit Order'}
+                    Submit Order
                   </Button>
                   <Button 
                     variant="outline" 
                     className="w-full"
                     onClick={clearCart}
-                    disabled={isSubmitting}
                   >
                     Clear Cart
                   </Button>

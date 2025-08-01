@@ -71,7 +71,6 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'tim
 
 export const getOrderStatus = async (orderId: string): Promise<OrderDetails> => {
   try {
-    // In development mode, get from localStorage
     if (import.meta.env.DEV) {
       await new Promise(resolve => setTimeout(resolve, 500));
       
@@ -101,7 +100,6 @@ export const getOrderStatus = async (orderId: string): Promise<OrderDetails> => 
 // Admin-facing functions
 export const getAdminOrders = async (status?: string): Promise<{orders: OrderDetails[]}> => {
   try {
-    // In development mode, get from localStorage
     if (import.meta.env.DEV) {
       await new Promise(resolve => setTimeout(resolve, 700));
       
