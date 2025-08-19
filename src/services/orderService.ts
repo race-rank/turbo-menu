@@ -14,7 +14,7 @@ export interface OrderDetails {
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed';
 }
 
-const API_BASE_URL = 'https://turbo-menu-backend-albu-alex-racerank.vercel.app';
+const API_BASE_URL = 'https://turbo-backend-98430741805.europe-west1.run.app';
 
 // Customer-facing functions
 export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'timestamp' | 'status'>): Promise<OrderDetails> => {
