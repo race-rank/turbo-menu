@@ -14,8 +14,7 @@ export interface OrderDetails {
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed';
 }
 
-// API endpoint - using the dev server on port 3001
-const API_BASE_URL = 'https://turbo-menu-backend-i6taj6xns-racerank.vercel.app';
+const API_BASE_URL = 'https://turbo-menu-backend-albu-alex-racerank.vercel.app';
 
 // Customer-facing functions
 export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'timestamp' | 'status'>): Promise<OrderDetails> => {
