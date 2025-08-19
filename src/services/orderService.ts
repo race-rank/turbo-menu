@@ -31,6 +31,7 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'tim
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify(orderData),
     });
@@ -56,7 +57,11 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'tim
 
 export const getOrderStatus = async (orderId: string): Promise<OrderDetails> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/orders/${orderId}`);
+    const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
+      headers: {
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
     
     if (!response.ok) {
       throw new Error(`Failed to get order status: ${response.statusText}`);
@@ -77,7 +82,11 @@ export const getAdminOrders = async (status?: string): Promise<{orders: OrderDet
       ? `${API_BASE_URL}/admin/orders?status=${status}`
       : `${API_BASE_URL}/admin/orders`;
     
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
     
     if (!response.ok) {
       throw new Error(`Failed to get admin orders: ${response.statusText}`);
@@ -98,6 +107,7 @@ export const updateOrderStatus = async (orderId: string, status: string): Promis
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
       },
       body: JSON.stringify({ status }),
     });
@@ -116,7 +126,11 @@ export const updateOrderStatus = async (orderId: string, status: string): Promis
 
 export const getAdminNotifications = async (): Promise<{notifications: any[]}> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/admin/notifications`);
+    const response = await fetch(`${API_BASE_URL}/admin/notifications`, {
+      headers: {
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
     
     if (!response.ok) {
       throw new Error(`Failed to get admin notifications: ${response.statusText}`);
