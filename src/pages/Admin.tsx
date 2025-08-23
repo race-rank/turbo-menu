@@ -17,6 +17,7 @@ import {
   OrderDetails
 } from '@/services/orderService';
 import { toast } from '@/hooks/use-toast';
+import { NavigationSidebar } from '@/components/NavigationSidebar';
 
 const Admin = () => {
   const [orders, setOrders] = useState<OrderDetails[]>([]);
@@ -24,7 +25,6 @@ const Admin = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
 
-  // Status options for the orders
   const statusOptions = [
     { value: 'pending', label: 'Pending', color: 'bg-yellow-500' },
     { value: 'confirmed', label: 'Confirmed', color: 'bg-blue-500' },
@@ -33,7 +33,6 @@ const Admin = () => {
     { value: 'completed', label: 'Completed', color: 'bg-gray-500' }
   ];
 
-  // Function to format date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('en-GB', {
@@ -44,7 +43,6 @@ const Admin = () => {
     }).format(date);
   };
 
-  // Load orders based on active tab
   const loadOrders = async () => {
     setIsLoading(true);
     try {
@@ -63,7 +61,6 @@ const Admin = () => {
     }
   };
 
-  // Load notifications
   const loadNotifications = async () => {
     try {
       const response = await getAdminNotifications();
@@ -73,7 +70,6 @@ const Admin = () => {
     }
   };
 
-  // Handle status change
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
       await updateOrderStatus(orderId, newStatus);
@@ -92,12 +88,10 @@ const Admin = () => {
     }
   };
 
-  // Load initial data
   useEffect(() => {
     loadOrders();
     loadNotifications();
 
-    // Poll for updates every 30 seconds
     const interval = setInterval(() => {
       loadOrders();
       loadNotifications();
@@ -109,6 +103,8 @@ const Admin = () => {
   return (
     <div className="min-h-screen bg-klaud-dark text-klaud-text">
       <header className="flex items-center justify-between p-4 border-b border-border">
+        <NavigationSidebar />
+
         <h1 className="text-2xl font-bold tracking-wider">TURBO ADMIN</h1>
         
         <div className="flex items-center gap-2">

@@ -1,4 +1,3 @@
-// filepath: /Users/alex.albu/Projects/Vite/turbo-menu/src/components/NavigationSidebar.tsx
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -37,7 +36,7 @@ export const NavigationSidebar = () => {
     <>
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetTrigger asChild>
-          <Button variant="outline" size="icon" className="fixed top-4 left-4 z-50">
+          <Button variant="outline" size="icon" className="relative m-4 z-40">
             <Menu className="h-4 w-4" />
           </Button>
         </SheetTrigger>

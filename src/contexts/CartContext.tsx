@@ -7,6 +7,8 @@ export interface CartItem {
   price: number;
   quantity: number;
   image: string;
+  tobaccoType?: 'blond' | 'dark';
+  tobaccoStrength?: number;
   hookah?: string;
   flavors?: string[];
 }
