@@ -1,6 +1,7 @@
 import { ArrowLeft, Minus, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
+import { useOrderTracking } from '@/contexts/OrderTrackingContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
@@ -9,6 +10,7 @@ import { submitOrder } from '@/services/orderService';
 const Cart = () => {
   const navigate = useNavigate();
   const { state, removeItem, updateQuantity, clearCart } = useCart();
+  const { addOrder } = useOrderTracking();
 
   const navigateBack = () => {
     navigate('/');
@@ -47,7 +49,10 @@ const Cart = () => {
         }
       };
       
-      await submitOrder(orderData);
+      const result = await submitOrder(orderData);
+      
+      // Add the order to tracking
+      addOrder(result);
       
       clearCart();
       

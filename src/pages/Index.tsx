@@ -32,12 +32,13 @@ const Index = () => {
   const recommendedMixes = [
     {
       id: 1,
-      name: 'Rich Forest',
+      name: 'Turbo Mix',
       price: 70,
       category: 'Fresh',
       mainImage: hookah1,
       flavors: [appleFlavor, mintFlavor, berryFlavor],
-      bgColor: 'bg-teal-500'
+      bgColor: 'bg-teal-500',
+      promoText: "Oferta Turbo Mix - Daca ghicesti aromele narghilelei, primesti 20% reducere!"
     },
     {
       id: 2,
@@ -292,6 +293,11 @@ const Index = () => {
                     </div>
                     
                     <div className="p-4 space-y-2">
+                      {mix.promoText && (
+                        <div className="bg-primary-100 text-secondary-800 p-2 rounded-md text-xs mb-2">
+                          {mix.promoText}
+                        </div>
+                      )}
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-bold text-turbo-text">{mix.price} Lei</span>
                         <span className="text-sm text-turbo-muted">Category</span>
