@@ -63,11 +63,11 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
-				'klaud-teal': 'hsl(var(--klaud-teal))',
-				'klaud-dark': 'hsl(var(--klaud-dark))',
-				'klaud-card': 'hsl(var(--klaud-card))',
-				'klaud-text': 'hsl(var(--klaud-text))',
-				'klaud-muted': 'hsl(var(--klaud-muted))'
+				'turbo-teal': 'hsl(var(--turbo-teal))',
+				'turbo-dark': 'hsl(var(--turbo-dark))',
+				'turbo-card': 'hsl(var(--turbo-card))',
+				'turbo-text': 'hsl(var(--turbo-text))',
+				'turbo-muted': 'hsl(var(--turbo-muted))'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

@@ -72,9 +72,9 @@ const Cart = () => {
   };
 
   return (
-    <div className="min-h-screen bg-klaud-dark text-klaud-text">
+    <div className="min-h-screen bg-turbo-dark text-turbo-text">
       <header className="flex items-center justify-between p-4 border-b border-border">
-        <Button variant="ghost" size="icon" className="text-klaud-text" onClick={navigateBack}>
+        <Button variant="ghost" size="icon" className="text-turbo-text" onClick={navigateBack}>
           <ArrowLeft className="h-6 w-6" />
         </Button>
         
@@ -86,7 +86,7 @@ const Cart = () => {
       <div className="container mx-auto px-4 py-6">
         {state.items.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-klaud-muted text-lg mb-4">Your cart is empty</p>
+            <p className="text-turbo-muted text-lg mb-4">Your cart is empty</p>
             <Button onClick={navigateBack} className="bg-primary hover:bg-primary/90">
               Start Shopping
             </Button>
@@ -95,7 +95,7 @@ const Cart = () => {
           <div className="space-y-6">
             <div className="space-y-4">
               {state.items.map((item) => (
-                <Card key={item.id} className="bg-klaud-card border-border">
+                <Card key={item.id} className="bg-turbo-card border-border">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
                       <img 
@@ -105,9 +105,9 @@ const Cart = () => {
                       />
                       
                       <div className="flex-1">
-                        <h3 className="font-semibold text-klaud-text">{item.name}</h3>
+                        <h3 className="font-semibold text-turbo-text">{item.name}</h3>
                         {item.type === 'custom' && (
-                          <div className="text-sm text-klaud-muted mt-1">
+                          <div className="text-sm text-turbo-muted mt-1">
                             <p>Hookah: {item.hookah}</p>
                             <p>Flavors: {item.flavors?.join(', ')}</p>
                           </div>
@@ -149,7 +149,7 @@ const Cart = () => {
               ))}
             </div>
 
-            <Card className="bg-klaud-card border-border">
+            <Card className="bg-turbo-card border-border">
               <CardContent className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-lg font-semibold">Total:</span>

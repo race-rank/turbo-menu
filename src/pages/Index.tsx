@@ -60,12 +60,12 @@ const Index = () => {
   ];
 
   const hookahs = [
-    { id: 1, name: 'Maklaud X', price: 70, image: hookah1 },
+    { id: 1, name: 'Maturbo X', price: 70, image: hookah1 },
     { id: 2, name: 'Project Helios', price: 90, image: hookah2 },
-    { id: 3, name: 'Maklaud Odyssey', price: 90, image: hookah3 },
-    { id: 4, name: 'Maklaud Skytech', price: 90, image: hookah1 },
-    { id: 5, name: 'Maklaud Dragon', price: 120, image: hookah2 },
-    { id: 6, name: 'Maklaud Rose', price: 120, image: hookah3 }
+    { id: 3, name: 'Maturbo Odyssey', price: 90, image: hookah3 },
+    { id: 4, name: 'Maturbo Skytech', price: 90, image: hookah1 },
+    { id: 5, name: 'Maturbo Dragon', price: 120, image: hookah2 },
+    { id: 6, name: 'Maturbo Rose', price: 120, image: hookah3 }
   ];
 
   const tobaccoTypes = [
@@ -249,7 +249,7 @@ const Index = () => {
           
           <h1 className="text-2xl font-bold tracking-wider">TURBO</h1>
           
-          <Button variant="ghost" size="icon" className="text-klaud-text relative" onClick={navigateToCart}>
+          <Button variant="ghost" size="icon" className="text-turbo-text relative" onClick={navigateToCart}>
             <ShoppingCart className="h-6 w-6" />
             {cartItemCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -269,7 +269,7 @@ const Index = () => {
             <h2 className="text-xl font-semibold mb-6">Recommended Mixes</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {recommendedMixes.map((mix) => (
-                <Card key={mix.id} className="bg-klaud-card border-border overflow-hidden">
+                <Card key={mix.id} className="bg-turbo-card border-border overflow-hidden">
                   <CardContent className="p-0">
                     <div className={`${mix.bgColor} p-4 text-center relative`}>
                       <img 
@@ -293,11 +293,11 @@ const Index = () => {
                     
                     <div className="p-4 space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-lg font-bold text-klaud-text">{mix.price} Lei</span>
-                        <span className="text-sm text-klaud-muted">Category</span>
+                        <span className="text-lg font-bold text-turbo-text">{mix.price} Lei</span>
+                        <span className="text-sm text-turbo-muted">Category</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-klaud-muted">{mix.category}</span>
+                        <span className="text-sm text-turbo-muted">{mix.category}</span>
                         <Button 
                           size="sm" 
                           className="bg-amber-600 hover:bg-amber-700 text-white"
@@ -319,7 +319,7 @@ const Index = () => {
               {hookahs.sort((a, b) => b.price - a.price).map((hookah) => (
                 <Card 
                   key={hookah.id} 
-                  className={`bg-klaud-card border-border cursor-pointer transition-all ${
+                  className={`bg-turbo-card border-border cursor-pointer transition-all ${
                     selectedHookah === hookah.id ? 'ring-2 ring-primary' : ''
                   }`}
                   onClick={() => setSelectedHookah(hookah.id)}
@@ -330,7 +330,7 @@ const Index = () => {
                       alt={hookah.name}
                       className="w-full h-24 object-cover mx-auto mb-2 rounded"
                     />
-                    <h3 className="text-sm font-medium text-klaud-text mb-1">{hookah.name}</h3>
+                    <h3 className="text-sm font-medium text-turbo-text mb-1">{hookah.name}</h3>
                     <p className="text-lg font-bold text-amber-400">{hookah.price} Lei</p>
                   </CardContent>
                 </Card>
@@ -344,7 +344,7 @@ const Index = () => {
               {tobaccoTypes.map((tobacco) => (
                 <Card 
                   key={tobacco.id} 
-                  className={`bg-klaud-card border-border cursor-pointer transition-all ${
+                  className={`bg-turbo-card border-border cursor-pointer transition-all ${
                     selectedTobaccoType === tobacco.id ? 'ring-2 ring-primary' : ''
                   }`}
                   onClick={() => setSelectedTobaccoType(tobacco.id as 'blond' | 'dark')}
@@ -358,8 +358,8 @@ const Index = () => {
                       />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-klaud-text mb-1">{tobacco.name}</h3>
-                      <p className="text-sm text-klaud-muted">{tobacco.description}</p>
+                      <h3 className="font-semibold text-turbo-text mb-1">{tobacco.name}</h3>
+                      <p className="text-sm text-turbo-muted">{tobacco.description}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -367,7 +367,7 @@ const Index = () => {
             </div>
 
             {selectedTobaccoType && (
-              <div className="mt-6 p-4 bg-klaud-card border border-border rounded-lg">
+              <div className="mt-6 p-4 bg-turbo-card border border-border rounded-lg">
                 <h3 className="font-medium mb-4">Select Tobacco Strength</h3>
                 <div className="space-y-6">
                   <div className="flex items-center justify-between">
@@ -399,18 +399,18 @@ const Index = () => {
             {selectedTobaccoType ? (
               <>
                 <div className="relative mb-6">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-klaud-muted h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-turbo-muted h-4 w-4" />
                   <Input
                     placeholder="Search for flavors here..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-muted border-border text-klaud-text placeholder:text-klaud-muted"
+                    className="pl-10 bg-muted border-border text-turbo-text placeholder:text-turbo-muted"
                   />
                 </div>
 
                 {selectedFlavors.length > 0 ? (
                   <div className="mb-4 flex flex-wrap items-center gap-3">
-                    <p className="text-sm text-klaud-muted">
+                    <p className="text-sm text-turbo-muted">
                       Selected flavors: {selectedFlavors.length}/3
                     </p>
                     <Button 
@@ -425,7 +425,7 @@ const Index = () => {
                   </div>
                 ) : (
                   <div className="mb-4 flex flex-wrap items-center gap-3">
-                    <p className="text-sm text-klaud-muted">
+                    <p className="text-sm text-turbo-muted">
                       Selected flavors: 0/3
                     </p>
                     <Button 
@@ -459,7 +459,7 @@ const Index = () => {
                   {filteredFlavors.map((flavor) => (
                     <Card 
                       key={flavor.id} 
-                      className={`bg-klaud-card border-border cursor-pointer transition-all ${
+                      className={`bg-turbo-card border-border cursor-pointer transition-all ${
                         selectedFlavors.includes(flavor.id) ? 'ring-2 ring-primary' : ''
                       }`}
                       onClick={() => handleFlavorSelect(flavor.id)}
@@ -481,7 +481,7 @@ const Index = () => {
                             </div>
                           )}
                         </div>
-                        <h3 className="text-xs font-medium text-klaud-text">{flavor.name}</h3>
+                        <h3 className="text-xs font-medium text-turbo-text">{flavor.name}</h3>
                         <div className="mt-2">
                           <div className="w-4 h-4 bg-primary rounded-full mx-auto opacity-50" />
                         </div>
@@ -492,33 +492,33 @@ const Index = () => {
               </>
             ) : (
               <div className="py-6 text-center bg-muted/30 rounded-lg">
-                <p className="text-klaud-muted">Please select a tobacco type first</p>
+                <p className="text-turbo-muted">Please select a tobacco type first</p>
               </div>
             )}
           </section>
 
           {(selectedHookah || selectedTobaccoType || selectedFlavors.length > 0) && (
             <section className="mt-8">
-              <Card className="bg-klaud-card border-border">
+              <Card className="bg-turbo-card border-border">
                 <CardContent className="p-6">
                   <h3 className="text-lg font-semibold mb-4">Your Selection</h3>
                   {selectedHookah && (
-                    <p className="text-klaud-muted mb-2">
+                    <p className="text-turbo-muted mb-2">
                       Hookah: {hookahs.find(h => h.id === selectedHookah)?.name}
                     </p>
                   )}
                   {selectedTobaccoType && (
                     <>
-                      <p className="text-klaud-muted mb-2">
+                      <p className="text-turbo-muted mb-2">
                         Tobacco: {tobaccoTypes.find(t => t.id === selectedTobaccoType)?.name}
                       </p>
-                      <p className="text-klaud-muted mb-2">
+                      <p className="text-turbo-muted mb-2">
                         Strength: {tobaccoStrength} - {getStrengthLabel(tobaccoStrength)}
                       </p>
                     </>
                   )}
                   {selectedFlavors.length > 0 && (
-                    <p className="text-klaud-muted mb-4">
+                    <p className="text-turbo-muted mb-4">
                       Flavors: {selectedFlavors.map(id => 
                         currentFlavors.find(f => f.id === id)?.name
                       ).join(', ')}

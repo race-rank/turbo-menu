@@ -8,7 +8,7 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Dark theme design system for Klaud hookah site */
+    /* Dark theme design system for Turbo hookah site */
     --background: 218 27% 8%;
     --foreground: 0 0% 95%;
 
@@ -39,12 +39,12 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
-    /* Custom Klaud colors */
-    --klaud-teal: 186 78% 55%;
-    --klaud-dark: 218 27% 8%;
-    --klaud-card: 218 27% 12%;
-    --klaud-text: 0 0% 95%;
-    --klaud-muted: 0 0% 65%;
+    /* Custom Turbo colors */
+    --turbo-teal: 186 78% 55%;
+    --turbo-dark: 218 27% 8%;
+    --turbo-card: 218 27% 12%;
+    --turbo-text: 0 0% 95%;
+    --turbo-muted: 0 0% 65%;
   }
 }
 
@@ -55,8 +55,8 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    background: hsl(var(--klaud-dark));
-    color: hsl(var(--klaud-text));
+    background: hsl(var(--turbo-dark));
+    color: hsl(var(--turbo-text));
   }
 }
 

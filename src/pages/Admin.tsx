@@ -101,7 +101,7 @@ const Admin = () => {
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-klaud-dark text-klaud-text">
+    <div className="min-h-screen bg-turbo-dark text-turbo-text">
       <header className="flex items-center justify-between p-4 border-b border-border">
         <NavigationSidebar />
 
@@ -122,7 +122,7 @@ const Admin = () => {
             <DropdownMenuContent align="end" className="w-80">
               <DropdownMenuLabel>Notifications</DropdownMenuLabel>
               {notifications.length === 0 ? (
-                <div className="p-4 text-center text-klaud-muted">
+                <div className="p-4 text-center text-turbo-muted">
                   No new notifications
                 </div>
               ) : (
@@ -132,14 +132,14 @@ const Admin = () => {
                       {notif.type === 'new-order' && (
                         <div>
                           <p className="font-medium">New Order: {notif.data.orderId}</p>
-                          <p className="text-xs text-klaud-muted">{formatDate(notif.timestamp)}</p>
+                          <p className="text-xs text-turbo-muted">{formatDate(notif.timestamp)}</p>
                         </div>
                       )}
                       {notif.type === 'status-change' && (
                         <div>
                           <p className="font-medium">Status Change: {notif.data.orderId}</p>
                           <p className="text-xs">{notif.data.previousStatus} → {notif.data.status}</p>
-                          <p className="text-xs text-klaud-muted">{formatDate(notif.timestamp)}</p>
+                          <p className="text-xs text-turbo-muted">{formatDate(notif.timestamp)}</p>
                         </div>
                       )}
                     </DropdownMenuItem>
@@ -174,7 +174,7 @@ const Admin = () => {
           className="w-full"
         >
           <div className="flex items-center justify-between mb-6">
-            <TabsList className="bg-klaud-card">
+            <TabsList className="bg-turbo-card">
               <TabsTrigger value="all">All Orders</TabsTrigger>
               <TabsTrigger value="pending">Pending</TabsTrigger>
               <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
@@ -187,16 +187,16 @@ const Admin = () => {
           <TabsContent value={activeTab} className="mt-0">
             {isLoading ? (
               <div className="text-center py-12">
-                <p className="text-klaud-muted">Loading orders...</p>
+                <p className="text-turbo-muted">Loading orders...</p>
               </div>
             ) : orders.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-klaud-muted text-lg mb-4">No orders found</p>
+                <p className="text-turbo-muted text-lg mb-4">No orders found</p>
               </div>
             ) : (
               <div className="space-y-6">
                 {orders.map((order) => (
-                  <Card key={order.orderId} className="bg-klaud-card border-border">
+                  <Card key={order.orderId} className="bg-turbo-card border-border">
                     <CardContent className="p-4">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
@@ -208,7 +208,7 @@ const Admin = () => {
                               {order.status}
                             </span>
                           </div>
-                          <p className="text-sm text-klaud-muted">
+                          <p className="text-sm text-turbo-muted">
                             {formatDate(order.timestamp)}
                           </p>
                           <p className="font-semibold mt-2">
