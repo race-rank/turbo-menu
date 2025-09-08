@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, ShoppingCart, Trash2, Shuffle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
@@ -31,6 +31,10 @@ const Index = () => {
   const [selectedFlavors, setSelectedFlavors] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isRandomButtonAnimating, setIsRandomButtonAnimating] = useState(false);
+
+  const step1Ref = useRef<HTMLDivElement>(null);
+  const step2Ref = useRef<HTMLDivElement>(null);
+  const step3Ref = useRef<HTMLDivElement>(null);
 
   const recommendedMixes = [
     {
@@ -260,14 +264,25 @@ const Index = () => {
     }
   }, [location.pathname]);
 
+  // Scroll to next step when a step is completed
+  useEffect(() => {
+    if (selectedHookah && step2Ref.current) {
+      step2Ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedHookah]);
+
+  useEffect(() => {
+    if (selectedTobaccoType && step3Ref.current) {
+      step3Ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedTobaccoType]);
+
   return (
     <div className="min-h-screen">
       <StickyHeader>
         <header className="flex items-center justify-between p-1">
           <NavigationSidebar />
-          
           <h1 className="text-2xl font-bold tracking-wider">TURBO</h1>
-          
           <Button variant="ghost" size="icon" className="text-turbo-text relative" onClick={navigateToCart}>
             <ShoppingCart className="h-6 w-6" />
             {cartItemCount > 0 && (
@@ -278,7 +293,6 @@ const Index = () => {
           </Button>
         </header>
       </StickyHeader>
-      
       <main className="container mx-auto px-4 py-6">
         <div className="container mx-auto px-4 py-6 space-y-8">
           <section>
@@ -336,8 +350,7 @@ const Index = () => {
               ))}
             </div>
           </section>
-
-          <section>
+          <section ref={step1Ref}>
             <h2 className="text-xl font-semibold mb-6">Step 1: Choose Hookah</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {hookahs.sort((a, b) => b.price - a.price).map((hookah) => (
@@ -361,8 +374,7 @@ const Index = () => {
               ))}
             </div>
           </section>
-
-          <section>
+          <section ref={step2Ref}>
             <h2 className="text-xl font-semibold mb-6">Step 2: Choose Tobacco Type</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {tobaccoTypes.map((tobacco) => (
@@ -416,8 +428,7 @@ const Index = () => {
               </div>
             )}
           </section>
-
-          <section>
+          <section ref={step3Ref}>
             <h2 className="text-xl font-semibold mb-4">Step 3: Choose up to three flavors</h2>
             
             {selectedTobaccoType ? (
