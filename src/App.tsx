@@ -6,12 +6,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { OrderTrackingProvider } from "@/contexts/OrderTrackingContext";
+import { TableProvider } from '@/contexts/TableContext';
 import { AdminGuard } from "@/components/AdminGuard";
 import { OrderStatusTracker } from "@/components/OrderStatusTracker";
 import Index from "./pages/Index";
 import Cart from "./pages/Cart";
 import Admin from "./pages/Admin";
-import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -21,26 +21,27 @@ const App = () => {
       <TooltipProvider>
         <AuthProvider>
           <CartProvider>
-            <OrderTrackingProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/cart" element={<Cart />} />
-                  <Route 
-                    path="/admin" 
-                    element={
-                      <AdminGuard>
-                        <Admin />
-                      </AdminGuard>
-                    } 
-                  />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-                <OrderStatusTracker />
-              </BrowserRouter>
-            </OrderTrackingProvider>
+            <TableProvider>
+              <OrderTrackingProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <Routes>
+                    <Route path="*" element={<Index />} />
+                    <Route path="/cart" element={<Cart />} />
+                    <Route 
+                      path="/admin" 
+                      element={
+                        <AdminGuard>
+                          <Admin />
+                        </AdminGuard>
+                      } 
+                    />
+                  </Routes>
+                  <OrderStatusTracker />
+                </BrowserRouter>
+              </OrderTrackingProvider>
+            </TableProvider>
           </CartProvider>
         </AuthProvider>
       </TooltipProvider>

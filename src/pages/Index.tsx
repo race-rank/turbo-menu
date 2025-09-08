@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, ShoppingCart, Trash2, Shuffle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
+import { useTable } from '@/contexts/TableContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,6 +23,8 @@ import berryFlavor from '@/assets/berry-flavor.jpg';
 const Index = () => {
   const navigate = useNavigate();
   const { addItem, getItemCount } = useCart();
+  const location = useLocation();
+  const { setTable } = useTable();
   const [selectedHookah, setSelectedHookah] = useState<number | null>(null);
   const [selectedTobaccoType, setSelectedTobaccoType] = useState<'blond' | 'dark' | null>(null);
   const [tobaccoStrength, setTobaccoStrength] = useState<number>(1);
@@ -131,13 +134,16 @@ const Index = () => {
 
   const addMixToCart = (mixId: number) => {
     const mix = recommendedMixes.find(m => m.id === mixId);
-    if (mix) {
+    const tableId = localStorage.getItem('turbo-table');
+    console.log(tableId);
+    if (mix && tableId) {
       addItem({
         id: `mix-${mixId}`,
         type: 'mix',
         name: mix.name,
         price: mix.price,
-        image: mix.mainImage
+        image: mix.mainImage,
+        table: tableId
       });
       
       // Trigger haptic feedback for successful add
@@ -193,7 +199,6 @@ const Index = () => {
   const addCustomMixToCart = () => {
     if (!selectedHookah || !selectedTobaccoType || selectedFlavors.length === 0) {
       errorHaptic();
-      
       toast({
         title: "Incomplete selection",
         description: "Please select a hookah, tobacco type, and at least one flavor.",
@@ -206,7 +211,10 @@ const Index = () => {
       currentFlavors.find(f => f.id === id)?.name
     ).filter(Boolean);
 
-    if (selectedHookahData) {
+    const tableId = localStorage.getItem('turbo-table');
+    console.log(tableId);
+
+    if (selectedHookahData && tableId) {
       addItem({
         id: `custom-${Date.now()}`,
         type: 'custom',
@@ -216,7 +224,8 @@ const Index = () => {
         hookah: selectedHookahData.name,
         tobaccoType: selectedTobaccoType,
         tobaccoStrength: tobaccoStrength,
-        flavors: selectedFlavorNames as string[]
+        flavors: selectedFlavorNames as string[],
+        table: tableId
       });
       
       successHaptic();
@@ -242,6 +251,15 @@ const Index = () => {
     setSelectedFlavors([]);
   };
   
+  useEffect(() => {
+    if (location.pathname.includes('table-') || location.pathname.includes('bar')) {
+      setTable(location.pathname);
+      localStorage.setItem('turbo-table', location.pathname);
+    } else {
+      localStorage.setItem('turbo-table', '');
+    }
+  }, [location.pathname]);
+
   return (
     <div className="min-h-screen">
       <StickyHeader>
