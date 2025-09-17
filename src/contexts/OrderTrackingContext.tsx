@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { OrderDetails, getOrderStatus } from '@/services/orderService';
+import { OrderDetails } from '@/services/orderService';
+import { subscribeToOrders } from '@/services/firebaseService';
 import { CartItem } from '@/contexts/CartContext';
 
 interface ActiveOrder {
@@ -33,12 +34,10 @@ export const useOrderTracking = () => {
 
 interface OrderTrackingProviderProps {
   children: ReactNode;
-  pollingInterval?: number;
 }
 
 export const OrderTrackingProvider: React.FC<OrderTrackingProviderProps> = ({ 
-  children, 
-  pollingInterval = 30000 // Default poll every 30 seconds
+  children
 }) => {
   const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>([]);
   
@@ -55,60 +54,41 @@ export const OrderTrackingProvider: React.FC<OrderTrackingProviderProps> = ({
     }
   }, []);
 
-  // Save active orders to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('turboActiveOrders', JSON.stringify(activeOrders));
   }, [activeOrders]);
 
-  // Poll for updates on active orders
   useEffect(() => {
     if (activeOrders.length === 0) return;
 
-    const updateOrderStatuses = async () => {
-      const updatedOrders = [...activeOrders];
-      let hasChanges = false;
-
-      for (let i = 0; i < updatedOrders.length; i++) {
-        try {
-          const orderDetails = await getOrderStatus(updatedOrders[i].orderId);
-          
-          // If status changed or order is complete, update it
-          if (orderDetails.status !== updatedOrders[i].status) {
-            updatedOrders[i] = {
-              orderId: orderDetails.orderId,
-              status: orderDetails.status,
-              timestamp: orderDetails.timestamp,
-              items: orderDetails.items,
-              total: orderDetails.total,
-              customerInfo: orderDetails.customerInfo
+    const unsubscribe = subscribeToOrders((updatedOrders) => {
+      setActiveOrders(prevOrders => {
+        return prevOrders.map(prevOrder => {
+          const updatedOrder = updatedOrders.find(order => order.orderId === prevOrder.orderId);
+          if (updatedOrder) {
+            return {
+              orderId: updatedOrder.orderId,
+              status: updatedOrder.status,
+              timestamp: updatedOrder.timestamp.toISOString(),
+              items: updatedOrder.items as CartItem[],
+              total: updatedOrder.total,
+              customerInfo: updatedOrder.customerInfo
             };
-            hasChanges = true;
           }
-          
-          // Remove completed orders after 2 minutes
-          if (orderDetails.status === 'completed') {
-            const completionTime = new Date(orderDetails.timestamp).getTime();
+          return prevOrder;
+        }).filter(order => {
+          if (order.status === 'completed') {
+            const completionTime = new Date(order.timestamp).getTime();
             const currentTime = new Date().getTime();
-            
-            if ((currentTime - completionTime) > 2 * 60 * 1000) {
-              updatedOrders.splice(i, 1);
-              i--; // Adjust index after removal
-              hasChanges = true;
-            }
+            return (currentTime - completionTime) <= 2 * 60 * 1000;
           }
-        } catch (error) {
-          console.error(`Failed to update status for order ${updatedOrders[i].orderId}`, error);
-        }
-      }
+          return true;
+        });
+      });
+    });
 
-      if (hasChanges) {
-        setActiveOrders(updatedOrders);
-      }
-    };
-
-    const intervalId = setInterval(updateOrderStatuses, pollingInterval);
-    return () => clearInterval(intervalId);
-  }, [activeOrders, pollingInterval]);
+    return () => unsubscribe();
+  }, [activeOrders.map(o => o.orderId).join(',')]);
 
   const addOrder = (order: OrderDetails) => {
     setActiveOrders(prev => [

@@ -33,14 +33,20 @@ const Admin = () => {
     { value: 'completed', label: 'Completed', color: 'bg-gray-500' }
   ];
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch (error) {
+      return 'N/A';
+    }
   };
 
   const loadOrders = async () => {
@@ -131,15 +137,15 @@ const Admin = () => {
                     <DropdownMenuItem key={notif.id} className="p-3 border-b border-border">
                       {notif.type === 'new-order' && (
                         <div>
-                          <p className="font-medium">New Order: {notif.data.orderId}</p>
-                          <p className="text-xs text-turbo-muted">{formatDate(notif.timestamp)}</p>
+                          <p className="font-medium">New Order: {notif.data?.orderId || 'Unknown'}</p>
+                          <p className="text-xs text-turbo-muted">{formatDate(notif.createdAt)}</p>
                         </div>
                       )}
                       {notif.type === 'status-change' && (
                         <div>
-                          <p className="font-medium">Status Change: {notif.data.orderId}</p>
-                          <p className="text-xs">{notif.data.previousStatus} → {notif.data.status}</p>
-                          <p className="text-xs text-turbo-muted">{formatDate(notif.timestamp)}</p>
+                          <p className="font-medium">Status Change: {notif.data?.orderId || 'Unknown'}</p>
+                          <p className="text-xs">{notif.data?.previousStatus || 'Unknown'} → {notif.data?.status || 'Unknown'}</p>
+                          <p className="text-xs text-turbo-muted">{formatDate(notif.createdAt)}</p>
                         </div>
                       )}
                     </DropdownMenuItem>
@@ -209,8 +215,13 @@ const Admin = () => {
                             </span>
                           </div>
                           <p className="text-sm text-turbo-muted">
-                            {formatDate(order.timestamp)}
+                            Created: {formatDate(new Date().toISOString())}
                           </p>
+                          {order.table && (
+                            <p className="text-sm text-turbo-muted">
+                              Table: {order.table}
+                            </p>
+                          )}
                           <p className="font-semibold mt-2">
                             {order.items.length} items · {order.total} Lei
                           </p>
@@ -257,7 +268,7 @@ const Admin = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                           {order.items.map((item, index) => (
                             <div key={index} className="flex items-center gap-2 text-sm">
-                              <span>• {item.quantity}x</span>
+                              <span>• 1x</span>
                               <span className="flex-1">{item.name}</span>
                               <span className="font-medium">{item.price} Lei</span>
                             </div>

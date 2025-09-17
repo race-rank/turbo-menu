@@ -38,12 +38,13 @@ const Cart = () => {
 
   const handleOrderSubmission = async () => {
     try {
-      // Generate a simple customer ID for now
       const customerId = `customer-${Math.random().toString(36).substr(2, 9)}`;
+      const tableId = localStorage.getItem('turbo-table') || '';
       
       const orderData = {
         items: state.items,
         total: state.total,
+        table: tableId,
         customerInfo: {
           id: customerId
         }
