@@ -256,12 +256,14 @@ const Index = () => {
   };
   
   useEffect(() => {
-    if (location.pathname.includes('table-') || location.pathname.includes('bar')) {
-      setTable(location.pathname);
-      localStorage.setItem('turbo-table', location.pathname);
-    } else {
-      localStorage.setItem('turbo-table', '');
-    }
+    // temporary fix
+    localStorage.setItem('turbo-table', 'table-2');
+    // if (location.pathname.includes('table-') || location.pathname.includes('bar')) {
+    //   setTable(location.pathname);
+    //   localStorage.setItem('turbo-table', location.pathname);
+    // } else {
+    //   localStorage.setItem('turbo-table', '');
+    // }
   }, [location.pathname]);
 
   // Scroll to next step when a step is completed
