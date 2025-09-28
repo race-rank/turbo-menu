@@ -1,13 +1,13 @@
 {
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
-      "routes": [
-        {
-          "src": "/(.*)",
-          "dest": "/index.html"
-        }
-      ],
       "headers": [
         {
           "key": "Access-Control-Allow-Credentials",
