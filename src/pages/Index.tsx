@@ -81,13 +81,13 @@ const Index = () => {
       id: 'blond', 
       name: 'Blond Tobacco', 
       description: 'Lighter, smoother smoke with vibrant flavor profiles',
-      image: appleFlavor // Reusing existing image for now
+      image: appleFlavor
     },
     { 
       id: 'dark', 
       name: 'Dark Tobacco', 
       description: 'Stronger, richer smoke with intense flavor notes',
-      image: berryFlavor // Reusing existing image for now
+      image: berryFlavor
     }
   ];
 
@@ -257,13 +257,13 @@ const Index = () => {
   
   useEffect(() => {
     // temporary fix
-    localStorage.setItem('turbo-table', 'table-2');
-    // if (location.pathname.includes('table-') || location.pathname.includes('bar')) {
-    //   setTable(location.pathname);
-    //   localStorage.setItem('turbo-table', location.pathname);
-    // } else {
-    //   localStorage.setItem('turbo-table', '');
-    // }
+    // localStorage.setItem('turbo-table', 'table-2');
+    if (location.pathname.includes('table-') || location.pathname.includes('bar')) {
+      setTable(location.pathname);
+      localStorage.setItem('turbo-table', location.pathname);
+    } else {
+      localStorage.setItem('turbo-table', '');
+    }
   }, [location.pathname]);
 
   // Scroll to next step when a step is completed
