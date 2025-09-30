@@ -58,7 +58,7 @@ const MenuManagement = () => {
 
   const [hookahForm, setHookahForm] = useState({
     name: '',
-    price: 0,
+    price: '',
     image: '',
     isActive: true
   });
@@ -68,7 +68,7 @@ const MenuManagement = () => {
     description: '',
     type: 'blond' as 'blond' | 'dark',
     image: '',
-    strengthRange: { min: 1, max: 5 },
+    strengthRange: { min: '', max: '' },
     isActive: true
   });
 
@@ -81,7 +81,7 @@ const MenuManagement = () => {
 
   const [mixForm, setMixForm] = useState({
     name: '',
-    price: 0,
+    price: '',
     category: '',
     mainImage: '',
     flavorImages: [''],
@@ -125,7 +125,7 @@ const MenuManagement = () => {
     setEditingHookah(hookah);
     setHookahForm({
       name: hookah.name,
-      price: hookah.price,
+      price: hookah.price.toString(),
       image: hookah.image,
       isActive: hookah.isActive
     });
@@ -139,7 +139,10 @@ const MenuManagement = () => {
       description: tobacco.description,
       type: tobacco.type,
       image: tobacco.image,
-      strengthRange: tobacco.strengthRange,
+      strengthRange: { 
+        min: tobacco.strengthRange.min.toString(), 
+        max: tobacco.strengthRange.max.toString() 
+      },
       isActive: tobacco.isActive
     });
     setIsTobaccoModalOpen(true);
@@ -160,7 +163,7 @@ const MenuManagement = () => {
     setEditingMix(mix);
     setMixForm({
       name: mix.name,
-      price: mix.price,
+      price: mix.price.toString(),
       category: mix.category,
       mainImage: mix.mainImage,
       flavorImages: mix.flavorImages,
@@ -173,14 +176,19 @@ const MenuManagement = () => {
 
   const handleCreateHookah = async () => {
     try {
+      const formData = {
+        ...hookahForm,
+        price: Number(hookahForm.price) || 0
+      };
+
       if (editingHookah) {
-        await updateHookah(editingHookah.id, hookahForm);
+        await updateHookah(editingHookah.id, formData);
         toast({
           title: "Success",
           description: "Hookah updated successfully!"
         });
       } else {
-        await createHookah(hookahForm);
+        await createHookah(formData);
         toast({
           title: "Success",
           description: "Hookah created successfully!"
@@ -188,7 +196,7 @@ const MenuManagement = () => {
       }
       setIsHookahModalOpen(false);
       setEditingHookah(null);
-      setHookahForm({ name: '', price: 0, image: '', isActive: true });
+      setHookahForm({ name: '', price: '', image: '', isActive: true });
       loadMenuData();
     } catch (error) {
       toast({
@@ -201,14 +209,22 @@ const MenuManagement = () => {
 
   const handleCreateTobacco = async () => {
     try {
+      const formData = {
+        ...tobaccoForm,
+        strengthRange: {
+          min: Number(tobaccoForm.strengthRange.min) || 1,
+          max: Number(tobaccoForm.strengthRange.max) || 5
+        }
+      };
+
       if (editingTobacco) {
-        await updateTobaccoType(editingTobacco.id, tobaccoForm);
+        await updateTobaccoType(editingTobacco.id, formData);
         toast({
           title: "Success",
           description: "Tobacco type updated successfully!"
         });
       } else {
-        await createTobaccoType(tobaccoForm);
+        await createTobaccoType(formData);
         toast({
           title: "Success",
           description: "Tobacco type created successfully!"
@@ -221,7 +237,7 @@ const MenuManagement = () => {
         description: '',
         type: 'blond',
         image: '',
-        strengthRange: { min: 1, max: 5 },
+        strengthRange: { min: '', max: '' },
         isActive: true
       });
       loadMenuData();
@@ -269,14 +285,19 @@ const MenuManagement = () => {
 
   const handleCreateMix = async () => {
     try {
+      const formData = {
+        ...mixForm,
+        price: Number(mixForm.price) || 0
+      };
+
       if (editingMix) {
-        await updateRecommendedMix(editingMix.id, mixForm);
+        await updateRecommendedMix(editingMix.id, formData);
         toast({
           title: "Success",
           description: "Recommended mix updated successfully!"
         });
       } else {
-        await createRecommendedMix(mixForm);
+        await createRecommendedMix(formData);
         toast({
           title: "Success",
           description: "Recommended mix created successfully!"
@@ -286,7 +307,7 @@ const MenuManagement = () => {
       setEditingMix(null);
       setMixForm({
         name: '',
-        price: 0,
+        price: '',
         category: '',
         mainImage: '',
         flavorImages: [''],
@@ -583,6 +604,7 @@ const MenuManagement = () => {
         </Tabs>
       </div>
 
+      {/* Hookah Modal */}
       <Dialog open={isHookahModalOpen} onOpenChange={(open) => {
         setIsHookahModalOpen(open);
         if (!open) resetModals();
@@ -606,7 +628,8 @@ const MenuManagement = () => {
                 id="hookah-price"
                 type="number"
                 value={hookahForm.price}
-                onChange={(e) => setHookahForm({...hookahForm, price: Number(e.target.value)})}
+                onChange={(e) => setHookahForm({...hookahForm, price: e.target.value})}
+                placeholder="Enter price"
               />
             </div>
             <div>
@@ -698,8 +721,9 @@ const MenuManagement = () => {
                   value={tobaccoForm.strengthRange.min}
                   onChange={(e) => setTobaccoForm({
                     ...tobaccoForm, 
-                    strengthRange: {...tobaccoForm.strengthRange, min: Number(e.target.value)}
+                    strengthRange: {...tobaccoForm.strengthRange, min: e.target.value}
                   })}
+                  placeholder="Min strength"
                 />
               </div>
               <div>
@@ -712,8 +736,9 @@ const MenuManagement = () => {
                   value={tobaccoForm.strengthRange.max}
                   onChange={(e) => setTobaccoForm({
                     ...tobaccoForm, 
-                    strengthRange: {...tobaccoForm.strengthRange, max: Number(e.target.value)}
+                    strengthRange: {...tobaccoForm.strengthRange, max: e.target.value}
                   })}
+                  placeholder="Max strength"
                 />
               </div>
             </div>
@@ -855,7 +880,8 @@ const MenuManagement = () => {
                   id="mix-price"
                   type="number"
                   value={mixForm.price}
-                  onChange={(e) => setMixForm({...mixForm, price: Number(e.target.value)})}
+                  onChange={(e) => setMixForm({...mixForm, price: e.target.value})}
+                  placeholder="Enter price"
                 />
               </div>
             </div>
