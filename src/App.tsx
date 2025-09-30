@@ -12,6 +12,7 @@ import { OrderStatusTracker } from "@/components/OrderStatusTracker";
 import Index from "./pages/Index";
 import Cart from "./pages/Cart";
 import Admin from "./pages/Admin";
+import MenuManagement from "./pages/MenuManagement";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +35,14 @@ const App = () => {
                       element={
                         <AdminGuard>
                           <Admin />
+                        </AdminGuard>
+                      } 
+                    />
+                    <Route 
+                      path="/menu-management" 
+                      element={
+                        <AdminGuard>
+                          <MenuManagement />
                         </AdminGuard>
                       } 
                     />

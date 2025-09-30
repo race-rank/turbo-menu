@@ -66,3 +66,52 @@ export interface DatabaseNotification {
   createdAt: Date;
   orderId?: string;
 }
+
+export interface DatabaseHookah {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DatabaseTobaccoType {
+  id: string;
+  name: string;
+  description: string;
+  type: 'blond' | 'dark';
+  image: string;
+  strengthRange: {
+    min: number;
+    max: number;
+  };
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DatabaseFlavor {
+  id: string;
+  name: string;
+  image: string;
+  compatibleTobaccoTypes: ('blond' | 'dark')[];
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DatabaseRecommendedMix {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  mainImage: string;
+  flavorImages: string[];
+  bgColor: string;
+  promoText?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}

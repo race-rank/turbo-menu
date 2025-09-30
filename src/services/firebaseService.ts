@@ -3,7 +3,6 @@ import {
   doc,
   addDoc,
   updateDoc,
-  deleteDoc,
   getDoc,
   getDocs,
   query,
@@ -24,7 +23,7 @@ const COLLECTIONS = {
   SESSIONS: 'sessions'
 } as const;
 
-const cleanObject = (obj: any): any => {
+export const cleanObject = (obj: any): any => {
   if (obj === null || obj === undefined) return null;
   if (Array.isArray(obj)) return obj.map(cleanObject);
   if (typeof obj === 'object') {
@@ -39,7 +38,7 @@ const cleanObject = (obj: any): any => {
   return obj;
 };
 
-const safeConvertTimestamp = (timestamp: any): Date => {
+export const safeConvertTimestamp = (timestamp: any): Date => {
   if (!timestamp) return new Date();
   if (timestamp instanceof Date) return timestamp;
   if (timestamp.toDate && typeof timestamp.toDate === 'function') {

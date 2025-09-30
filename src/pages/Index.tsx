@@ -12,118 +12,69 @@ import { NavigationSidebar } from '@/components/NavigationSidebar';
 import { WelcomeHeader } from '@/components/WelcomeHeader';
 import { successHaptic, errorHaptic } from '@/utils/haptics';
 import { Slider } from "@/components/ui/slider";
-
-import hookah1 from '@/assets/hookah-1.jpg';
-import hookah2 from '@/assets/hookah-2.jpg';
-import hookah3 from '@/assets/hookah-3.jpg';
-import appleFlavor from '@/assets/apple-flavor.jpg';
-import mintFlavor from '@/assets/mint-flavor.jpg';
-import berryFlavor from '@/assets/berry-flavor.jpg';
+import { getHookahs, getTobaccoTypes, getFlavors, getRecommendedMixes } from '@/services/menuService';
+import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 
 const Index = () => {
   const navigate = useNavigate();
   const { addItem, getItemCount } = useCart();
   const location = useLocation();
   const { setTable } = useTable();
-  const [selectedHookah, setSelectedHookah] = useState<number | null>(null);
+  const [selectedHookah, setSelectedHookah] = useState<string | null>(null);
   const [selectedTobaccoType, setSelectedTobaccoType] = useState<'blond' | 'dark' | null>(null);
   const [tobaccoStrength, setTobaccoStrength] = useState<number>(1);
-  const [selectedFlavors, setSelectedFlavors] = useState<number[]>([]);
+  const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isRandomButtonAnimating, setIsRandomButtonAnimating] = useState(false);
+  const [hookahs, setHookahs] = useState<DatabaseHookah[]>([]);
+  const [tobaccoTypes, setTobaccoTypes] = useState<DatabaseTobaccoType[]>([]);
+  const [flavors, setFlavors] = useState<DatabaseFlavor[]>([]);
+  const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const step1Ref = useRef<HTMLDivElement>(null);
   const step2Ref = useRef<HTMLDivElement>(null);
   const step3Ref = useRef<HTMLDivElement>(null);
 
-  const recommendedMixes = [
-    {
-      id: 1,
-      name: 'Turbo Mix',
-      price: 70,
-      category: 'Fresh',
-      mainImage: hookah1,
-      flavors: [appleFlavor, mintFlavor, berryFlavor],
-      bgColor: 'bg-teal-500',
-      promoText: "Oferta Turbo Mix - Daca ghicesti aromele narghilelei, primesti 20% reducere!"
-    },
-    {
-      id: 2,
-      name: 'Balkan Mix',
-      price: 70,
-      category: 'Fresh',
-      mainImage: hookah2,
-      flavors: [mintFlavor, appleFlavor, berryFlavor],
-      bgColor: 'bg-teal-500'
-    },
-    {
-      id: 3,
-      name: 'Cactus Blast',
-      price: 70,
-      category: 'Fresh',
-      mainImage: hookah3,
-      flavors: [berryFlavor, mintFlavor, appleFlavor],
-      bgColor: 'bg-teal-500'
-    }
-  ];
+  useEffect(() => {
+    const loadMenuData = async () => {
+      try {
+        setIsLoading(true);
+        const [hookahsData, tobaccoData, flavorsData, mixesData] = await Promise.all([
+          getHookahs(),
+          getTobaccoTypes(),
+          getFlavors(),
+          getRecommendedMixes()
+        ]);
+        
+        setHookahs(hookahsData);
+        setTobaccoTypes(tobaccoData);
+        setFlavors(flavorsData);
+        setRecommendedMixes(mixesData);
+      } catch (error) {
+        console.error('Error loading menu data:', error);
+        toast({
+          title: "Error loading menu",
+          description: "Failed to load menu data. Please refresh the page.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const hookahs = [
-    { id: 1, name: 'Maturbo X', price: 70, image: hookah1 },
-    { id: 2, name: 'Project Helios', price: 90, image: hookah2 },
-    { id: 3, name: 'Maturbo Odyssey', price: 90, image: hookah3 },
-    { id: 4, name: 'Maturbo Skytech', price: 90, image: hookah1 },
-    { id: 5, name: 'Maturbo Dragon', price: 120, image: hookah2 },
-    { id: 6, name: 'Maturbo Rose', price: 120, image: hookah3 }
-  ];
+    loadMenuData();
+  }, []);
 
-  const tobaccoTypes = [
-    { 
-      id: 'blond', 
-      name: 'Blond Tobacco', 
-      description: 'Lighter, smoother smoke with vibrant flavor profiles',
-      image: appleFlavor
-    },
-    { 
-      id: 'dark', 
-      name: 'Dark Tobacco', 
-      description: 'Stronger, richer smoke with intense flavor notes',
-      image: berryFlavor
-    }
-  ];
-
-  // Flavors organized by tobacco type
-  const flavorsByType = {
-    blond: [
-      { id: 1, name: 'Aloe Drink', image: appleFlavor },
-      { id: 2, name: 'American Beer', image: berryFlavor },
-      { id: 3, name: 'Ananas Shock', image: mintFlavor },
-      { id: 4, name: 'Aperol Spritz', image: appleFlavor },
-      { id: 5, name: 'Apple Hook', image: appleFlavor },
-      { id: 6, name: 'Apple Shock', image: appleFlavor },
-      { id: 9, name: 'Banana Milkshake', image: berryFlavor },
-      { id: 12, name: 'Basil Blast', image: mintFlavor },
-      { id: 14, name: 'Bubble Gum', image: mintFlavor },
-      { id: 16, name: 'Coconut', image: appleFlavor },
-    ],
-    dark: [
-      { id: 7, name: 'Apple Squirt', image: appleFlavor },
-      { id: 8, name: 'Banana', image: berryFlavor },
-      { id: 10, name: 'Banana Way', image: berryFlavor },
-      { id: 11, name: 'Barberry Shock', image: berryFlavor },
-      { id: 13, name: 'Blueberry', image: berryFlavor },
-      { id: 15, name: 'Cherry', image: berryFlavor },
-      { id: 17, name: 'Cola', image: berryFlavor },
-      { id: 18, name: 'Grape', image: berryFlavor }
-    ]
-  };
-
-  const currentFlavors = selectedTobaccoType ? flavorsByType[selectedTobaccoType] : [];
+  const currentFlavors = selectedTobaccoType 
+    ? flavors.filter(flavor => flavor.compatibleTobaccoTypes.includes(selectedTobaccoType))
+    : [];
 
   const filteredFlavors = currentFlavors.filter(flavor =>
     flavor.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleFlavorSelect = (flavorId: number) => {
+  const handleFlavorSelect = (flavorId: string) => {
     if (selectedFlavors.includes(flavorId)) {
       setSelectedFlavors(prev => prev.filter(id => id !== flavorId));
     } else if (selectedFlavors.length < 3) {
@@ -136,10 +87,10 @@ const Index = () => {
     }
   };
 
-  const addMixToCart = (mixId: number) => {
+  const addMixToCart = (mixId: string) => {
     const mix = recommendedMixes.find(m => m.id === mixId);
     const tableId = localStorage.getItem('turbo-table');
-    console.log(tableId);
+    
     if (mix && tableId) {
       addItem({
         id: `mix-${mixId}`,
@@ -150,7 +101,6 @@ const Index = () => {
         table: tableId
       });
       
-      // Trigger haptic feedback for successful add
       successHaptic();
       
       toast({
@@ -171,7 +121,7 @@ const Index = () => {
     
     setIsRandomButtonAnimating(true);
     
-    const availableFlavors = flavorsByType[selectedTobaccoType];
+    const availableFlavors = flavors.filter(flavor => flavor.compatibleTobaccoTypes.includes(selectedTobaccoType));
     const shuffled = [...availableFlavors].sort(() => 0.5 - Math.random());
     const randomThree = shuffled.slice(0, Math.min(3, shuffled.length)).map(flavor => flavor.id);
     setSelectedFlavors(randomThree);
@@ -216,7 +166,6 @@ const Index = () => {
     ).filter(Boolean);
 
     const tableId = localStorage.getItem('turbo-table');
-    console.log(tableId);
 
     if (selectedHookahData && tableId) {
       addItem({
@@ -256,8 +205,6 @@ const Index = () => {
   };
   
   useEffect(() => {
-    // temporary fix
-    // localStorage.setItem('turbo-table', 'table-2');
     if (location.pathname.includes('table-') || location.pathname.includes('bar')) {
       setTable(location.pathname);
       localStorage.setItem('turbo-table', location.pathname);
@@ -266,7 +213,6 @@ const Index = () => {
     }
   }, [location.pathname]);
 
-  // Scroll to next step when a step is completed
   useEffect(() => {
     if (selectedHookah && step2Ref.current) {
       step2Ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -278,6 +224,14 @@ const Index = () => {
       step3Ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [selectedTobaccoType]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-lg">Loading menu...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">
@@ -315,7 +269,7 @@ const Index = () => {
                       <h3 className="text-white font-semibold mt-2">{mix.name}</h3>
                       
                       <div className="flex justify-center gap-1 mt-2">
-                        {mix.flavors.map((flavor, index) => (
+                        {mix.flavorImages.map((flavor, index) => (
                           <img 
                             key={index}
                             src={flavor}
@@ -355,7 +309,7 @@ const Index = () => {
           <section ref={step1Ref}>
             <h2 className="text-xl font-semibold mb-6">Step 1: Choose Hookah</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {hookahs.sort((a, b) => b.price - a.price).map((hookah) => (
+              {hookahs.map((hookah) => (
                 <Card 
                   key={hookah.id} 
                   className={`bg-turbo-card border-border cursor-pointer transition-all ${
@@ -383,9 +337,9 @@ const Index = () => {
                 <Card 
                   key={tobacco.id} 
                   className={`bg-turbo-card border-border cursor-pointer transition-all ${
-                    selectedTobaccoType === tobacco.id ? 'ring-2 ring-primary' : ''
+                    selectedTobaccoType === tobacco.type ? 'ring-2 ring-primary' : ''
                   }`}
-                  onClick={() => setSelectedTobaccoType(tobacco.id as 'blond' | 'dark')}
+                  onClick={() => setSelectedTobaccoType(tobacco.type)}
                 >
                   <CardContent className="p-4 flex items-center gap-4">
                     <div className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0">
@@ -415,16 +369,16 @@ const Index = () => {
                   
                   <Slider
                     value={[tobaccoStrength]}
-                    min={selectedTobaccoType === 'blond' ? 1 : 6}
-                    max={selectedTobaccoType === 'blond' ? 5 : 10}
+                    min={tobaccoTypes.find(t => t.type === selectedTobaccoType)?.strengthRange.min || 1}
+                    max={tobaccoTypes.find(t => t.type === selectedTobaccoType)?.strengthRange.max || 5}
                     step={1}
                     onValueChange={(value) => setTobaccoStrength(value[0])}
                     className="w-full"
                   />
                   
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{selectedTobaccoType === 'blond' ? 'Mild' : 'Medium'}</span>
-                    <span>{selectedTobaccoType === 'blond' ? 'Medium' : 'Strong'}</span>
+                    <span>Mild</span>
+                    <span>Strong</span>
                   </div>
                 </div>
               </div>
