@@ -182,6 +182,96 @@ export const getRecommendedMixes = async (): Promise<DatabaseRecommendedMix[]> =
   }
 };
 
+// Update operations
+export const updateHookah = async (id: string, updates: Partial<DatabaseHookah>) => {
+  try {
+    const hookahRef = doc(firestore, MENU_COLLECTIONS.HOOKAHS, id);
+    await updateDoc(hookahRef, {
+      ...cleanObject(updates),
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating hookah:', error);
+    throw error;
+  }
+};
+
+export const updateTobaccoType = async (id: string, updates: Partial<DatabaseTobaccoType>) => {
+  try {
+    const tobaccoRef = doc(firestore, MENU_COLLECTIONS.TOBACCO_TYPES, id);
+    await updateDoc(tobaccoRef, {
+      ...cleanObject(updates),
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating tobacco type:', error);
+    throw error;
+  }
+};
+
+export const updateFlavor = async (id: string, updates: Partial<DatabaseFlavor>) => {
+  try {
+    const flavorRef = doc(firestore, MENU_COLLECTIONS.FLAVORS, id);
+    await updateDoc(flavorRef, {
+      ...cleanObject(updates),
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating flavor:', error);
+    throw error;
+  }
+};
+
+export const updateRecommendedMix = async (id: string, updates: Partial<DatabaseRecommendedMix>) => {
+  try {
+    const mixRef = doc(firestore, MENU_COLLECTIONS.RECOMMENDED_MIXES, id);
+    await updateDoc(mixRef, {
+      ...cleanObject(updates),
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating recommended mix:', error);
+    throw error;
+  }
+};
+
+// Delete operations (soft delete by setting isActive to false)
+export const deleteHookah = async (id: string) => {
+  try {
+    await updateHookah(id, { isActive: false });
+  } catch (error) {
+    console.error('Error deleting hookah:', error);
+    throw error;
+  }
+};
+
+export const deleteTobaccoType = async (id: string) => {
+  try {
+    await updateTobaccoType(id, { isActive: false });
+  } catch (error) {
+    console.error('Error deleting tobacco type:', error);
+    throw error;
+  }
+};
+
+export const deleteFlavor = async (id: string) => {
+  try {
+    await updateFlavor(id, { isActive: false });
+  } catch (error) {
+    console.error('Error deleting flavor:', error);
+    throw error;
+  }
+};
+
+export const deleteRecommendedMix = async (id: string) => {
+  try {
+    await updateRecommendedMix(id, { isActive: false });
+  } catch (error) {
+    console.error('Error deleting recommended mix:', error);
+    throw error;
+  }
+};
+
 // Real-time subscriptions
 export const subscribeToMenuData = (
   onHookahsChange: (hookahs: DatabaseHookah[]) => void,

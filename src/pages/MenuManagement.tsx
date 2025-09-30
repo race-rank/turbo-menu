@@ -23,7 +23,15 @@ import {
   createHookah,
   createTobaccoType,
   createFlavor,
-  createRecommendedMix
+  createRecommendedMix,
+  updateHookah,
+  updateTobaccoType,
+  updateFlavor,
+  updateRecommendedMix,
+  deleteHookah,
+  deleteTobaccoType,
+  deleteFlavor,
+  deleteRecommendedMix
 } from '@/services/menuService';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -82,6 +90,11 @@ const MenuManagement = () => {
     isActive: true
   });
 
+  const [editingHookah, setEditingHookah] = useState<DatabaseHookah | null>(null);
+  const [editingTobacco, setEditingTobacco] = useState<DatabaseTobaccoType | null>(null);
+  const [editingFlavor, setEditingFlavor] = useState<DatabaseFlavor | null>(null);
+  const [editingMix, setEditingMix] = useState<DatabaseRecommendedMix | null>(null);
+
   const loadMenuData = async () => {
     try {
       setIsLoading(true);
@@ -108,20 +121,79 @@ const MenuManagement = () => {
     }
   };
 
+  const handleEditHookah = (hookah: DatabaseHookah) => {
+    setEditingHookah(hookah);
+    setHookahForm({
+      name: hookah.name,
+      price: hookah.price,
+      image: hookah.image,
+      isActive: hookah.isActive
+    });
+    setIsHookahModalOpen(true);
+  };
+
+  const handleEditTobacco = (tobacco: DatabaseTobaccoType) => {
+    setEditingTobacco(tobacco);
+    setTobaccoForm({
+      name: tobacco.name,
+      description: tobacco.description,
+      type: tobacco.type,
+      image: tobacco.image,
+      strengthRange: tobacco.strengthRange,
+      isActive: tobacco.isActive
+    });
+    setIsTobaccoModalOpen(true);
+  };
+
+  const handleEditFlavor = (flavor: DatabaseFlavor) => {
+    setEditingFlavor(flavor);
+    setFlavorForm({
+      name: flavor.name,
+      image: flavor.image,
+      compatibleTobaccoTypes: flavor.compatibleTobaccoTypes,
+      isActive: flavor.isActive
+    });
+    setIsFlavorModalOpen(true);
+  };
+
+  const handleEditMix = (mix: DatabaseRecommendedMix) => {
+    setEditingMix(mix);
+    setMixForm({
+      name: mix.name,
+      price: mix.price,
+      category: mix.category,
+      mainImage: mix.mainImage,
+      flavorImages: mix.flavorImages,
+      bgColor: mix.bgColor,
+      promoText: mix.promoText || '',
+      isActive: mix.isActive
+    });
+    setIsMixModalOpen(true);
+  };
+
   const handleCreateHookah = async () => {
     try {
-      await createHookah(hookahForm);
-      toast({
-        title: "Success",
-        description: "Hookah created successfully!"
-      });
+      if (editingHookah) {
+        await updateHookah(editingHookah.id, hookahForm);
+        toast({
+          title: "Success",
+          description: "Hookah updated successfully!"
+        });
+      } else {
+        await createHookah(hookahForm);
+        toast({
+          title: "Success",
+          description: "Hookah created successfully!"
+        });
+      }
       setIsHookahModalOpen(false);
+      setEditingHookah(null);
       setHookahForm({ name: '', price: 0, image: '', isActive: true });
       loadMenuData();
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create hookah.",
+        description: `Failed to ${editingHookah ? 'update' : 'create'} hookah.`,
         variant: "destructive"
       });
     }
@@ -129,12 +201,21 @@ const MenuManagement = () => {
 
   const handleCreateTobacco = async () => {
     try {
-      await createTobaccoType(tobaccoForm);
-      toast({
-        title: "Success",
-        description: "Tobacco type created successfully!"
-      });
+      if (editingTobacco) {
+        await updateTobaccoType(editingTobacco.id, tobaccoForm);
+        toast({
+          title: "Success",
+          description: "Tobacco type updated successfully!"
+        });
+      } else {
+        await createTobaccoType(tobaccoForm);
+        toast({
+          title: "Success",
+          description: "Tobacco type created successfully!"
+        });
+      }
       setIsTobaccoModalOpen(false);
+      setEditingTobacco(null);
       setTobaccoForm({
         name: '',
         description: '',
@@ -147,7 +228,7 @@ const MenuManagement = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create tobacco type.",
+        description: `Failed to ${editingTobacco ? 'update' : 'create'} tobacco type.`,
         variant: "destructive"
       });
     }
@@ -155,12 +236,21 @@ const MenuManagement = () => {
 
   const handleCreateFlavor = async () => {
     try {
-      await createFlavor(flavorForm);
-      toast({
-        title: "Success",
-        description: "Flavor created successfully!"
-      });
+      if (editingFlavor) {
+        await updateFlavor(editingFlavor.id, flavorForm);
+        toast({
+          title: "Success",
+          description: "Flavor updated successfully!"
+        });
+      } else {
+        await createFlavor(flavorForm);
+        toast({
+          title: "Success",
+          description: "Flavor created successfully!"
+        });
+      }
       setIsFlavorModalOpen(false);
+      setEditingFlavor(null);
       setFlavorForm({
         name: '',
         image: '',
@@ -171,7 +261,7 @@ const MenuManagement = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create flavor.",
+        description: `Failed to ${editingFlavor ? 'update' : 'create'} flavor.`,
         variant: "destructive"
       });
     }
@@ -179,12 +269,21 @@ const MenuManagement = () => {
 
   const handleCreateMix = async () => {
     try {
-      await createRecommendedMix(mixForm);
-      toast({
-        title: "Success",
-        description: "Recommended mix created successfully!"
-      });
+      if (editingMix) {
+        await updateRecommendedMix(editingMix.id, mixForm);
+        toast({
+          title: "Success",
+          description: "Recommended mix updated successfully!"
+        });
+      } else {
+        await createRecommendedMix(mixForm);
+        toast({
+          title: "Success",
+          description: "Recommended mix created successfully!"
+        });
+      }
       setIsMixModalOpen(false);
+      setEditingMix(null);
       setMixForm({
         name: '',
         price: 0,
@@ -199,10 +298,93 @@ const MenuManagement = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create recommended mix.",
+        description: `Failed to ${editingMix ? 'update' : 'create'} recommended mix.`,
         variant: "destructive"
       });
     }
+  };
+
+  const handleDeleteHookah = async (id: string) => {
+    if (confirm('Are you sure you want to delete this hookah?')) {
+      try {
+        await deleteHookah(id);
+        toast({
+          title: "Success",
+          description: "Hookah deleted successfully!"
+        });
+        loadMenuData();
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete hookah.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleDeleteTobacco = async (id: string) => {
+    if (confirm('Are you sure you want to delete this tobacco type?')) {
+      try {
+        await deleteTobaccoType(id);
+        toast({
+          title: "Success",
+          description: "Tobacco type deleted successfully!"
+        });
+        loadMenuData();
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete tobacco type.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleDeleteFlavor = async (id: string) => {
+    if (confirm('Are you sure you want to delete this flavor?')) {
+      try {
+        await deleteFlavor(id);
+        toast({
+          title: "Success",
+          description: "Flavor deleted successfully!"
+        });
+        loadMenuData();
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete flavor.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const handleDeleteMix = async (id: string) => {
+    if (confirm('Are you sure you want to delete this recommended mix?')) {
+      try {
+        await deleteRecommendedMix(id);
+        toast({
+          title: "Success",
+          description: "Recommended mix deleted successfully!"
+        });
+        loadMenuData();
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to delete recommended mix.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  const resetModals = () => {
+    setEditingHookah(null);
+    setEditingTobacco(null);
+    setEditingFlavor(null);
+    setEditingMix(null);
   };
 
   useEffect(() => {
@@ -243,6 +425,24 @@ const MenuManagement = () => {
                     <h3 className="font-semibold">{hookah.name}</h3>
                     <p className="text-amber-400 font-bold">{hookah.price} Lei</p>
                     <p className="text-xs text-turbo-muted">Active: {hookah.isActive ? 'Yes' : 'No'}</p>
+                    <div className="flex gap-2 mt-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleEditHookah(hookah)}
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        onClick={() => handleDeleteHookah(hookah.id)}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -264,12 +464,30 @@ const MenuManagement = () => {
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
                       <img src={tobacco.image} alt={tobacco.name} className="w-16 h-16 object-cover rounded" />
-                      <div>
+                      <div className="flex-1">
                         <h3 className="font-semibold">{tobacco.name}</h3>
                         <p className="text-sm text-turbo-muted">{tobacco.description}</p>
                         <p className="text-xs">Type: {tobacco.type}</p>
                         <p className="text-xs">Strength: {tobacco.strengthRange.min}-{tobacco.strengthRange.max}</p>
                       </div>
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleEditTobacco(tobacco)}
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        onClick={() => handleDeleteTobacco(tobacco.id)}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Delete
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -295,6 +513,24 @@ const MenuManagement = () => {
                     <p className="text-xs text-turbo-muted">
                       {flavor.compatibleTobaccoTypes.join(', ')}
                     </p>
+                    <div className="flex gap-1 mt-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="flex-1 text-xs"
+                        onClick={() => handleEditFlavor(flavor)}
+                      >
+                        <Edit className="h-3 w-3" />
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        className="flex-1 text-xs"
+                        onClick={() => handleDeleteFlavor(flavor.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -321,6 +557,24 @@ const MenuManagement = () => {
                     {mix.promoText && (
                       <p className="text-xs text-turbo-muted mt-1">{mix.promoText}</p>
                     )}
+                    <div className="flex gap-2 mt-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleEditMix(mix)}
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        onClick={() => handleDeleteMix(mix.id)}
+                      >
+                        <Trash2 className="h-3 w-3 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -329,11 +583,13 @@ const MenuManagement = () => {
         </Tabs>
       </div>
 
-      {/* Hookah Modal */}
-      <Dialog open={isHookahModalOpen} onOpenChange={setIsHookahModalOpen}>
+      <Dialog open={isHookahModalOpen} onOpenChange={(open) => {
+        setIsHookahModalOpen(open);
+        if (!open) resetModals();
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Hookah</DialogTitle>
+            <DialogTitle>{editingHookah ? 'Edit Hookah' : 'Add New Hookah'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -383,10 +639,13 @@ const MenuManagement = () => {
       </Dialog>
 
       {/* Tobacco Type Modal */}
-      <Dialog open={isTobaccoModalOpen} onOpenChange={setIsTobaccoModalOpen}>
+      <Dialog open={isTobaccoModalOpen} onOpenChange={(open) => {
+        setIsTobaccoModalOpen(open);
+        if (!open) resetModals();
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Tobacco Type</DialogTitle>
+            <DialogTitle>{editingTobacco ? 'Edit Tobacco Type' : 'Add New Tobacco Type'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -480,10 +739,13 @@ const MenuManagement = () => {
       </Dialog>
 
       {/* Flavor Modal */}
-      <Dialog open={isFlavorModalOpen} onOpenChange={setIsFlavorModalOpen}>
+      <Dialog open={isFlavorModalOpen} onOpenChange={(open) => {
+        setIsFlavorModalOpen(open);
+        if (!open) resetModals();
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Flavor</DialogTitle>
+            <DialogTitle>{editingFlavor ? 'Edit Flavor' : 'Add New Flavor'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -569,10 +831,13 @@ const MenuManagement = () => {
       </Dialog>
 
       {/* Recommended Mix Modal */}
-      <Dialog open={isMixModalOpen} onOpenChange={setIsMixModalOpen}>
+      <Dialog open={isMixModalOpen} onOpenChange={(open) => {
+        setIsMixModalOpen(open);
+        if (!open) resetModals();
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add New Recommended Mix</DialogTitle>
+            <DialogTitle>{editingMix ? 'Edit Recommended Mix' : 'Add New Recommended Mix'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
