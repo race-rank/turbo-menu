@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { FileUpload } from '@/components/ui/file-upload';
 
 const MenuManagement = () => {
   const [hookahs, setHookahs] = useState<DatabaseHookah[]>([]);
@@ -632,14 +633,11 @@ const MenuManagement = () => {
                 placeholder="Enter price"
               />
             </div>
-            <div>
-              <Label htmlFor="hookah-image">Image URL</Label>
-              <Input
-                id="hookah-image"
-                value={hookahForm.image}
-                onChange={(e) => setHookahForm({...hookahForm, image: e.target.value})}
-              />
-            </div>
+            <FileUpload
+              label="Hookah Image"
+              value={hookahForm.image}
+              onChange={(base64) => setHookahForm({...hookahForm, image: base64})}
+            />
             <div className="flex items-center space-x-2">
               <Switch
                 checked={hookahForm.isActive}
@@ -710,6 +708,11 @@ const MenuManagement = () => {
                 onChange={(e) => setTobaccoForm({...tobaccoForm, image: e.target.value})}
               />
             </div>
+            <FileUpload
+              label="Tobacco Type Image"
+              value={tobaccoForm.image}
+              onChange={(base64) => setTobaccoForm({...tobaccoForm, image: base64})}
+            />
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="tobacco-min-strength">Min Strength</Label>
@@ -781,14 +784,11 @@ const MenuManagement = () => {
                 onChange={(e) => setFlavorForm({...flavorForm, name: e.target.value})}
               />
             </div>
-            <div>
-              <Label htmlFor="flavor-image">Image URL</Label>
-              <Input
-                id="flavor-image"
-                value={flavorForm.image}
-                onChange={(e) => setFlavorForm({...flavorForm, image: e.target.value})}
-              />
-            </div>
+            <FileUpload
+              label="Flavor Image"
+              value={flavorForm.image}
+              onChange={(base64) => setFlavorForm({...flavorForm, image: base64})}
+            />
             <div>
               <Label>Compatible Tobacco Types</Label>
               <div className="flex items-center space-x-4 mt-2">
@@ -860,7 +860,7 @@ const MenuManagement = () => {
         setIsMixModalOpen(open);
         if (!open) resetModals();
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingMix ? 'Edit Recommended Mix' : 'Add New Recommended Mix'}</DialogTitle>
           </DialogHeader>
@@ -901,31 +901,39 @@ const MenuManagement = () => {
                 onChange={(e) => setMixForm({...mixForm, mainImage: e.target.value})}
               />
             </div>
+            <FileUpload
+              label="Main Image"
+              value={mixForm.mainImage}
+              onChange={(base64) => setMixForm({...mixForm, mainImage: base64})}
+            />
             <div>
-              <Label>Flavor Images (URLs)</Label>
+              <Label>Flavor Images</Label>
               {mixForm.flavorImages.map((image, index) => (
-                <div key={index} className="flex gap-2 mt-2">
-                  <Input
+                <div key={index} className="mt-3 p-3 border border-border rounded-lg">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium">Flavor Image {index + 1}</span>
+                    {mixForm.flavorImages.length > 1 && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          const newImages = mixForm.flavorImages.filter((_, i) => i !== index);
+                          setMixForm({...mixForm, flavorImages: newImages});
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <FileUpload
+                    label=""
                     value={image}
-                    placeholder={`Flavor image ${index + 1} URL`}
-                    onChange={(e) => {
+                    onChange={(base64) => {
                       const newImages = [...mixForm.flavorImages];
-                      newImages[index] = e.target.value;
+                      newImages[index] = base64;
                       setMixForm({...mixForm, flavorImages: newImages});
                     }}
                   />
-                  {mixForm.flavorImages.length > 1 && (
-                    <Button 
-                      variant="outline" 
-                      size="icon"
-                      onClick={() => {
-                        const newImages = mixForm.flavorImages.filter((_, i) => i !== index);
-                        setMixForm({...mixForm, flavorImages: newImages});
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
               ))}
               <Button 
