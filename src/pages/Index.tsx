@@ -225,6 +225,36 @@ const Index = () => {
     }
   }, [selectedTobaccoType]);
 
+  const getHookahTobaccoType = (hookahName: string): 'blond' | 'dark' | null => {
+    if (hookahName.toLowerCase().includes('blond')) return 'blond';
+    if (hookahName.toLowerCase().includes('dark')) return 'dark';
+    return null;
+  };
+
+  const getAvailableTobaccoTypes = () => {
+    if (!selectedHookah) return tobaccoTypes;
+    
+    const selectedHookahData = hookahs.find(h => h.id === selectedHookah);
+    if (!selectedHookahData) return tobaccoTypes;
+    
+    const hookahTobaccoType = getHookahTobaccoType(selectedHookahData.name);
+    if (!hookahTobaccoType) return tobaccoTypes;
+    
+    return tobaccoTypes.filter(tobacco => tobacco.type === hookahTobaccoType);
+  };
+
+  useEffect(() => {
+    if (selectedHookah) {
+      const selectedHookahData = hookahs.find(h => h.id === selectedHookah);
+      if (selectedHookahData) {
+        const hookahTobaccoType = getHookahTobaccoType(selectedHookahData.name);
+        if (hookahTobaccoType && hookahTobaccoType !== selectedTobaccoType) {
+          setSelectedTobaccoType(hookahTobaccoType);
+        }
+      }
+    }
+  }, [selectedHookah]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -333,7 +363,7 @@ const Index = () => {
           <section ref={step2Ref}>
             <h2 className="text-xl font-semibold mb-6">Step 2: Choose Tobacco Type</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {tobaccoTypes.map((tobacco) => (
+              {getAvailableTobaccoTypes().map((tobacco) => (
                 <Card 
                   key={tobacco.id} 
                   className={`bg-turbo-card border-border cursor-pointer transition-all ${
