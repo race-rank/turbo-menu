@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Home, ShoppingCart, Settings, LogOut, Utensils } from 'lucide-react';
+import { Menu, Home, ShoppingCart, Settings, LogOut, Utensils, Star } from 'lucide-react';
 import { useAuth } from "@/contexts/AuthContext";
 import { LoginDialog } from "./LoginDialog";
 import { cn } from "@/lib/utils";
@@ -106,6 +106,25 @@ export const NavigationSidebar = () => {
                   Admin Panel
                 </Button>
               )}
+              
+              <a
+                href="https://www.google.com/search?sca_esv=a420dcef264fc5ad&tbm=lcl&sxsrf=AE3TifPiQBSvRxmNeGro4O_nsZzQcPG1XA:1760021518520&q=Hookah+Tabacu+Recenzii&rflfq=1&num=20&stick=H4sIAAAAAAAAAONgkxIxNDMxtDC2NDAwMTczszQyMLQ0MtrAyPiKUcwjPz87MUMhJDEpMblUISg1OTWvKjNzESsOCQCs8uH2TQAAAA&rldimm=16418390047669201922&hl=ro-RO&sa=X&ved=2ahUKEwiK9qGLr5eQAxWL87sIHQK3KIIQ9fQKegQIVBAF&biw=2056&bih=1290&dpr=2#lkt=LocalPoiReviews"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <Star className="h-4 w-4" />
+                Google Reviews
+              </a>
+              <a
+                href="https://www.tripadvisor.com/Restaurant_Review-g298474-d26352926-Reviews-Hookah_Tabacu-Cluj_Napoca_Cluj_County_Northwest_Romania_Transylvania.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <Star className="h-4 w-4" />
+                Trip Advisor
+              </a>
             </nav>
             
             {loggedIn && (
