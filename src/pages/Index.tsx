@@ -31,6 +31,7 @@ const Index = () => {
   const [flavors, setFlavors] = useState<DatabaseFlavor[]>([]);
   const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasBlueIce, setHasBlueIce] = useState(false);
 
   const step1Ref = useRef<HTMLDivElement>(null);
   const step2Ref = useRef<HTMLDivElement>(null);
@@ -107,6 +108,8 @@ const Index = () => {
         title: "Added to cart",
         description: `${mix.name} has been added to your cart!`,
       });
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -191,6 +194,8 @@ const Index = () => {
       setSelectedHookah(null);
       setSelectedTobaccoType(null);
       setSelectedFlavors([]);
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -200,8 +205,33 @@ const Index = () => {
 
   const cartItemCount = getItemCount();
 
+  const blueIceFlavor = flavors.find(flavor => 
+    flavor.name.toLowerCase().includes('blue ice') || 
+    flavor.name.toLowerCase().includes('ice')
+  );
+
+  const handleBlueIceToggle = () => {
+    if (!blueIceFlavor) return;
+    
+    if (hasBlueIce) {
+      setSelectedFlavors(prev => prev.filter(id => id !== blueIceFlavor.id));
+      setHasBlueIce(false);
+    } else {
+      // Blue ice doesn't count towards the 3-flavor limit
+      setSelectedFlavors(prev => [...prev, blueIceFlavor.id]);
+      setHasBlueIce(true);
+    }
+  };
+
+  useEffect(() => {
+    if (blueIceFlavor) {
+      setHasBlueIce(selectedFlavors.includes(blueIceFlavor.id));
+    }
+  }, [selectedFlavors, blueIceFlavor]);
+
   const clearSelections = () => {
     setSelectedFlavors([]);
+    setHasBlueIce(false);
   };
   
   useEffect(() => {
@@ -432,7 +462,8 @@ const Index = () => {
                 {selectedFlavors.length > 0 ? (
                   <div className="mb-4 flex flex-wrap items-center gap-3">
                     <p className="text-sm text-turbo-muted">
-                      Selected flavors: {selectedFlavors.length}/3
+                      Selected flavors: {selectedFlavors.filter(id => !blueIceFlavor || id !== blueIceFlavor.id).length}/3
+                      {hasBlueIce && <span className="ml-2 text-blue-400">+ Blue Ice</span>}
                     </p>
                     <Button 
                       variant="outline" 
@@ -448,6 +479,7 @@ const Index = () => {
                   <div className="mb-4 flex flex-wrap items-center gap-3">
                     <p className="text-sm text-turbo-muted">
                       Selected flavors: 0/3
+                      {hasBlueIce && <span className="ml-2 text-blue-400">+ Blue Ice</span>}
                     </p>
                     <Button 
                       variant="outline" 
@@ -462,7 +494,7 @@ const Index = () => {
                   </div>
                 )}
 
-                <div className="mb-4">
+                <div className="mb-4 flex gap-2">
                   <Button 
                     variant="secondary" 
                     size="sm"
@@ -474,10 +506,23 @@ const Index = () => {
                     <Shuffle className="h-4 w-4" />
                     Random Mix
                   </Button>
+                  
+                  {blueIceFlavor && (
+                    <Button 
+                      variant={hasBlueIce ? "default" : "outline"}
+                      size="sm"
+                      onClick={handleBlueIceToggle}
+                      className="flex items-center gap-1"
+                    >
+                      {hasBlueIce ? "Remove Blue Ice" : "Add Blue Ice"}
+                    </Button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {filteredFlavors.map((flavor) => (
+                  {filteredFlavors
+                    .filter(flavor => !blueIceFlavor || flavor.id !== blueIceFlavor.id)
+                    .map((flavor) => (
                     <Card 
                       key={flavor.id} 
                       className={`bg-turbo-card border-border cursor-pointer transition-all ${
