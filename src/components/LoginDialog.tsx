@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import bcrypt from 'bcryptjs';
 
 interface LoginDialogProps {
   open: boolean;
@@ -23,10 +24,10 @@ export const LoginDialog: React.FC<LoginDialogProps> = ({ open, onOpenChange }) 
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (login(userInput, passInput)) {
+    const ok = await login(userInput, passInput);
+    if (ok) {
       toast.success('Access granted!');
       onOpenChange(false);
       setUserInput('');

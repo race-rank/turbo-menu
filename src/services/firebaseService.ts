@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase'
 import { DatabaseOrder, DatabaseNotification } from '@/types/database';
+import bcrypt from 'bcryptjs';
 
 const COLLECTIONS = {
   ORDERS: 'orders',
@@ -232,6 +233,23 @@ export const getUnreadNotifications = async (): Promise<DatabaseNotification[]> 
   } catch (error) {
     console.error('Error getting notifications:', error);
     throw error;
+  }
+};
+
+export const validateAdminCredentials = async (username: string, password: string): Promise<boolean> => {
+  try {
+    const adminsRef = collection(firestore, "admins");
+    const q = query(adminsRef, where("username", "==", username));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return false;
+    const adminDoc = snapshot.docs[0];
+    const adminData = adminDoc.data();
+
+    if (!adminData.password) return false;
+    return await bcrypt.compare(password, adminData.password);
+  } catch (error) {
+    console.error('Error validating admin credentials:', error);
+    return false;
   }
 };
 
