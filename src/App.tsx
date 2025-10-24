@@ -13,6 +13,7 @@ import Index from "./pages/Index";
 import Cart from "./pages/Cart";
 import Admin from "./pages/Admin";
 import MenuManagement from "./pages/MenuManagement";
+import Statistics from "./pages/Statistics";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,14 @@ const App = () => {
                       element={
                         <AdminGuard>
                           <MenuManagement />
+                        </AdminGuard>
+                      } 
+                    />
+                    <Route 
+                      path="/statistics" 
+                      element={
+                        <AdminGuard>
+                          <Statistics />
                         </AdminGuard>
                       } 
                     />

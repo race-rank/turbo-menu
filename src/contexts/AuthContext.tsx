@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { validateAdminCredentials } from '@/services/firebaseService';
 
 interface AuthContextType {
   loggedIn: boolean;
   hasAdminRights: boolean;
   logout: () => void;
-  login: (username: string, password: string) => boolean;
+  login: (username: string, password: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,8 +26,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loggedIn, setLoggedIn] = useState(false);
   const [hasAdminRights, setHasAdminRights] = useState(false);
 
-  const login = (username: string, password: string): boolean => {
-    if (username === 'admin' && password === 'turbo') {
+  const login = async (username: string, password: string): Promise<boolean> => {
+    const valid = await validateAdminCredentials(username, password);
+    if (valid) {
       setLoggedIn(true);
       setHasAdminRights(true);
       return true;

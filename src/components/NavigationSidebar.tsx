@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Home, ShoppingCart, Settings, LogOut, Utensils, Star } from 'lucide-react';
+import { Menu, Home, ShoppingCart, Settings, LogOut, Utensils, Star, BarChart2 } from 'lucide-react';
 import { useAuth } from "@/contexts/AuthContext";
 import { LoginDialog } from "./LoginDialog";
 import { cn } from "@/lib/utils";
@@ -79,7 +79,6 @@ export const NavigationSidebar = () => {
                     <Settings className="h-4 w-4" />
                     Admin Panel
                   </Link>
-                  
                   <Link
                     to="/menu-management"
                     onClick={() => setSidebarOpen(false)}
@@ -92,6 +91,19 @@ export const NavigationSidebar = () => {
                   >
                     <Utensils className="h-4 w-4" />
                     Menu Management
+                  </Link>
+                  <Link
+                    to="/statistics"
+                    onClick={() => setSidebarOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                      location.pathname === "/statistics"
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <BarChart2 className="h-4 w-4" />
+                    Statistics
                   </Link>
                 </>
               )}
