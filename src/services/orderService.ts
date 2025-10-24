@@ -5,7 +5,8 @@ import {
   getOrdersByStatus, 
   updateOrderRecord,
   createNotificationRecord,
-  getUnreadNotifications
+  getUnreadNotifications,
+  getOrdersByDateRange
 } from './firebaseService';
 
 export interface OrderDetails {
@@ -20,6 +21,7 @@ export interface OrderDetails {
     table?: string;
   };
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed';
+  createdAt?: Date;
 }
 
 const convertCartItemToDbItem = (item: CartItem) => ({
@@ -164,4 +166,19 @@ export const getAdminNotifications = async (): Promise<{notifications: any[]}> =
     console.error('Error getting admin notifications from Firebase:', error);
     throw error;
   }
+};
+
+export const getOrdersInRange = async (start: Date, end: Date): Promise<OrderDetails[]> => {
+  const dbOrders = await getOrdersByDateRange(start, end);
+  return dbOrders.map(order => ({
+    orderId: order.orderId,
+    items: order.items as CartItem[],
+    total: order.total,
+    table: order.table,
+    customerInfo: order.customerInfo,
+    status: order.status,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+    timestamp: order.timestamp,
+  }));
 };

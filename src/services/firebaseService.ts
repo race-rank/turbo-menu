@@ -261,3 +261,27 @@ export const convertTimestampToDate = (timestamp: Timestamp | Date): Date => {
   if (timestamp instanceof Date) return timestamp;
   return timestamp.toDate();
 };
+
+export const getOrdersByDateRange = async (start: Date, end: Date): Promise<DatabaseOrder[]> => {
+  try {
+    const ordersQuery = query(
+      collection(firestore, 'orders'),
+      where('createdAt', '>=', start),
+      where('createdAt', '<=', end),
+      orderBy('createdAt', 'asc')
+    );
+    const querySnapshot = await getDocs(ordersQuery);
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        timestamp: safeConvertTimestamp(data.timestamp),
+        createdAt: safeConvertTimestamp(data.createdAt),
+        updatedAt: safeConvertTimestamp(data.updatedAt)
+      } as DatabaseOrder;
+    });
+  } catch (error) {
+    console.error('Error getting orders by date range:', error);
+    throw error;
+  }
+};
