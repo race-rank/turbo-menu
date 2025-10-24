@@ -463,6 +463,17 @@ const Index = () => {
                   <div className="mb-4 flex flex-wrap items-center gap-3">
                     <p className="text-sm text-turbo-muted">
                       Selected flavors: {selectedFlavors.filter(id => !blueIceFlavor || id !== blueIceFlavor.id).length}/3
+                      <span className="ml-2 text-turbo-text font-medium">
+                        {selectedFlavors
+                          .filter(id => {
+                            console.log(id, blueIceFlavor);
+                            return !blueIceFlavor || id !== blueIceFlavor.id
+                          })
+                          .map(id => currentFlavors.find(f => f.id === id)?.name)
+                          .filter(Boolean)
+                          .join(', ')
+                        }
+                      </span>
                       {hasBlueIce && <span className="ml-2 text-blue-400">+ Blue Ice</span>}
                     </p>
                     <Button 
@@ -480,6 +491,9 @@ const Index = () => {
                     <p className="text-sm text-turbo-muted">
                       Selected flavors: 0/3
                       {hasBlueIce && <span className="ml-2 text-blue-400">+ Blue Ice</span>}
+                      <span className="ml-2 text-turbo-text font-medium">
+                        {hasBlueIce && blueIceFlavor ? blueIceFlavor.name : ''}
+                      </span>
                     </p>
                     <Button 
                       variant="outline" 
