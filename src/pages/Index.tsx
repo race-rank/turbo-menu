@@ -474,7 +474,7 @@ const Index = () => {
                           .join(', ')
                         }
                       </span>
-                      {hasBlueIce && <span className="ml-2 text-blue-400">+ Blue Ice</span>}
+                      {hasBlueIce && <span className="ml-2 text-blue-400">+ Ice</span>}
                     </p>
                     <Button 
                       variant="outline" 
@@ -490,7 +490,7 @@ const Index = () => {
                   <div className="mb-4 flex flex-wrap items-center gap-3">
                     <p className="text-sm text-turbo-muted">
                       Selected flavors: 0/3
-                      {hasBlueIce && <span className="ml-2 text-blue-400">+ Blue Ice</span>}
+                      {hasBlueIce && <span className="ml-2 text-blue-400">+ Ice</span>}
                       <span className="ml-2 text-turbo-text font-medium">
                         {hasBlueIce && blueIceFlavor ? blueIceFlavor.name : ''}
                       </span>
@@ -528,7 +528,7 @@ const Index = () => {
                       onClick={handleBlueIceToggle}
                       className="flex items-center gap-1"
                     >
-                      {hasBlueIce ? "Remove Blue Ice" : "Add Blue Ice"}
+                      {hasBlueIce ? "Remove Ice" : "Add Ice"}
                     </Button>
                   )}
                 </div>
