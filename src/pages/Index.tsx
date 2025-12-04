@@ -68,7 +68,7 @@ const Index = () => {
   }, []);
 
   const currentFlavors = selectedTobaccoType 
-    ? flavors.filter(flavor => flavor.compatibleTobaccoTypes.includes(selectedTobaccoType))
+    ? flavors.filter(flavor => flavor.isActive && flavor.compatibleTobaccoTypes.includes(selectedTobaccoType))
     : [];
 
   const filteredFlavors = currentFlavors.filter(flavor =>
@@ -545,25 +545,24 @@ const Index = () => {
                       onClick={() => handleFlavorSelect(flavor.id)}
                     >
                       <CardContent className="p-4 text-center">
-                        <div className="relative">
-                          <img 
-                            src={flavor.image} 
-                            alt={flavor.name}
-                            className="w-full h-16 object-cover mx-auto mb-2 rounded"
+                        <div className="relative aspect-square w-full h-full min-h-[96px] min-w-[96px] p-1 overflow-hidden rounded shadow mx-auto mb-2">
+                          <div
+                            className="absolute inset-0 bg-center bg-cover rounded"
+                            style={{ backgroundImage: `url(${flavor.image})`, filter: 'brightness(0.6)' }}
                           />
-                          {selectedFlavors.includes(flavor.id) && (
-                            <div className="absolute inset-0 bg-primary/20 rounded flex items-center justify-center">
-                              <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                                <span className="text-primary-foreground text-sm font-bold">
-                                  {selectedFlavors.indexOf(flavor.id) + 1}
-                                </span>
-                              </div>
+                          <div className="relative z-10 flex flex-col items-center justify-end h-full w-full p-1">
+                            <div className="w-full bg-black/60 rounded px-2 py-1 flex flex-col items-center">
+                              <h3 className="text-xs font-semibold text-white mb-1 truncate w-full">{flavor.name}</h3>
+                              <div className="w-4 h-4 bg-primary rounded-full opacity-70 mb-1" />
+                              {selectedFlavors.includes(flavor.id) && (
+                                <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                                  <span className="text-primary-foreground text-sm font-bold">
+                                    {selectedFlavors.indexOf(flavor.id) + 1}
+                                  </span>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        <h3 className="text-xs font-medium text-turbo-text">{flavor.name}</h3>
-                        <div className="mt-2">
-                          <div className="w-4 h-4 bg-primary rounded-full mx-auto opacity-50" />
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
