@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase'
 import { DatabaseOrder, DatabaseNotification } from '@/types/database';
+import bcrypt from 'bcryptjs';
 
 const COLLECTIONS = {
   ORDERS: 'orders',
@@ -235,6 +236,23 @@ export const getUnreadNotifications = async (): Promise<DatabaseNotification[]> 
   }
 };
 
+export const validateAdminCredentials = async (username: string, password: string): Promise<boolean> => {
+  try {
+    const adminsRef = collection(firestore, "admins");
+    const q = query(adminsRef, where("username", "==", username));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return false;
+    const adminDoc = snapshot.docs[0];
+    const adminData = adminDoc.data();
+
+    if (!adminData.password) return false;
+    return await bcrypt.compare(password, adminData.password);
+  } catch (error) {
+    console.error('Error validating admin credentials:', error);
+    return false;
+  }
+};
+
 export const generateOrderId = (): string => {
   return `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`.toUpperCase();
 };
@@ -242,4 +260,28 @@ export const generateOrderId = (): string => {
 export const convertTimestampToDate = (timestamp: Timestamp | Date): Date => {
   if (timestamp instanceof Date) return timestamp;
   return timestamp.toDate();
+};
+
+export const getOrdersByDateRange = async (start: Date, end: Date): Promise<DatabaseOrder[]> => {
+  try {
+    const ordersQuery = query(
+      collection(firestore, 'orders'),
+      where('createdAt', '>=', start),
+      where('createdAt', '<=', end),
+      orderBy('createdAt', 'asc')
+    );
+    const querySnapshot = await getDocs(ordersQuery);
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        timestamp: safeConvertTimestamp(data.timestamp),
+        createdAt: safeConvertTimestamp(data.createdAt),
+        updatedAt: safeConvertTimestamp(data.updatedAt)
+      } as DatabaseOrder;
+    });
+  } catch (error) {
+    console.error('Error getting orders by date range:', error);
+    throw error;
+  }
 };
