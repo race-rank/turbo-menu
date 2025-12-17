@@ -33,7 +33,11 @@ const convertCartItemToDbItem = (item: CartItem) => ({
   hookah: item.hookah,
   tobaccoType: item.tobaccoType,
   tobaccoStrength: item.tobaccoStrength,
-  flavors: item.flavors
+  flavors: item.flavors,
+  hasLED: item.hasLED,
+  hasColoredWater: item.hasColoredWater,
+  hasAlcohol: item.hasAlcohol,
+  hasFruits: item.hasFruits
 });
 
 export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'status'>): Promise<OrderDetails> => {
@@ -48,6 +52,7 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'sta
       items: orderData.items.map(convertCartItemToDbItem),
       total: orderData.total,
       table: orderData.table,
+      timestamp: new Date(),
       customerInfo: orderData.customerInfo,
       status: 'pending' as const
     };

@@ -116,6 +116,22 @@ const Cart = () => {
                           <div className="text-sm text-turbo-muted mt-1">
                             <p>Hookah: {item.hookah}</p>
                             <p>Flavors: {item.flavors?.join(', ')}</p>
+                            {(item.hasLED || item.hasColoredWater || item.hasAlcohol || item.hasFruits) && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {item.hasLED && (
+                                  <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded">💡 LED</span>
+                                )}
+                                {item.hasColoredWater && (
+                                  <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">🎨 Colored</span>
+                                )}
+                                {item.hasAlcohol && (
+                                  <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">🍷 Alcohol</span>
+                                )}
+                                {item.hasFruits && (
+                                  <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">🍊 Fruits</span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                         <p className="text-amber-400 font-bold mt-2">{item.price} Lei</p>

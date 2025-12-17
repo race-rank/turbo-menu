@@ -12,6 +12,10 @@ export interface CartItem {
   tobaccoStrength?: number;
   hookah?: string;
   flavors?: string[];
+  hasLED?: boolean;
+  hasColoredWater?: boolean;
+  hasAlcohol?: boolean;
+  hasFruits?: boolean;
 }
 
 interface CartState {

@@ -61,7 +61,11 @@ const MenuManagement = () => {
     name: '',
     price: '',
     image: '',
-    isActive: true
+    isActive: true,
+    hasLED: false,
+    hasColoredWater: false,
+    hasAlcohol: false,
+    hasFruits: false
   });
 
   const [tobaccoForm, setTobaccoForm] = useState({
@@ -128,7 +132,11 @@ const MenuManagement = () => {
       name: hookah.name,
       price: hookah.price.toString(),
       image: hookah.image,
-      isActive: hookah.isActive
+      isActive: hookah.isActive,
+      hasLED: hookah.hasLED || false,
+      hasColoredWater: hookah.hasColoredWater || false,
+      hasAlcohol: hookah.hasAlcohol || false,
+      hasFruits: hookah.hasFruits || false
     });
     setIsHookahModalOpen(true);
   };
@@ -197,7 +205,7 @@ const MenuManagement = () => {
       }
       setIsHookahModalOpen(false);
       setEditingHookah(null);
-      setHookahForm({ name: '', price: '', image: '', isActive: true });
+      setHookahForm({ name: '', price: '', image: '', isActive: true, hasLED: false, hasColoredWater: false, hasAlcohol: false, hasFruits: false });
       loadMenuData();
     } catch (error) {
       toast({
@@ -447,6 +455,22 @@ const MenuManagement = () => {
                     <h3 className="font-semibold">{hookah.name}</h3>
                     <p className="text-amber-400 font-bold">{hookah.price} Lei</p>
                     <p className="text-xs text-turbo-muted">Active: {hookah.isActive ? 'Yes' : 'No'}</p>
+                    {(hookah.hasLED || hookah.hasColoredWater || hookah.hasAlcohol || hookah.hasFruits) && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {hookah.hasLED && (
+                          <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded">LED</span>
+                        )}
+                        {hookah.hasColoredWater && (
+                          <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">Color</span>
+                        )}
+                        {hookah.hasAlcohol && (
+                          <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">Alcohol</span>
+                        )}
+                        {hookah.hasFruits && (
+                          <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Fruits</span>
+                        )}
+                      </div>
+                    )}
                     <div className="flex gap-2 mt-2">
                       <Button 
                         size="sm" 
@@ -638,6 +662,37 @@ const MenuManagement = () => {
               value={hookahForm.image}
               onChange={(base64) => setHookahForm({...hookahForm, image: base64})}
             />
+            <div className="space-y-3">
+              <Label>Hookah Options</Label>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={hookahForm.hasLED}
+                  onCheckedChange={(checked) => setHookahForm({...hookahForm, hasLED: checked})}
+                />
+                <Label>LED Hookah</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={hookahForm.hasColoredWater}
+                  onCheckedChange={(checked) => setHookahForm({...hookahForm, hasColoredWater: checked})}
+                />
+                <Label>Colored Water</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={hookahForm.hasAlcohol}
+                  onCheckedChange={(checked) => setHookahForm({...hookahForm, hasAlcohol: checked})}
+                />
+                <Label>Alcohol in Vase</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={hookahForm.hasFruits}
+                  onCheckedChange={(checked) => setHookahForm({...hookahForm, hasFruits: checked})}
+                />
+                <Label>Fruits in Vase</Label>
+              </div>
+            </div>
             <div className="flex items-center space-x-2">
               <Switch
                 checked={hookahForm.isActive}

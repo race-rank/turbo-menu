@@ -25,6 +25,10 @@ export interface DatabaseOrderItem {
   tobaccoStrength?: number;
   flavors?: string[];
   table?: string;
+  hasLED?: boolean;
+  hasColoredWater?: boolean;
+  hasAlcohol?: boolean;
+  hasFruits?: boolean;
 }
 
 export interface DatabaseProduct {
@@ -73,6 +77,10 @@ export interface DatabaseHookah {
   price: number;
   image: string;
   isActive: boolean;
+  hasLED?: boolean;
+  hasColoredWater?: boolean;
+  hasAlcohol?: boolean;
+  hasFruits?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -267,10 +267,37 @@ const Admin = () => {
                         <h4 className="text-sm font-medium mb-2">Items:</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                           {order.items.map((item, index) => (
-                            <div key={index} className="flex items-center gap-2 text-sm">
-                              <span>• 1x</span>
-                              <span className="flex-1">{item.name}</span>
-                              <span className="font-medium">{item.price} Lei</span>
+                            <div key={index} className="flex flex-col gap-1 text-sm p-2 bg-muted/30 rounded">
+                              <div className="flex items-center justify-between">
+                                <span className="flex-1">• 1x {item.name}</span>
+                                <span className="font-medium">{item.price} Lei</span>
+                              </div>
+                              {item.type === 'custom' && (
+                                <>
+                                  {item.hookah && (
+                                    <span className="text-xs text-turbo-muted ml-4">Hookah: {item.hookah}</span>
+                                  )}
+                                  {item.flavors && item.flavors.length > 0 && (
+                                    <span className="text-xs text-turbo-muted ml-4">Flavors: {item.flavors.join(', ')}</span>
+                                  )}
+                                  {(item.hasLED || item.hasColoredWater || item.hasAlcohol || item.hasFruits) && (
+                                    <div className="flex flex-wrap gap-1 ml-4 mt-1">
+                                      {item.hasLED && (
+                                        <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded">💡 LED</span>
+                                      )}
+                                      {item.hasColoredWater && (
+                                        <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">🎨 Colored</span>
+                                      )}
+                                      {item.hasAlcohol && (
+                                        <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">🍷 Alcohol</span>
+                                      )}
+                                      {item.hasFruits && (
+                                        <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">🍊 Fruits</span>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )}
                             </div>
                           ))}
                         </div>

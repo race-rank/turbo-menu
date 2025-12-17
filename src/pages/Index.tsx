@@ -15,6 +15,13 @@ import { Slider } from "@/components/ui/slider";
 import { getHookahs, getTobaccoTypes, getFlavors, getRecommendedMixes } from '@/services/menuService';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 
+const ADDON_PRICES = {
+  hasLED: 30,
+  hasColoredWater: 10,
+  hasFruits: 20,
+  hasAlcohol: 40
+};
+
 const Index = () => {
   const navigate = useNavigate();
   const { addItem, getItemCount } = useCart();
@@ -32,6 +39,12 @@ const Index = () => {
   const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasBlueIce, setHasBlueIce] = useState(false);
+  const [selectedAddons, setSelectedAddons] = useState({
+    hasLED: false,
+    hasColoredWater: false,
+    hasAlcohol: false,
+    hasFruits: false
+  });
 
   const step1Ref = useRef<HTMLDivElement>(null);
   const step2Ref = useRef<HTMLDivElement>(null);
@@ -169,19 +182,30 @@ const Index = () => {
     ).filter(Boolean);
 
     const tableId = localStorage.getItem('turbo-table');
+    
+    // Calculate total price with addons
+    let totalPrice = selectedHookahData?.price || 0;
+    if (selectedAddons.hasLED) totalPrice += ADDON_PRICES.hasLED;
+    if (selectedAddons.hasColoredWater) totalPrice += ADDON_PRICES.hasColoredWater;
+    if (selectedAddons.hasFruits) totalPrice += ADDON_PRICES.hasFruits;
+    if (selectedAddons.hasAlcohol) totalPrice += ADDON_PRICES.hasAlcohol;
 
     if (selectedHookahData && tableId) {
       addItem({
         id: `custom-${Date.now()}`,
         type: 'custom',
         name: 'Custom Mix',
-        price: selectedHookahData.price,
+        price: totalPrice,
         image: selectedHookahData.image,
         hookah: selectedHookahData.name,
         tobaccoType: selectedTobaccoType,
         tobaccoStrength: tobaccoStrength,
         flavors: selectedFlavorNames as string[],
-        table: tableId
+        table: tableId,
+        hasLED: selectedAddons.hasLED,
+        hasColoredWater: selectedAddons.hasColoredWater,
+        hasAlcohol: selectedAddons.hasAlcohol,
+        hasFruits: selectedAddons.hasFruits
       });
       
       successHaptic();
@@ -385,11 +409,81 @@ const Index = () => {
                     />
                     <h3 className="text-sm font-medium text-turbo-text mb-1">{hookah.name}</h3>
                     <p className="text-lg font-bold text-amber-400">{hookah.price} Lei</p>
+                    {(hookah.hasLED || hookah.hasColoredWater || hookah.hasAlcohol || hookah.hasFruits) && (
+                      <div className="mt-2 flex flex-wrap gap-1 justify-center">
+                        {hookah.hasLED && (
+                          <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">💡</span>
+                        )}
+                        {hookah.hasColoredWater && (
+                          <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">🎨</span>
+                        )}
+                        {hookah.hasAlcohol && (
+                          <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">🍷</span>
+                        )}
+                        {hookah.hasFruits && (
+                          <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">🍊</span>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
             </div>
           </section>
+          
+          {selectedHookah && (
+            <section className="mt-8">
+              <h2 className="text-xl font-semibold mb-6">Customize Your Hookah</h2>
+              <Card className="bg-turbo-card border-border">
+                <CardContent className="p-6">
+                  <h3 className="font-medium mb-4 text-turbo-text">Select Add-ons (Optional)</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Button
+                      variant={selectedAddons.hasLED ? "default" : "outline"}
+                      size="lg"
+                      onClick={() => setSelectedAddons({ hasLED: !selectedAddons.hasLED, hasColoredWater: false, hasAlcohol: false, hasFruits: false })}
+                      className="h-auto py-4 flex flex-col items-center gap-2"
+                    >
+                      <span className="text-2xl">💡</span>
+                      <span className="text-sm">LED Hookah</span>
+                      <span className="text-xs text-amber-400 font-bold">+{ADDON_PRICES.hasLED} Lei</span>
+                    </Button>
+                    <Button
+                      variant={selectedAddons.hasColoredWater ? "default" : "outline"}
+                      size="lg"
+                      onClick={() => setSelectedAddons({ hasLED: false, hasColoredWater: !selectedAddons.hasColoredWater, hasAlcohol: false, hasFruits: false })}
+                      className="h-auto py-4 flex flex-col items-center gap-2"
+                    >
+                      <span className="text-2xl">🎨</span>
+                      <span className="text-sm">Colored Water</span>
+                      <span className="text-xs text-amber-400 font-bold">+{ADDON_PRICES.hasColoredWater} Lei</span>
+                    </Button>
+                    <Button
+                      variant={selectedAddons.hasAlcohol ? "default" : "outline"}
+                      size="lg"
+                      onClick={() => setSelectedAddons({ hasLED: false, hasColoredWater: false, hasAlcohol: !selectedAddons.hasAlcohol, hasFruits: false })}
+                      className="h-auto py-4 flex flex-col items-center gap-2"
+                    >
+                      <span className="text-2xl">🍷</span>
+                      <span className="text-sm">Alcohol in Vase</span>
+                      <span className="text-xs text-amber-400 font-bold">+{ADDON_PRICES.hasAlcohol} Lei</span>
+                    </Button>
+                    <Button
+                      variant={selectedAddons.hasFruits ? "default" : "outline"}
+                      size="lg"
+                      onClick={() => setSelectedAddons({ hasLED: false, hasColoredWater: false, hasAlcohol: false, hasFruits: !selectedAddons.hasFruits })}
+                      className="h-auto py-4 flex flex-col items-center gap-2"
+                    >
+                      <span className="text-2xl">🍊</span>
+                      <span className="text-sm">Fruits in Vase</span>
+                      <span className="text-xs text-amber-400 font-bold">+{ADDON_PRICES.hasFruits} Lei</span>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+          )}
+          
           <section ref={step2Ref}>
             <h2 className="text-xl font-semibold mb-6">Step 2: Choose Tobacco Type</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
