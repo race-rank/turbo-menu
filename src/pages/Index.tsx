@@ -28,7 +28,7 @@ const Index = () => {
   const location = useLocation();
   const { setTable } = useTable();
   const [selectedHookah, setSelectedHookah] = useState<string | null>(null);
-  const [selectedTobaccoType, setSelectedTobaccoType] = useState<'blond' | 'dark' | 'mix' | null>(null);
+  const [selectedTobaccoType, setSelectedTobaccoType] = useState<'virginia' | 'darkblend' | 'mix' | null>(null);
   const [tobaccoStrength, setTobaccoStrength] = useState<number>(1);
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,18 +89,28 @@ const Index = () => {
       : flavors.filter(flavor => flavor.isActive && flavor.compatibleTobaccoTypes.includes(selectedTobaccoType));
     
     // Expand flavors that are compatible with both types
-    const expandedFlavors: Array<DatabaseFlavor & { variantType?: 'blond' | 'dark', variantId: string }> = [];
+    const expandedFlavors: Array<DatabaseFlavor & { variantType?: 'virginia' | 'darkblend', variantId: string }> = [];
     
     baseFlavors.forEach(flavor => {
       if (flavor.compatibleTobaccoTypes.length > 1) {
-        // Flavor is compatible with both - create separate variants
-        flavor.compatibleTobaccoTypes.forEach(type => {
+        // Flavor is compatible with both - create separate variants only for Mix
+        if (selectedTobaccoType === 'mix') {
+          // For Mix: show both variants
+          flavor.compatibleTobaccoTypes.forEach(type => {
+            expandedFlavors.push({
+              ...flavor,
+              variantType: type,
+              variantId: `${flavor.id}-${type}`
+            });
+          });
+        } else {
+          // For single type selection: show only the selected type variant
           expandedFlavors.push({
             ...flavor,
-            variantType: type,
-            variantId: `${flavor.id}-${type}`
+            variantType: selectedTobaccoType as 'virginia' | 'darkblend',
+            variantId: `${flavor.id}-${selectedTobaccoType}`
           });
-        });
+        }
       } else {
         // Single compatibility - assign type and keep single entry
         expandedFlavors.push({
@@ -185,9 +195,9 @@ const Index = () => {
   }, [selectedTobaccoType]);
 
   useEffect(() => {
-    if (selectedTobaccoType === 'blond') {
+    if (selectedTobaccoType === 'virginia') {
       setTobaccoStrength(3);
-    } else if (selectedTobaccoType === 'dark') {
+    } else if (selectedTobaccoType === 'darkblend') {
       setTobaccoStrength(8);
     } else if (selectedTobaccoType === 'mix') {
       setTobaccoStrength(5);
@@ -212,16 +222,16 @@ const Index = () => {
       return;
     }
 
-    // Validation for Mix tobacco type: must have at least one dark and one blond flavor
+    // Validation for Mix tobacco type: must have at least one darkblend and one virginia flavor
     if (selectedTobaccoType === 'mix') {
-      const hasDarkFlavor = selectedFlavors.some(variantId => variantId.endsWith('-dark'));
-      const hasBlondFlavor = selectedFlavors.some(variantId => variantId.endsWith('-blond'));
+      const hasDarkblendFlavor = selectedFlavors.some(variantId => variantId.endsWith('-darkblend'));
+      const hasVirginiaFlavor = selectedFlavors.some(variantId => variantId.endsWith('-virginia'));
       
-      if (!hasDarkFlavor || !hasBlondFlavor) {
+      if (!hasDarkblendFlavor || !hasVirginiaFlavor) {
         errorHaptic();
         toast({
           title: "Invalid Mix Selection",
-          description: "For a Mix hookah, you must select at least one DARK and one BLOND flavor.",
+          description: "For a Mix hookah, you must select at least one DARKBLEND and one VIRGINIA flavor.",
           variant: "destructive"
         });
         return;
@@ -337,10 +347,10 @@ const Index = () => {
     }
   }, [selectedTobaccoType]);
 
-  const getHookahTobaccoType = (hookahName: string): 'blond' | 'dark' | 'mix' | null => {
+  const getHookahTobaccoType = (hookahName: string): 'virginia' | 'darkblend' | 'mix' | null => {
     if (hookahName.toLowerCase().includes('mix')) return 'mix';
-    if (hookahName.toLowerCase().includes('blond')) return 'blond';
-    if (hookahName.toLowerCase().includes('dark')) return 'dark';
+    if (hookahName.toLowerCase().includes('virginia')) return 'virginia';
+    if (hookahName.toLowerCase().includes('darkblend')) return 'darkblend';
     return null;
   };
 
@@ -548,7 +558,7 @@ const Index = () => {
             {selectedTobaccoType === 'mix' && (
               <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                 <p className="text-sm text-blue-400">
-                  ℹ️ <strong>Mix Tobacco:</strong> This selection includes both Dark and Blond tobacco types. You must choose flavors from both types.
+                  ℹ️ <strong>Mix Tobacco:</strong> This selection includes both Darkblend and Virginia tobacco types. You must choose flavors from both types.
                 </p>
               </div>
             )}
@@ -730,7 +740,7 @@ const Index = () => {
                                   {flavor.variantType && (
                                     <div className="flex gap-1 mb-1">
                                       <span className={`text-[9px] px-1.5 py-0.5 text-white rounded font-semibold ${
-                                        flavor.variantType === 'blond' ? 'bg-amber-500/80' : 'bg-purple-500/80'
+                                        flavor.variantType === 'virginia' ? 'bg-amber-500/80' : 'bg-purple-500/80'
                                       }`}>
                                         {flavor.variantType.toUpperCase()}
                                       </span>

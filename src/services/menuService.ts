@@ -115,7 +115,7 @@ export const createFlavor = async (flavorData: Omit<DatabaseFlavor, 'id' | 'crea
   }
 };
 
-export const getFlavors = async (tobaccoType?: 'blond' | 'dark'): Promise<DatabaseFlavor[]> => {
+export const getFlavors = async (tobaccoType?: 'virginia' | 'darkblend'): Promise<DatabaseFlavor[]> => {
   try {
     let flavorsQuery = query(
       collection(firestore, MENU_COLLECTIONS.FLAVORS),
