@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +51,12 @@ const MenuManagement = () => {
   const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('hookahs');
+  
+  // Search states for each tab
+  const [hookahSearch, setHookahSearch] = useState('');
+  const [tobaccoSearch, setTobaccoSearch] = useState('');
+  const [flavorSearch, setFlavorSearch] = useState('');
+  const [mixSearch, setMixSearch] = useState('');
   
   const [isHookahModalOpen, setIsHookahModalOpen] = useState(false);
   const [isTobaccoModalOpen, setIsTobaccoModalOpen] = useState(false);
@@ -430,6 +436,27 @@ const MenuManagement = () => {
     loadMenuData();
   }, []);
 
+  // Filtered lists based on search
+  const filteredHookahs = hookahs.filter(hookah => 
+    hookah.name.toLowerCase().includes(hookahSearch.toLowerCase())
+  );
+  
+  const filteredTobaccoTypes = tobaccoTypes.filter(tobacco => 
+    tobacco.name.toLowerCase().includes(tobaccoSearch.toLowerCase()) ||
+    tobacco.description.toLowerCase().includes(tobaccoSearch.toLowerCase()) ||
+    tobacco.type.toLowerCase().includes(tobaccoSearch.toLowerCase())
+  );
+  
+  const filteredFlavors = flavors.filter(flavor => 
+    flavor.name.toLowerCase().includes(flavorSearch.toLowerCase()) ||
+    flavor.compatibleTobaccoTypes.some(type => type.toLowerCase().includes(flavorSearch.toLowerCase()))
+  );
+  
+  const filteredMixes = recommendedMixes.filter(mix => 
+    mix.name.toLowerCase().includes(mixSearch.toLowerCase()) ||
+    mix.category.toLowerCase().includes(mixSearch.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-turbo-dark text-turbo-text">
       <header className="flex items-center justify-between p-4 border-b border-border">
@@ -456,8 +483,18 @@ const MenuManagement = () => {
               </Button>
             </div>
             
+            <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-turbo-muted h-4 w-4" />
+              <Input
+                placeholder="Search hookahs by name..."
+                value={hookahSearch}
+                onChange={(e) => setHookahSearch(e.target.value)}
+                className="pl-10 bg-turbo-card border-border text-turbo-text"
+              />
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {hookahs.map((hookah) => (
+              {filteredHookahs.map((hookah) => (
                 <Card key={hookah.id} className="bg-turbo-card border-border">
                   <CardContent className="p-4">
                     <img src={hookah.image} alt={hookah.name} className="w-full h-32 object-cover rounded mb-2" />
@@ -513,8 +550,18 @@ const MenuManagement = () => {
               </Button>
             </div>
             
+            <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-turbo-muted h-4 w-4" />
+              <Input
+                placeholder="Search tobacco types by name, description, or type..."
+                value={tobaccoSearch}
+                onChange={(e) => setTobaccoSearch(e.target.value)}
+                className="pl-10 bg-turbo-card border-border text-turbo-text"
+              />
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {tobaccoTypes.map((tobacco) => (
+              {filteredTobaccoTypes.map((tobacco) => (
                 <Card key={tobacco.id} className="bg-turbo-card border-border">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-4">
@@ -559,8 +606,18 @@ const MenuManagement = () => {
               </Button>
             </div>
             
+            <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-turbo-muted h-4 w-4" />
+              <Input
+                placeholder="Search flavors by name or tobacco type..."
+                value={flavorSearch}
+                onChange={(e) => setFlavorSearch(e.target.value)}
+                className="pl-10 bg-turbo-card border-border text-turbo-text"
+              />
+            </div>
+            
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {flavors.map((flavor) => (
+              {filteredFlavors.map((flavor) => (
                 <Card key={flavor.id} className="bg-turbo-card border-border">
                   <CardContent className="p-4 text-center">
                     <img src={flavor.image} alt={flavor.name} className="w-full h-16 object-cover rounded mb-2" />
@@ -601,8 +658,18 @@ const MenuManagement = () => {
               </Button>
             </div>
             
+            <div className="relative mb-6">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-turbo-muted h-4 w-4" />
+              <Input
+                placeholder="Search mixes by name or category..."
+                value={mixSearch}
+                onChange={(e) => setMixSearch(e.target.value)}
+                className="pl-10 bg-turbo-card border-border text-turbo-text"
+              />
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recommendedMixes.map((mix) => (
+              {filteredMixes.map((mix) => (
                 <Card key={mix.id} className="bg-turbo-card border-border">
                   <CardContent className="p-4">
                     <img src={mix.mainImage} alt={mix.name} className="w-full h-32 object-cover rounded mb-2" />
