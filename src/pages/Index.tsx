@@ -28,7 +28,7 @@ const Index = () => {
   const location = useLocation();
   const { setTable } = useTable();
   const [selectedHookah, setSelectedHookah] = useState<string | null>(null);
-  const [selectedTobaccoType, setSelectedTobaccoType] = useState<'blond' | 'dark' | null>(null);
+  const [selectedTobaccoType, setSelectedTobaccoType] = useState<'blond' | 'dark' | 'mix' | null>(null);
   const [tobaccoStrength, setTobaccoStrength] = useState<number>(1);
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -80,19 +80,51 @@ const Index = () => {
     loadMenuData();
   }, []);
 
-  const currentFlavors = selectedTobaccoType 
-    ? flavors.filter(flavor => flavor.isActive && flavor.compatibleTobaccoTypes.includes(selectedTobaccoType))
-    : [];
+  // Create expanded flavor list with separate entries for dual-compatible flavors
+  const getExpandedFlavors = () => {
+    if (!selectedTobaccoType) return [];
+    
+    let baseFlavors = selectedTobaccoType === 'mix'
+      ? flavors.filter(flavor => flavor.isActive)
+      : flavors.filter(flavor => flavor.isActive && flavor.compatibleTobaccoTypes.includes(selectedTobaccoType));
+    
+    // Expand flavors that are compatible with both types
+    const expandedFlavors: Array<DatabaseFlavor & { variantType?: 'blond' | 'dark', variantId: string }> = [];
+    
+    baseFlavors.forEach(flavor => {
+      if (flavor.compatibleTobaccoTypes.length > 1) {
+        // Flavor is compatible with both - create separate variants
+        flavor.compatibleTobaccoTypes.forEach(type => {
+          expandedFlavors.push({
+            ...flavor,
+            variantType: type,
+            variantId: `${flavor.id}-${type}`
+          });
+        });
+      } else {
+        // Single compatibility - assign type and keep single entry
+        expandedFlavors.push({
+          ...flavor,
+          variantType: flavor.compatibleTobaccoTypes[0],
+          variantId: flavor.id
+        });
+      }
+    });
+    
+    return expandedFlavors;
+  };
+
+  const currentFlavors = getExpandedFlavors();
 
   const filteredFlavors = currentFlavors.filter(flavor =>
     flavor.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleFlavorSelect = (flavorId: string) => {
-    if (selectedFlavors.includes(flavorId)) {
-      setSelectedFlavors(prev => prev.filter(id => id !== flavorId));
+  const handleFlavorSelect = (variantId: string) => {
+    if (selectedFlavors.includes(variantId)) {
+      setSelectedFlavors(prev => prev.filter(id => id !== variantId));
     } else if (selectedFlavors.length < 3) {
-      setSelectedFlavors(prev => [...prev, flavorId]);
+      setSelectedFlavors(prev => [...prev, variantId]);
     } else {
       toast({
         title: "Maximum flavors reached",
@@ -137,9 +169,11 @@ const Index = () => {
     
     setIsRandomButtonAnimating(true);
     
-    const availableFlavors = flavors.filter(flavor => flavor.compatibleTobaccoTypes.includes(selectedTobaccoType));
+    // Get expanded flavors list
+    const availableFlavors = currentFlavors;
+    
     const shuffled = [...availableFlavors].sort(() => 0.5 - Math.random());
-    const randomThree = shuffled.slice(0, Math.min(3, shuffled.length)).map(flavor => flavor.id);
+    const randomThree = shuffled.slice(0, Math.min(3, shuffled.length)).map(flavor => flavor.variantId);
     setSelectedFlavors(randomThree);
     
     setTimeout(() => setIsRandomButtonAnimating(false), 300);
@@ -155,6 +189,8 @@ const Index = () => {
       setTobaccoStrength(3);
     } else if (selectedTobaccoType === 'dark') {
       setTobaccoStrength(8);
+    } else if (selectedTobaccoType === 'mix') {
+      setTobaccoStrength(5);
     }
   }, [selectedTobaccoType]);
 
@@ -176,10 +212,29 @@ const Index = () => {
       return;
     }
 
+    // Validation for Mix tobacco type: must have at least one dark and one blond flavor
+    if (selectedTobaccoType === 'mix') {
+      const hasDarkFlavor = selectedFlavors.some(variantId => variantId.endsWith('-dark'));
+      const hasBlondFlavor = selectedFlavors.some(variantId => variantId.endsWith('-blond'));
+      
+      if (!hasDarkFlavor || !hasBlondFlavor) {
+        errorHaptic();
+        toast({
+          title: "Invalid Mix Selection",
+          description: "For a Mix hookah, you must select at least one DARK and one BLOND flavor.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     const selectedHookahData = hookahs.find(h => h.id === selectedHookah);
-    const selectedFlavorNames = selectedFlavors.map(id => 
-      currentFlavors.find(f => f.id === id)?.name
-    ).filter(Boolean);
+    const selectedFlavorNames = selectedFlavors.map(variantId => {
+      const flavor = currentFlavors.find(f => f.variantId === variantId);
+      if (!flavor) return null;
+      // Add type suffix if it's a variant
+      return flavor.variantType ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})` : flavor.name;
+    }).filter(Boolean);
 
     const tableId = localStorage.getItem('turbo-table');
     
@@ -233,23 +288,26 @@ const Index = () => {
     flavor.name.toLowerCase().includes('blue ice') || 
     flavor.name.toLowerCase().includes('ice')
   );
+  
+  // Get the variant ID for blue ice (if it exists in current flavors)
+  const blueIceVariantId = blueIceFlavor ? currentFlavors.find(f => f.id === blueIceFlavor.id)?.variantId : undefined;
 
   const handleBlueIceToggle = () => {
-    if (!blueIceFlavor) return;
+    if (!blueIceVariantId) return;
     
     if (hasBlueIce) {
-      setSelectedFlavors(prev => prev.filter(id => id !== blueIceFlavor.id));
+      setSelectedFlavors(prev => prev.filter(id => !id.startsWith(blueIceFlavor!.id)));
       setHasBlueIce(false);
     } else {
       // Blue ice doesn't count towards the 3-flavor limit
-      setSelectedFlavors(prev => [...prev, blueIceFlavor.id]);
+      setSelectedFlavors(prev => [...prev, blueIceVariantId]);
       setHasBlueIce(true);
     }
   };
 
   useEffect(() => {
     if (blueIceFlavor) {
-      setHasBlueIce(selectedFlavors.includes(blueIceFlavor.id));
+      setHasBlueIce(selectedFlavors.some(id => id.startsWith(blueIceFlavor.id)));
     }
   }, [selectedFlavors, blueIceFlavor]);
 
@@ -279,7 +337,8 @@ const Index = () => {
     }
   }, [selectedTobaccoType]);
 
-  const getHookahTobaccoType = (hookahName: string): 'blond' | 'dark' | null => {
+  const getHookahTobaccoType = (hookahName: string): 'blond' | 'dark' | 'mix' | null => {
+    if (hookahName.toLowerCase().includes('mix')) return 'mix';
     if (hookahName.toLowerCase().includes('blond')) return 'blond';
     if (hookahName.toLowerCase().includes('dark')) return 'dark';
     return null;
@@ -486,30 +545,44 @@ const Index = () => {
           
           <section ref={step2Ref}>
             <h2 className="text-xl font-semibold mb-6">Step 2: Choose Tobacco Type</h2>
+            {selectedTobaccoType === 'mix' && (
+              <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <p className="text-sm text-blue-400">
+                  ℹ️ <strong>Mix Tobacco:</strong> This selection includes both Dark and Blond tobacco types. You must choose flavors from both types.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {getAvailableTobaccoTypes().map((tobacco) => (
-                <Card 
-                  key={tobacco.id} 
-                  className={`bg-turbo-card border-border cursor-pointer transition-all ${
-                    selectedTobaccoType === tobacco.type ? 'ring-2 ring-primary' : ''
-                  }`}
-                  onClick={() => setSelectedTobaccoType(tobacco.type)}
-                >
-                  <CardContent className="p-4 flex items-center gap-4">
-                    <div className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0">
-                      <img 
-                        src={tobacco.image} 
-                        alt={tobacco.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-turbo-text mb-1">{tobacco.name}</h3>
-                      <p className="text-sm text-turbo-muted">{tobacco.description}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {getAvailableTobaccoTypes().map((tobacco) => {
+                const isMixType = selectedTobaccoType === 'mix';
+                const isDisabled = isMixType && tobacco.type !== 'mix';
+                
+                return (
+                  <Card 
+                    key={tobacco.id} 
+                    className={`bg-turbo-card border-border transition-all ${
+                      selectedTobaccoType === tobacco.type ? 'ring-2 ring-primary' : ''
+                    } ${
+                      isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                    }`}
+                    onClick={() => !isDisabled && setSelectedTobaccoType(tobacco.type)}
+                  >
+                    <CardContent className="p-4 flex items-center gap-4">
+                      <div className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0">
+                        <img 
+                          src={tobacco.image} 
+                          alt={tobacco.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-turbo-text mb-1">{tobacco.name}</h3>
+                        <p className="text-sm text-turbo-muted">{tobacco.description}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {selectedTobaccoType && (
@@ -523,8 +596,8 @@ const Index = () => {
                   
                   <Slider
                     value={[tobaccoStrength]}
-                    min={tobaccoTypes.find(t => t.type === selectedTobaccoType)?.strengthRange.min || 1}
-                    max={tobaccoTypes.find(t => t.type === selectedTobaccoType)?.strengthRange.max || 5}
+                    min={selectedTobaccoType === 'mix' ? 3 : (tobaccoTypes.find(t => t.type === selectedTobaccoType)?.strengthRange.min || 1)}
+                    max={selectedTobaccoType === 'mix' ? 7 : (tobaccoTypes.find(t => t.type === selectedTobaccoType)?.strengthRange.max || 5)}
                     step={1}
                     onValueChange={(value) => setTobaccoStrength(value[0])}
                     className="w-full"
@@ -556,14 +629,15 @@ const Index = () => {
                 {selectedFlavors.length > 0 ? (
                   <div className="mb-4 flex flex-wrap items-center gap-3">
                     <p className="text-sm text-turbo-muted">
-                      Selected flavors: {selectedFlavors.filter(id => !blueIceFlavor || id !== blueIceFlavor.id).length}/3
+                      Selected flavors: {selectedFlavors.filter(id => !blueIceFlavor || !id.startsWith(blueIceFlavor.id)).length}/3
                       <span className="ml-2 text-turbo-text font-medium">
                         {selectedFlavors
-                          .filter(id => {
-                            console.log(id, blueIceFlavor);
-                            return !blueIceFlavor || id !== blueIceFlavor.id
+                          .filter(variantId => !blueIceFlavor || !variantId.startsWith(blueIceFlavor.id))
+                          .map(variantId => {
+                            const flavor = currentFlavors.find(f => f.variantId === variantId);
+                            if (!flavor) return null;
+                            return flavor.variantType ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})` : flavor.name;
                           })
-                          .map(id => currentFlavors.find(f => f.id === id)?.name)
                           .filter(Boolean)
                           .join(', ')
                         }
@@ -630,37 +704,53 @@ const Index = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                   {filteredFlavors
                     .filter(flavor => !blueIceFlavor || flavor.id !== blueIceFlavor.id)
-                    .map((flavor) => (
-                    <Card 
-                      key={flavor.id} 
-                      className={`bg-turbo-card border-border cursor-pointer transition-all ${
-                        selectedFlavors.includes(flavor.id) ? 'ring-2 ring-primary' : ''
-                      }`}
-                      onClick={() => handleFlavorSelect(flavor.id)}
-                    >
-                      <CardContent className="p-4 text-center">
-                        <div className="relative aspect-square w-full h-full min-h-[96px] min-w-[96px] p-1 overflow-hidden rounded shadow mx-auto mb-2">
-                          <div
-                            className="absolute inset-0 bg-center bg-cover rounded"
-                            style={{ backgroundImage: `url(${flavor.image})`, filter: 'brightness(0.6)' }}
-                          />
-                          <div className="relative z-10 flex flex-col items-center justify-end h-full w-full p-1">
-                            <div className="w-full bg-black/60 rounded px-2 py-1 flex flex-col items-center">
-                              <h3 className="text-xs font-semibold text-white mb-1 truncate w-full">{flavor.name}</h3>
-                              <div className="w-4 h-4 bg-primary rounded-full opacity-70 mb-1" />
-                              {selectedFlavors.includes(flavor.id) && (
-                                <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                                  <span className="text-primary-foreground text-sm font-bold">
-                                    {selectedFlavors.indexOf(flavor.id) + 1}
-                                  </span>
+                    .map((flavor) => {
+                      const displayName = flavor.variantType 
+                        ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`
+                        : flavor.name;
+                      
+                      return (
+                        <Card 
+                          key={flavor.variantId} 
+                          className={`bg-turbo-card border-border cursor-pointer transition-all ${
+                            selectedFlavors.includes(flavor.variantId) ? 'ring-2 ring-primary' : ''
+                          }`}
+                          onClick={() => handleFlavorSelect(flavor.variantId)}
+                        >
+                          <CardContent className="p-4 text-center">
+                            <div className="relative aspect-square w-full h-full min-h-[96px] min-w-[96px] p-1 overflow-hidden rounded shadow mx-auto mb-2">
+                              <div
+                                className="absolute inset-0 bg-center bg-cover rounded"
+                                style={{ backgroundImage: `url(${flavor.image})`, filter: 'brightness(0.6)' }}
+                              />
+                              <div className="relative z-10 flex flex-col items-center justify-end h-full w-full p-1">
+                                <div className="w-full bg-black/60 rounded px-2 py-1 flex flex-col items-center">
+                                  <h3 className="text-xs font-semibold text-white mb-1 truncate w-full">{displayName}</h3>
+                                  {/* Show tobacco type badge for variant */}
+                                  {flavor.variantType && (
+                                    <div className="flex gap-1 mb-1">
+                                      <span className={`text-[9px] px-1.5 py-0.5 text-white rounded font-semibold ${
+                                        flavor.variantType === 'blond' ? 'bg-amber-500/80' : 'bg-purple-500/80'
+                                      }`}>
+                                        {flavor.variantType.toUpperCase()}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="w-4 h-4 bg-primary rounded-full opacity-70 mb-1" />
+                                  {selectedFlavors.includes(flavor.variantId) && (
+                                    <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                                      <span className="text-primary-foreground text-sm font-bold">
+                                        {selectedFlavors.indexOf(flavor.variantId) + 1}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                 </div>
               </>
             ) : (
@@ -692,9 +782,13 @@ const Index = () => {
                   )}
                   {selectedFlavors.length > 0 && (
                     <p className="text-turbo-muted mb-4">
-                      Flavors: {selectedFlavors.map(id => 
-                        currentFlavors.find(f => f.id === id)?.name
-                      ).join(', ')}
+                      Flavors: {selectedFlavors.map(variantId => {
+                        const flavor = currentFlavors.find(f => f.variantId === variantId);
+                        if (!flavor) return '';
+                        return flavor.variantType 
+                          ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`
+                          : flavor.name;
+                      }).join(', ')}
                     </p>
                   )}
                   <Button 

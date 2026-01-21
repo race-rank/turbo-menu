@@ -71,7 +71,7 @@ const MenuManagement = () => {
   const [tobaccoForm, setTobaccoForm] = useState({
     name: '',
     description: '',
-    type: 'blond' as 'blond' | 'dark',
+    type: 'blond' as 'blond' | 'dark' | 'mix',
     image: '',
     strengthRange: { min: '', max: '' },
     isActive: true
@@ -99,6 +99,15 @@ const MenuManagement = () => {
   const [editingTobacco, setEditingTobacco] = useState<DatabaseTobaccoType | null>(null);
   const [editingFlavor, setEditingFlavor] = useState<DatabaseFlavor | null>(null);
   const [editingMix, setEditingMix] = useState<DatabaseRecommendedMix | null>(null);
+
+  useEffect(() => {
+    if (tobaccoForm.type === 'mix' && !editingTobacco) {
+      setTobaccoForm(prev => ({
+        ...prev,
+        strengthRange: { min: '3', max: '7' }
+      }));
+    }
+  }, [tobaccoForm.type, editingTobacco]);
 
   const loadMenuData = async () => {
     try {
@@ -744,7 +753,7 @@ const MenuManagement = () => {
               <Label htmlFor="tobacco-type">Type</Label>
               <Select 
                 value={tobaccoForm.type} 
-                onValueChange={(value: 'blond' | 'dark') => setTobaccoForm({...tobaccoForm, type: value})}
+                onValueChange={(value: 'blond' | 'dark' | 'mix') => setTobaccoForm({...tobaccoForm, type: value})}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -752,8 +761,14 @@ const MenuManagement = () => {
                 <SelectContent>
                   <SelectItem value="blond">Blond</SelectItem>
                   <SelectItem value="dark">Dark</SelectItem>
+                  <SelectItem value="mix">Mix</SelectItem>
                 </SelectContent>
               </Select>
+              {tobaccoForm.type === 'mix' && (
+                <p className="text-xs text-blue-400 mt-1">
+                  ℹ️ Mix type includes both Dark and Blond tobacco. Default strength range: 3-7.
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="tobacco-image">Image URL</Label>

@@ -8,7 +8,7 @@ export interface CartItem {
   quantity: number;
   image: string;
   table: string;
-  tobaccoType?: 'blond' | 'dark';
+  tobaccoType?: 'blond' | 'dark' | 'mix';
   tobaccoStrength?: number;
   hookah?: string;
   flavors?: string[];

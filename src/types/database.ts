@@ -21,7 +21,7 @@ export interface DatabaseOrderItem {
   price: number;
   image: string;
   hookah?: string;
-  tobaccoType?: 'blond' | 'dark';
+  tobaccoType?: 'blond' | 'dark' | 'mix';
   tobaccoStrength?: number;
   flavors?: string[];
   table?: string;
@@ -89,7 +89,7 @@ export interface DatabaseTobaccoType {
   id: string;
   name: string;
   description: string;
-  type: 'blond' | 'dark';
+  type: 'blond' | 'dark' | 'mix';
   image: string;
   strengthRange: {
     min: number;
