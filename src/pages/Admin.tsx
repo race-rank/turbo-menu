@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, MoreHorizontal, RefreshCw, Filter } from 'lucide-react';
+import { Bell, MoreHorizontal, RefreshCw, Filter, Clock, CheckCircle, Package, Sparkles, List, History } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -107,7 +107,7 @@ const Admin = () => {
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-turbo-dark text-turbo-text">
+    <div className="min-h-screen bg-turbo-dark text-turbo-text pb-20">
       <header className="flex items-center justify-between p-4 border-b border-border">
         <NavigationSidebar />
 
@@ -179,16 +179,14 @@ const Admin = () => {
           onValueChange={setActiveTab}
           className="w-full"
         >
-          <div className="flex items-center justify-between mb-6">
-            <TabsList className="bg-turbo-card">
-              <TabsTrigger value="all">All Orders</TabsTrigger>
-              <TabsTrigger value="pending">Pending</TabsTrigger>
-              <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
-              <TabsTrigger value="preparing">Preparing</TabsTrigger>
-              <TabsTrigger value="ready">Ready</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-            </TabsList>
-          </div>
+          <TabsList className="hidden">
+            <TabsTrigger value="all">All Orders</TabsTrigger>
+            <TabsTrigger value="pending">Pending</TabsTrigger>
+            <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
+            <TabsTrigger value="preparing">Preparing</TabsTrigger>
+            <TabsTrigger value="ready">Ready</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
+          </TabsList>
 
           <TabsContent value={activeTab} className="mt-0">
             {isLoading ? (
@@ -310,6 +308,66 @@ const Admin = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Bottom Tab Bar Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-turbo-card border-t border-border z-50">
+        <div className="flex justify-around items-center h-16">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'all' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <List className="h-5 w-5 mb-1" />
+            <span className="text-xs">All</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'pending' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <Clock className="h-5 w-5 mb-1" />
+            <span className="text-xs">Pending</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('confirmed')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'confirmed' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <CheckCircle className="h-5 w-5 mb-1" />
+            <span className="text-xs">Confirmed</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('preparing')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'preparing' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <Package className="h-5 w-5 mb-1" />
+            <span className="text-xs">Preparing</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('ready')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'ready' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <Sparkles className="h-5 w-5 mb-1" />
+            <span className="text-xs">Ready</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('completed')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'completed' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <History className="h-5 w-5 mb-1" />
+            <span className="text-xs">Completed</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 };

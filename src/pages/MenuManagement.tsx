@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, Edit, Trash2, Save, X, Search, Flame, Leaf, Droplets, Sparkles } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -458,7 +458,7 @@ const MenuManagement = () => {
   );
 
   return (
-    <div className="min-h-screen bg-turbo-dark text-turbo-text">
+    <div className="min-h-screen bg-turbo-dark text-turbo-text pb-20">
       <header className="flex items-center justify-between p-4 border-b border-border">
         <NavigationSidebar />
         <h1 className="text-2xl font-bold tracking-wider">MENU MANAGEMENT</h1>
@@ -467,7 +467,7 @@ const MenuManagement = () => {
 
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="bg-turbo-card mb-6">
+          <TabsList className="hidden">
             <TabsTrigger value="hookahs">Hookahs</TabsTrigger>
             <TabsTrigger value="tobacco">Tobacco Types</TabsTrigger>
             <TabsTrigger value="flavors">Flavors</TabsTrigger>
@@ -1131,6 +1131,47 @@ const MenuManagement = () => {
           </div>
         </DialogContent>
       </Dialog>
+      
+      <nav className="fixed bottom-0 left-0 right-0 bg-turbo-card border-t border-border z-50">
+        <div className="flex justify-around items-center h-16">
+          <button
+            onClick={() => setActiveTab('hookahs')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'hookahs' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <Flame className="h-5 w-5 mb-1" />
+            <span className="text-xs">Hookahs</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('tobacco')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'tobacco' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <Leaf className="h-5 w-5 mb-1" />
+            <span className="text-xs">Tobacco</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('flavors')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'flavors' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <Droplets className="h-5 w-5 mb-1" />
+            <span className="text-xs">Flavors</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('mixes')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'mixes' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <Sparkles className="h-5 w-5 mb-1" />
+            <span className="text-xs">Mixes</span>
+          </button>
+        </div>
+      </nav>
     </div>
   );
 };
