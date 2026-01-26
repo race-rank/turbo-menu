@@ -33,11 +33,22 @@ const Admin = () => {
     { value: 'completed', label: 'Completed', color: 'bg-gray-500' }
   ];
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A';
+  const formatDate = (timestamp?: number | string | Date) => {
+    console.log("Formatting date for timestamp:", timestamp);
+    if (!timestamp) return '';
     try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'N/A';
+      let date: Date;
+      if (typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      } else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else {
+        return '';
+      }
+      
+      if (isNaN(date.getTime())) return '';
       return new Intl.DateTimeFormat('en-GB', {
         day: '2-digit',
         month: '2-digit',
@@ -45,7 +56,7 @@ const Admin = () => {
         minute: '2-digit'
       }).format(date);
     } catch (error) {
-      return 'N/A';
+      return '';
     }
   };
 
@@ -138,14 +149,14 @@ const Admin = () => {
                       {notif.type === 'new-order' && (
                         <div>
                           <p className="font-medium">New Order: {notif.data?.orderId || 'Unknown'}</p>
-                          <p className="text-xs text-turbo-muted">{formatDate(notif.createdAt)}</p>
+                          <p className="text-xs text-turbo-muted">{formatDate(notif?.timestamp)}</p>
                         </div>
                       )}
                       {notif.type === 'status-change' && (
                         <div>
                           <p className="font-medium">Status Change: {notif.data?.orderId || 'Unknown'}</p>
                           <p className="text-xs">{notif.data?.previousStatus || 'Unknown'} → {notif.data?.status || 'Unknown'}</p>
-                          <p className="text-xs text-turbo-muted">{formatDate(notif.createdAt)}</p>
+                          <p className="text-xs text-turbo-muted">{formatDate(notif?.timestamp)}</p>
                         </div>
                       )}
                     </DropdownMenuItem>
@@ -213,7 +224,7 @@ const Admin = () => {
                             </span>
                           </div>
                           <p className="text-sm text-turbo-muted">
-                            Created: {formatDate(new Date().toISOString())}
+                            Created: {formatDate(order?.timestamp) || '—'}
                           </p>
                           {order.table && (
                             <p className="text-sm text-turbo-muted">

@@ -12,6 +12,7 @@ import {
 export interface OrderDetails {
   orderId: string;
   items: CartItem[];
+  timestamp?: number;
   total: number;
   table?: string;
   customerInfo: {
@@ -48,11 +49,13 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'sta
     console.log('Total:', orderData.total, 'Lei');
     console.log('===================================');
     
+    const timestamp = new Date();
+    const epochTime = timestamp.getTime();
     const dbOrderData = {
       items: orderData.items.map(convertCartItemToDbItem),
       total: orderData.total,
       table: orderData.table,
-      timestamp: new Date(),
+      timestamp: epochTime,
       customerInfo: orderData.customerInfo,
       status: 'pending' as const
     };
@@ -78,7 +81,8 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'sta
       total: orderData.total,
       table: orderData.table,
       customerInfo: orderData.customerInfo,
-      status: 'pending'
+      status: 'pending',
+      createdAt: timestamp
     };
   } catch (error) {
     console.error('Error submitting order to Firebase:', error);

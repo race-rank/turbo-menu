@@ -6,7 +6,7 @@ import { CartItem } from '@/contexts/CartContext';
 interface ActiveOrder {
   orderId: string;
   status: string;
-  timestamp: string;
+  timestamp: number;
   items: CartItem[];
   total: number;
   customerInfo: {
@@ -36,6 +36,32 @@ interface OrderTrackingProviderProps {
   children: ReactNode;
 }
 
+const safeToEpochTime = (timestamp: any): number => {
+  if (!timestamp) {
+    return Date.now();
+  }
+  
+  if (typeof timestamp === 'number') {
+    return timestamp;
+  }
+  
+  if (timestamp instanceof Date) {
+    return timestamp.getTime();
+  }
+  
+  if (timestamp && typeof timestamp === 'object' && 'toDate' in timestamp) {
+    // Firestore Timestamp object
+    return timestamp.toDate().getTime();
+  }
+  
+  try {
+    return new Date(timestamp).getTime();
+  } catch (e) {
+    console.error('Failed to convert timestamp:', timestamp, e);
+    return Date.now();
+  }
+};
+
 export const OrderTrackingProvider: React.FC<OrderTrackingProviderProps> = ({ 
   children
 }) => {
@@ -46,7 +72,12 @@ export const OrderTrackingProvider: React.FC<OrderTrackingProviderProps> = ({
     const savedOrders = localStorage.getItem('turboActiveOrders');
     if (savedOrders) {
       try {
-        setActiveOrders(JSON.parse(savedOrders));
+        const parsed = JSON.parse(savedOrders);
+        const validatedOrders = (Array.isArray(parsed) ? parsed : []).map((order: any) => ({
+          ...order,
+          timestamp: typeof order.timestamp === 'number' ? order.timestamp : safeToEpochTime(order.timestamp)
+        }));
+        setActiveOrders(validatedOrders);
       } catch (e) {
         console.error('Failed to parse saved orders', e);
         localStorage.removeItem('turboActiveOrders');
@@ -69,7 +100,7 @@ export const OrderTrackingProvider: React.FC<OrderTrackingProviderProps> = ({
             return {
               orderId: updatedOrder.orderId,
               status: updatedOrder.status,
-              timestamp: updatedOrder.timestamp.toISOString(),
+              timestamp: safeToEpochTime(updatedOrder.timestamp),
               items: updatedOrder.items as CartItem[],
               total: updatedOrder.total,
               customerInfo: updatedOrder.customerInfo
@@ -91,12 +122,15 @@ export const OrderTrackingProvider: React.FC<OrderTrackingProviderProps> = ({
   }, [activeOrders.map(o => o.orderId).join(',')]);
 
   const addOrder = (order: OrderDetails) => {
+    const timestamp = order.createdAt || new Date();
+    const epochTime = safeToEpochTime(timestamp);
+    
     setActiveOrders(prev => [
       ...prev,
       {
         orderId: order.orderId,
         status: order.status,
-        timestamp: order.timestamp,
+        timestamp: epochTime,
         items: order.items,
         total: order.total,
         customerInfo: order.customerInfo
