@@ -108,10 +108,18 @@ const Admin = () => {
   useEffect(() => {
     loadOrders();
     loadNotifications();
+  }, [activeTab]);
 
-    const interval = setInterval(() => {
-      loadOrders();
-      loadNotifications();
+  // Silent refresh of orders only (no loading state)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const status = activeTab !== 'all' ? activeTab : undefined;
+        const response = await getAdminOrders(status);
+        setOrders(response.orders);
+      } catch (error) {
+        console.error('Failed to refresh orders:', error);
+      }
     }, 30000);
 
     return () => clearInterval(interval);

@@ -55,7 +55,7 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'sta
       items: orderData.items.map(convertCartItemToDbItem),
       total: orderData.total,
       table: orderData.table,
-      timestamp: epochTime,
+      timestamp: timestamp,
       customerInfo: orderData.customerInfo,
       status: 'pending' as const
     };
@@ -179,15 +179,23 @@ export const getAdminNotifications = async (): Promise<{notifications: any[]}> =
 
 export const getOrdersInRange = async (start: Date, end: Date): Promise<OrderDetails[]> => {
   const dbOrders = await getOrdersByDateRange(start, end);
-  return dbOrders.map(order => ({
-    orderId: order.orderId,
-    items: order.items as CartItem[],
-    total: order.total,
-    table: order.table,
-    customerInfo: order.customerInfo,
-    status: order.status,
-    createdAt: order.createdAt,
-    updatedAt: order.updatedAt,
-    timestamp: order.timestamp,
-  }));
+  return dbOrders.map(order => {
+    let timestamp: number | undefined;
+    if (order.timestamp instanceof Date) {
+      timestamp = order.timestamp.getTime();
+    } else if (typeof order.timestamp === 'number') {
+      timestamp = order.timestamp;
+    }
+    
+    return {
+      orderId: order.orderId,
+      items: order.items as CartItem[],
+      total: order.total,
+      table: order.table,
+      customerInfo: order.customerInfo,
+      status: order.status,
+      timestamp: timestamp,
+      createdAt: order.createdAt,
+    };
+  });
 };
