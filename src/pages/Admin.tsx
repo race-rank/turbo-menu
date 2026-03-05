@@ -34,7 +34,6 @@ const Admin = () => {
   ];
 
   const formatDate = (timestamp?: number | string | Date) => {
-    console.log("Formatting date for timestamp:", timestamp);
     if (!timestamp) return '';
     try {
       let date: Date;
@@ -63,8 +62,7 @@ const Admin = () => {
   const loadOrders = async () => {
     setIsLoading(true);
     try {
-      const status = activeTab !== 'all' ? activeTab : undefined;
-      const response = await getAdminOrders(status);
+      const response = await getAdminOrders();
       setOrders(response.orders);
     } catch (error) {
       console.error('Failed to load orders:', error);
@@ -114,8 +112,7 @@ const Admin = () => {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const status = activeTab !== 'all' ? activeTab : undefined;
-        const response = await getAdminOrders(status);
+        const response = await getAdminOrders();
         setOrders(response.orders);
       } catch (error) {
         console.error('Failed to refresh orders:', error);
@@ -123,7 +120,7 @@ const Admin = () => {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [activeTab]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-turbo-dark text-turbo-text pb-20">
@@ -218,7 +215,9 @@ const Admin = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                {orders.map((order) => (
+                {orders
+                  .filter(order => activeTab === 'all' || order.status === activeTab)
+                  .map((order) => (
                   <Card key={order.orderId} className="bg-turbo-card border-border">
                     <CardContent className="p-4">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -232,7 +231,7 @@ const Admin = () => {
                             </span>
                           </div>
                           <p className="text-sm text-turbo-muted">
-                            Created: {formatDate(order?.timestamp) || '—'}
+                            Created: {formatDate(order?.createdAt) || '—'}
                           </p>
                           {order.table && (
                             <p className="text-sm text-turbo-muted">

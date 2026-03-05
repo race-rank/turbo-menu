@@ -68,7 +68,7 @@ export const AnalyticsDashboard = ({ orders, isLoading = false }: AnalyticsDashb
     }
 
     const filteredOrders = orders.filter(order => {
-      const orderDate = new Date(order.timestamp || 0);
+      const orderDate = new Date(order.createdAt || 0);
       return orderDate >= startDate && orderDate <= now;
     });
 

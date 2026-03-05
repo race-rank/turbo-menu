@@ -50,14 +50,13 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'sta
     console.log('===================================');
     
     const timestamp = new Date();
-    const epochTime = timestamp.getTime();
     const dbOrderData = {
       items: orderData.items.map(convertCartItemToDbItem),
       total: orderData.total,
       table: orderData.table,
-      timestamp: timestamp,
       customerInfo: orderData.customerInfo,
       status: 'pending' as const
+      // timestamp will be set by serverTimestamp() in createOrderRecord
     };
     
     const orderId = await createOrderRecord(dbOrderData);
@@ -82,6 +81,7 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'sta
       table: orderData.table,
       customerInfo: orderData.customerInfo,
       status: 'pending',
+      timestamp: timestamp.getTime(),
       createdAt: timestamp
     };
   } catch (error) {
@@ -100,7 +100,9 @@ export const getAdminOrders = async (status?: string): Promise<{orders: OrderDet
       total: order.total,
       table: order.table,
       customerInfo: order.customerInfo,
-      status: order.status
+      status: order.status,
+      updatedAt: order.updatedAt,
+      createdAt: order.createdAt
     }));
     
     return { orders };
