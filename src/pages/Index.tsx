@@ -341,17 +341,19 @@ const Index = () => {
     }
   }, [selectedHookah]);
 
-  useEffect(() => {
-    if (selectedTobaccoType && step3Ref.current) {
-      step3Ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [selectedTobaccoType]);
-
   const getHookahTobaccoType = (hookahName: string): 'virginia' | 'darkblend' | 'mix' | null => {
     if (hookahName.toLowerCase().includes('mix')) return 'mix';
     if (hookahName.toLowerCase().includes('virginia')) return 'virginia';
     if (hookahName.toLowerCase().includes('darkblend')) return 'darkblend';
     return null;
+  };
+
+  const getHookahTypeBorder = (type: 'virginia' | 'darkblend' | 'mix' | null) => {
+    // Return only the border color (width is controlled on selection)
+    if (type === 'virginia') return 'border-emerald-500';
+    if (type === 'mix') return 'border-yellow-500';
+    if (type === 'darkblend') return 'border-rose-500';
+    return 'border-border';
   };
 
   const getAvailableTobaccoTypes = () => {
@@ -465,8 +467,8 @@ const Index = () => {
               {hookahs.map((hookah) => (
                 <Card 
                   key={hookah.id} 
-                  className={`bg-turbo-card border-border cursor-pointer transition-all ${
-                    selectedHookah === hookah.id ? 'ring-2 ring-primary' : ''
+                  className={`bg-turbo-card border ${getHookahTypeBorder(getHookahTobaccoType(hookah.name))} cursor-pointer transition-all ${
+                    selectedHookah === hookah.id ? 'border-4' : 'border-2'
                   }`}
                   onClick={() => setSelectedHookah(hookah.id)}
                 >
@@ -553,74 +555,36 @@ const Index = () => {
             </section>
           )}
           
-          <section ref={step2Ref}>
-            <h2 className="text-xl font-semibold mb-6">Step 2: Choose Tobacco Type</h2>
-            {selectedTobaccoType === 'mix' && (
-              <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                <p className="text-sm text-blue-400">
-                  ℹ️ <strong>Mix Tobacco:</strong> This selection includes both Darkblend and Virginia tobacco types. You must choose flavors from both types.
-                </p>
-              </div>
-            )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {getAvailableTobaccoTypes().map((tobacco) => {
-                const isMixType = selectedTobaccoType === 'mix';
-                const isDisabled = isMixType && tobacco.type !== 'mix';
-                
-                return (
-                  <Card 
-                    key={tobacco.id} 
-                    className={`bg-turbo-card border-border transition-all ${
-                      selectedTobaccoType === tobacco.type ? 'ring-2 ring-primary' : ''
-                    } ${
-                      isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                    }`}
-                    onClick={() => !isDisabled && setSelectedTobaccoType(tobacco.type)}
-                  >
-                    <CardContent className="p-4 flex items-center gap-4">
-                      <div className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0">
-                        <img 
-                          src={tobacco.image} 
-                          alt={tobacco.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-turbo-text mb-1">{tobacco.name}</h3>
-                        <p className="text-sm text-turbo-muted">{tobacco.description}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-
-            {selectedTobaccoType && (
-              <div className="mt-6 p-4 bg-turbo-card border border-border rounded-lg">
-                <h3 className="font-medium mb-4">Select Tobacco Strength</h3>
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Strength: {tobaccoStrength}</span>
-                    <span className="text-sm font-medium text-primary">{getStrengthLabel(tobaccoStrength)}</span>
+          {selectedHookah && selectedTobaccoType && (
+            <section>
+              <h2 className="text-xl font-semibold mb-6">Step 2: Tobacco Strength</h2>
+              <Card className="bg-turbo-card border-border">
+                <CardContent className="p-6">
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Strength: {tobaccoStrength}</span>
+                      <span className="text-sm font-medium text-primary">{getStrengthLabel(tobaccoStrength)}</span>
+                    </div>
+                    
+                    <Slider
+                      value={[tobaccoStrength]}
+                      min={selectedTobaccoType === 'mix' ? 3 : (tobaccoTypes.find(t => t.type === selectedTobaccoType)?.strengthRange.min || 1)}
+                      max={selectedTobaccoType === 'mix' ? 7 : (tobaccoTypes.find(t => t.type === selectedTobaccoType)?.strengthRange.max || 5)}
+                      step={1}
+                      onValueChange={(value) => setTobaccoStrength(value[0])}
+                      className="w-full"
+                    />
+                    
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Mild</span>
+                      <span>Strong</span>
+                    </div>
                   </div>
-                  
-                  <Slider
-                    value={[tobaccoStrength]}
-                    min={selectedTobaccoType === 'mix' ? 3 : (tobaccoTypes.find(t => t.type === selectedTobaccoType)?.strengthRange.min || 1)}
-                    max={selectedTobaccoType === 'mix' ? 7 : (tobaccoTypes.find(t => t.type === selectedTobaccoType)?.strengthRange.max || 5)}
-                    step={1}
-                    onValueChange={(value) => setTobaccoStrength(value[0])}
-                    className="w-full"
-                  />
-                  
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Mild</span>
-                    <span>Strong</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </section>
+                </CardContent>
+              </Card>
+            </section>
+          )}
+          
           <section ref={step3Ref}>
             <h2 className="text-xl font-semibold mb-4">Step 3: Choose up to three flavors</h2>
             
