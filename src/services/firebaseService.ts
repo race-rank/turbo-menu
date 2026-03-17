@@ -51,15 +51,15 @@ export const safeConvertTimestamp = (timestamp: any): Date => {
   return new Date(timestamp);
 };
 
-export const createOrderRecord = async (orderData: Omit<DatabaseOrder, 'orderId' | 'createdAt' | 'updatedAt'>) => {
+export const createOrderRecord = async (orderData: Omit<DatabaseOrder, 'orderId' | 'createdAt' | 'updatedAt' | 'timestamp'>) => {
   try {
-    const cleanedOrderData = cleanObject({
-      ...orderData,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
+    const cleanedOrderData = cleanObject(orderData);
     
-    const docRef = await addDoc(collection(firestore, COLLECTIONS.ORDERS), cleanedOrderData);
+    const docRef = await addDoc(collection(firestore, COLLECTIONS.ORDERS), {
+      ...cleanedOrderData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()    
+    });
     
     await updateDoc(docRef, { orderId: docRef.id });
     

@@ -4,15 +4,27 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 export interface RedirectLog {
   target: string;
   source?: string;
+  latitude?: number;
+  longitude?: number;
+  language?: string;
+  timezone?: string;
+  screenResolution?: string;
+  devicePixelRatio?: number;
+  platform?: string;
+  oscpu?: string;
+  cookieEnabled?: boolean;
+  doNotTrack?: string | null;
   timestamp: any;
   userAgent?: string;
   referrer?: string;
   pathname?: string;
+  [key: string]: any;
 }
 
 /**
  * Log a redirect event to Firestore for analytics
  * Captures user agent, referrer, and current pathname
+ * Also captures device, browser, and user preferences
  */
 export const logRedirectEvent = async (data: Omit<RedirectLog, 'timestamp'>) => {
   try {

@@ -50,14 +50,13 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'sta
     console.log('===================================');
     
     const timestamp = new Date();
-    const epochTime = timestamp.getTime();
     const dbOrderData = {
       items: orderData.items.map(convertCartItemToDbItem),
       total: orderData.total,
       table: orderData.table,
-      timestamp: epochTime,
       customerInfo: orderData.customerInfo,
       status: 'pending' as const
+      // timestamp will be set by serverTimestamp() in createOrderRecord
     };
     
     const orderId = await createOrderRecord(dbOrderData);
@@ -82,6 +81,7 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'sta
       table: orderData.table,
       customerInfo: orderData.customerInfo,
       status: 'pending',
+      timestamp: timestamp.getTime(),
       createdAt: timestamp
     };
   } catch (error) {
@@ -100,7 +100,9 @@ export const getAdminOrders = async (status?: string): Promise<{orders: OrderDet
       total: order.total,
       table: order.table,
       customerInfo: order.customerInfo,
-      status: order.status
+      status: order.status,
+      updatedAt: order.updatedAt,
+      createdAt: order.createdAt
     }));
     
     return { orders };
@@ -179,15 +181,23 @@ export const getAdminNotifications = async (): Promise<{notifications: any[]}> =
 
 export const getOrdersInRange = async (start: Date, end: Date): Promise<OrderDetails[]> => {
   const dbOrders = await getOrdersByDateRange(start, end);
-  return dbOrders.map(order => ({
-    orderId: order.orderId,
-    items: order.items as CartItem[],
-    total: order.total,
-    table: order.table,
-    customerInfo: order.customerInfo,
-    status: order.status,
-    createdAt: order.createdAt,
-    updatedAt: order.updatedAt,
-    timestamp: order.timestamp,
-  }));
+  return dbOrders.map(order => {
+    let timestamp: number | undefined;
+    if (order.timestamp instanceof Date) {
+      timestamp = order.timestamp.getTime();
+    } else if (typeof order.timestamp === 'number') {
+      timestamp = order.timestamp;
+    }
+    
+    return {
+      orderId: order.orderId,
+      items: order.items as CartItem[],
+      total: order.total,
+      table: order.table,
+      customerInfo: order.customerInfo,
+      status: order.status,
+      timestamp: timestamp,
+      createdAt: order.createdAt,
+    };
+  });
 };

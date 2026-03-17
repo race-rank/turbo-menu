@@ -2,7 +2,7 @@ export interface DatabaseOrder {
   orderId: string;
   items: DatabaseOrderItem[];
   total: number;
-  timestamp: Date;
+  timestamp: number | Date;
   table?: string;
   customerInfo: {
     id: string;

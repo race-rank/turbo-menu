@@ -14,6 +14,7 @@ import Cart from "./pages/Cart";
 import Admin from "./pages/Admin";
 import MenuManagement from "./pages/MenuManagement";
 import Statistics from "./pages/Statistics";
+import RedirectPage from "./pages/RedirectPage";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => {
                 <Sonner />
                 <BrowserRouter>
                   <Routes>
+                    <Route path="/" element={<RedirectPage />} />
                     <Route path="*" element={<Index />} />
                     <Route path="/cart" element={<Cart />} />
                     <Route 
