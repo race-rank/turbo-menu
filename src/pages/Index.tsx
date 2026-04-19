@@ -45,6 +45,7 @@ const Index = () => {
     hasAlcohol: false,
     hasFruits: false
   });
+  const [flavorPercentages, setFlavorPercentages] = useState<Record<string, number>>({});
 
   const step1Ref = useRef<HTMLDivElement>(null);
   const step2Ref = useRef<HTMLDivElement>(null);
@@ -143,10 +144,23 @@ const Index = () => {
     }
   };
 
+  const isValidTableId = (tableId: string | null): boolean =>
+    !!tableId && (tableId.includes('table-') || tableId.includes('bar'));
+
   const addMixToCart = (mixId: string) => {
     const mix = recommendedMixes.find(m => m.id === mixId);
     const tableId = localStorage.getItem('turbo-table');
-    
+
+    if (!isValidTableId(tableId)) {
+      errorHaptic();
+      toast({
+        title: "No table selected",
+        description: "Please scan your table's QR code to place an order.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (mix && tableId) {
       addItem({
         id: `mix-${mixId}`,
@@ -204,6 +218,59 @@ const Index = () => {
     }
   }, [selectedTobaccoType]);
 
+  const FLAVOR_MIN = 10;
+
+  const getFlavorMax = (variantId: string) => {
+    const flavor = currentFlavors.find(f => f.variantId === variantId);
+    return flavor?.name.toLowerCase().includes('ice') ? 40 : 70;
+  };
+
+  useEffect(() => {
+    if (selectedFlavors.length === 0) {
+      setFlavorPercentages({});
+      return;
+    }
+    const equalShare = Math.floor(100 / selectedFlavors.length);
+    const remainder = 100 - equalShare * selectedFlavors.length;
+    const next: Record<string, number> = {};
+    selectedFlavors.forEach((id, i) => {
+      next[id] = equalShare + (i === 0 ? remainder : 0);
+    });
+    setFlavorPercentages(next);
+  }, [selectedFlavors]);
+
+  const handlePercentageChange = (changedId: string, newValue: number) => {
+    const others = selectedFlavors.filter(id => id !== changedId);
+    if (others.length === 0) return;
+
+    const othersMinTotal = others.length * FLAVOR_MIN;
+    const othersMaxTotal = others.reduce((sum, id) => sum + getFlavorMax(id), 0);
+    const clampedNew = Math.max(
+      FLAVOR_MIN,
+      100 - othersMaxTotal,
+      Math.min(getFlavorMax(changedId), 100 - othersMinTotal, newValue)
+    );
+
+    const remainingForOthers = 100 - clampedNew;
+    const currentOthersSum = others.reduce((sum, id) => sum + (flavorPercentages[id] ?? FLAVOR_MIN), 0);
+
+    const next: Record<string, number> = { [changedId]: clampedNew };
+    let assigned = 0;
+    others.forEach((id, i) => {
+      if (i === others.length - 1) {
+        next[id] = Math.max(FLAVOR_MIN, Math.min(getFlavorMax(id), remainingForOthers - assigned));
+      } else {
+        const proportion = currentOthersSum > 0 ? (flavorPercentages[id] ?? FLAVOR_MIN) / currentOthersSum : 1 / others.length;
+        const val = Math.round(proportion * remainingForOthers);
+        const clamped = Math.max(FLAVOR_MIN, Math.min(getFlavorMax(id), val));
+        next[id] = clamped;
+        assigned += clamped;
+      }
+    });
+
+    setFlavorPercentages(next);
+  };
+
   const getStrengthLabel = (strength: number): string => {
     if (strength <= 2) return 'Very Mild';
     if (strength <= 4) return 'Mild';
@@ -213,6 +280,17 @@ const Index = () => {
   };
 
   const addCustomMixToCart = () => {
+    const tableId = localStorage.getItem('turbo-table');
+    if (!isValidTableId(tableId)) {
+      errorHaptic();
+      toast({
+        title: "No table selected",
+        description: "Please scan your table's QR code to place an order.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!selectedHookah || !selectedTobaccoType || selectedFlavors.length === 0) {
       errorHaptic();
       toast({
@@ -246,8 +324,6 @@ const Index = () => {
       return flavor.variantType ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})` : flavor.name;
     }).filter(Boolean);
 
-    const tableId = localStorage.getItem('turbo-table');
-    
     // Calculate total price with addons
     let totalPrice = selectedHookahData?.price || 0;
     if (selectedAddons.hasLED) totalPrice += ADDON_PRICES.hasLED;
@@ -266,6 +342,7 @@ const Index = () => {
         tobaccoType: selectedTobaccoType,
         tobaccoStrength: tobaccoStrength,
         flavors: selectedFlavorNames as string[],
+        flavorPercentages: selectedFlavors.length >= 2 ? flavorPercentages : undefined,
         table: tableId,
         hasLED: selectedAddons.hasLED,
         hasColoredWater: selectedAddons.hasColoredWater,
@@ -283,6 +360,7 @@ const Index = () => {
       setSelectedHookah(null);
       setSelectedTobaccoType(null);
       setSelectedFlavors([]);
+      setFlavorPercentages({});
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -755,15 +833,52 @@ const Index = () => {
                     </>
                   )}
                   {selectedFlavors.length > 0 && (
-                    <p className="text-turbo-muted mb-4">
-                      Flavors: {selectedFlavors.map(variantId => {
-                        const flavor = currentFlavors.find(f => f.variantId === variantId);
-                        if (!flavor) return '';
-                        return flavor.variantType 
-                          ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`
-                          : flavor.name;
-                      }).join(', ')}
-                    </p>
+                    <div className="mb-4">
+                      {selectedFlavors.length >= 2 ? (
+                        <div className="space-y-4">
+                          {selectedFlavors.map(variantId => {
+                            const flavor = currentFlavors.find(f => f.variantId === variantId);
+                            if (!flavor) return null;
+                            const label = flavor.variantType
+                              ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`
+                              : flavor.name;
+                            const pct = flavorPercentages[variantId] ?? FLAVOR_MIN;
+                            return (
+                              <div key={variantId}>
+                                <div className="flex justify-between mb-1">
+                                  <span className="text-turbo-muted text-sm">{label}</span>
+                                  <span className="text-primary font-semibold text-sm">{pct}%</span>
+                                </div>
+                                <Slider
+                                  value={[pct]}
+                                  min={FLAVOR_MIN}
+                                  max={getFlavorMax(variantId)}
+                                  step={1}
+                                  onValueChange={([val]) => handlePercentageChange(variantId, val)}
+                                  className="w-full"
+                                />
+                              </div>
+                            );
+                          })}
+                          <div className="flex justify-between pt-2 border-t border-border">
+                            <span className="text-turbo-muted text-sm">Total</span>
+                            <span className="text-white font-bold text-sm">
+                              {selectedFlavors.reduce((sum, id) => sum + (flavorPercentages[id] ?? 0), 0)}%
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-turbo-muted">
+                          Flavors: {selectedFlavors.map(variantId => {
+                            const flavor = currentFlavors.find(f => f.variantId === variantId);
+                            if (!flavor) return '';
+                            return flavor.variantType
+                              ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`
+                              : flavor.name;
+                          }).join(', ')}
+                        </p>
+                      )}
+                    </div>
                   )}
                   <Button 
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" 
