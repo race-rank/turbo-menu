@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { submitOrder } from '@/services/orderService';
+import { OrderFooter } from '@/components/layout/OrderFooter';
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -78,7 +79,7 @@ const Cart = () => {
   };
 
   return (
-    <div className="min-h-screen bg-turbo-dark text-turbo-text">
+    <div className="min-h-screen bg-turbo-dark text-turbo-text pb-24">
       <header className="flex items-center justify-between p-4 border-b border-border">
         <Button variant="ghost" size="icon" className="text-turbo-text" onClick={navigateBack}>
           <ArrowLeft className="h-6 w-6" />
@@ -197,6 +198,11 @@ const Cart = () => {
           </div>
         )}
       </div>
+      {state.items.length > 0 && (
+        <OrderFooter
+          primaryAction={{ label: 'Submit Order', onClick: handleOrderSubmission }}
+        />
+      )}
     </div>
   );
 };

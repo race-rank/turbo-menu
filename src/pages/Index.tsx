@@ -8,10 +8,21 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { StickyHeader } from '@/components/layout/StickyHeader';
+import { OrderFooter } from '@/components/layout/OrderFooter';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
 import { WelcomeHeader } from '@/components/WelcomeHeader';
 import { successHaptic, errorHaptic } from '@/utils/haptics';
 import { Slider } from "@/components/ui/slider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { getHookahs, getTobaccoTypes, getFlavors, getRecommendedMixes } from '@/services/menuService';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 
@@ -38,7 +49,7 @@ const Index = () => {
   const [flavors, setFlavors] = useState<DatabaseFlavor[]>([]);
   const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [hasBlueIce, setHasBlueIce] = useState(false);
+  const [iceDialogOpen, setIceDialogOpen] = useState(false);
   const [selectedAddons, setSelectedAddons] = useState({
     hasLED: false,
     hasColoredWater: false,
@@ -225,16 +236,23 @@ const Index = () => {
     return flavor?.name.toLowerCase().includes('ice') ? 40 : 70;
   };
 
+  const snap10 = (n: number) => Math.round(n / 10) * 10;
+
   useEffect(() => {
     if (selectedFlavors.length === 0) {
       setFlavorPercentages({});
       return;
     }
-    const equalShare = Math.floor(100 / selectedFlavors.length);
-    const remainder = 100 - equalShare * selectedFlavors.length;
+    // Default split (multiples of 10): 1→100, 2→50/50, 3→40/30/30
+    const defaults: Record<number, number[]> = {
+      1: [100],
+      2: [50, 50],
+      3: [40, 30, 30],
+    };
+    const split = defaults[selectedFlavors.length] ?? [];
     const next: Record<string, number> = {};
     selectedFlavors.forEach((id, i) => {
-      next[id] = equalShare + (i === 0 ? remainder : 0);
+      next[id] = split[i] ?? FLAVOR_MIN;
     });
     setFlavorPercentages(next);
   }, [selectedFlavors]);
@@ -248,7 +266,7 @@ const Index = () => {
     const clampedNew = Math.max(
       FLAVOR_MIN,
       100 - othersMaxTotal,
-      Math.min(getFlavorMax(changedId), 100 - othersMinTotal, newValue)
+      Math.min(getFlavorMax(changedId), 100 - othersMinTotal, snap10(newValue))
     );
 
     const remainingForOthers = 100 - clampedNew;
@@ -261,8 +279,9 @@ const Index = () => {
         next[id] = Math.max(FLAVOR_MIN, Math.min(getFlavorMax(id), remainingForOthers - assigned));
       } else {
         const proportion = currentOthersSum > 0 ? (flavorPercentages[id] ?? FLAVOR_MIN) / currentOthersSum : 1 / others.length;
-        const val = Math.round(proportion * remainingForOthers);
-        const clamped = Math.max(FLAVOR_MIN, Math.min(getFlavorMax(id), val));
+        const raw = proportion * remainingForOthers;
+        const snapped = snap10(raw);
+        const clamped = Math.max(FLAVOR_MIN, Math.min(getFlavorMax(id), snapped));
         next[id] = clamped;
         assigned += clamped;
       }
@@ -279,7 +298,7 @@ const Index = () => {
     return 'Very Strong';
   };
 
-  const addCustomMixToCart = () => {
+  const requestAddToCart = () => {
     const tableId = localStorage.getItem('turbo-table');
     if (!isValidTableId(tableId)) {
       errorHaptic();
@@ -300,11 +319,10 @@ const Index = () => {
       return;
     }
 
-    // Validation for Mix tobacco type: must have at least one darkblend and one virginia flavor
     if (selectedTobaccoType === 'mix') {
       const hasDarkblendFlavor = selectedFlavors.some(variantId => variantId.endsWith('-darkblend'));
       const hasVirginiaFlavor = selectedFlavors.some(variantId => variantId.endsWith('-virginia'));
-      
+
       if (!hasDarkblendFlavor || !hasVirginiaFlavor) {
         errorHaptic();
         toast({
@@ -316,54 +334,61 @@ const Index = () => {
       }
     }
 
+    setIceDialogOpen(true);
+  };
+
+  const finalizeAddToCart = (withIce: boolean) => {
+    setIceDialogOpen(false);
+    const tableId = localStorage.getItem('turbo-table');
     const selectedHookahData = hookahs.find(h => h.id === selectedHookah);
+    if (!selectedHookahData || !tableId || !selectedTobaccoType) return;
+
     const selectedFlavorNames = selectedFlavors.map(variantId => {
       const flavor = currentFlavors.find(f => f.variantId === variantId);
       if (!flavor) return null;
-      // Add type suffix if it's a variant
       return flavor.variantType ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})` : flavor.name;
-    }).filter(Boolean);
+    }).filter(Boolean) as string[];
 
-    // Calculate total price with addons
-    let totalPrice = selectedHookahData?.price || 0;
+    if (withIce && blueIceFlavor) {
+      selectedFlavorNames.push(blueIceFlavor.name);
+    }
+
+    let totalPrice = selectedHookahData.price || 0;
     if (selectedAddons.hasLED) totalPrice += ADDON_PRICES.hasLED;
     if (selectedAddons.hasColoredWater) totalPrice += ADDON_PRICES.hasColoredWater;
     if (selectedAddons.hasFruits) totalPrice += ADDON_PRICES.hasFruits;
     if (selectedAddons.hasAlcohol) totalPrice += ADDON_PRICES.hasAlcohol;
 
-    if (selectedHookahData && tableId) {
-      addItem({
-        id: `custom-${Date.now()}`,
-        type: 'custom',
-        name: 'Custom Mix',
-        price: totalPrice,
-        image: selectedHookahData.image,
-        hookah: selectedHookahData.name,
-        tobaccoType: selectedTobaccoType,
-        tobaccoStrength: tobaccoStrength,
-        flavors: selectedFlavorNames as string[],
-        flavorPercentages: selectedFlavors.length >= 2 ? flavorPercentages : undefined,
-        table: tableId,
-        hasLED: selectedAddons.hasLED,
-        hasColoredWater: selectedAddons.hasColoredWater,
-        hasAlcohol: selectedAddons.hasAlcohol,
-        hasFruits: selectedAddons.hasFruits
-      });
-      
-      successHaptic();
-      
-      toast({
-        title: "Added to cart",
-        description: "Custom mix has been added to your cart!",
-      });
-      
-      setSelectedHookah(null);
-      setSelectedTobaccoType(null);
-      setSelectedFlavors([]);
-      setFlavorPercentages({});
+    addItem({
+      id: `custom-${Date.now()}`,
+      type: 'custom',
+      name: 'Custom Mix',
+      price: totalPrice,
+      image: selectedHookahData.image,
+      hookah: selectedHookahData.name,
+      tobaccoType: selectedTobaccoType,
+      tobaccoStrength: tobaccoStrength,
+      flavors: selectedFlavorNames,
+      flavorPercentages: selectedFlavors.length >= 2 ? flavorPercentages : undefined,
+      table: tableId,
+      hasLED: selectedAddons.hasLED,
+      hasColoredWater: selectedAddons.hasColoredWater,
+      hasAlcohol: selectedAddons.hasAlcohol,
+      hasFruits: selectedAddons.hasFruits
+    });
 
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    successHaptic();
+    toast({
+      title: "Added to cart",
+      description: withIce ? "Custom mix with ice added to your cart!" : "Custom mix has been added to your cart!",
+    });
+
+    setSelectedHookah(null);
+    setSelectedTobaccoType(null);
+    setSelectedFlavors([]);
+    setFlavorPercentages({});
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const navigateToCart = () => {
@@ -372,36 +397,13 @@ const Index = () => {
 
   const cartItemCount = getItemCount();
 
-  const blueIceFlavor = flavors.find(flavor => 
-    flavor.name.toLowerCase().includes('blue ice') || 
+  const blueIceFlavor = flavors.find(flavor =>
+    flavor.name.toLowerCase().includes('blue ice') ||
     flavor.name.toLowerCase().includes('ice')
   );
-  
-  // Get the variant ID for blue ice (if it exists in current flavors)
-  const blueIceVariantId = blueIceFlavor ? currentFlavors.find(f => f.id === blueIceFlavor.id)?.variantId : undefined;
-
-  const handleBlueIceToggle = () => {
-    if (!blueIceVariantId) return;
-    
-    if (hasBlueIce) {
-      setSelectedFlavors(prev => prev.filter(id => !id.startsWith(blueIceFlavor!.id)));
-      setHasBlueIce(false);
-    } else {
-      // Blue ice doesn't count towards the 3-flavor limit
-      setSelectedFlavors(prev => [...prev, blueIceVariantId]);
-      setHasBlueIce(true);
-    }
-  };
-
-  useEffect(() => {
-    if (blueIceFlavor) {
-      setHasBlueIce(selectedFlavors.some(id => id.startsWith(blueIceFlavor.id)));
-    }
-  }, [selectedFlavors, blueIceFlavor]);
 
   const clearSelections = () => {
     setSelectedFlavors([]);
-    setHasBlueIce(false);
   };
   
   useEffect(() => {
@@ -465,7 +467,7 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-24">
       <StickyHeader>
         <header className="flex items-center justify-between p-1">
           <NavigationSidebar />
@@ -717,10 +719,9 @@ const Index = () => {
                 {selectedFlavors.length > 0 ? (
                   <div className="mb-4 flex flex-wrap items-center gap-3">
                     <p className="text-sm text-turbo-muted">
-                      Selected flavors: {selectedFlavors.filter(id => !blueIceFlavor || !id.startsWith(blueIceFlavor.id)).length}/3
+                      Selected flavors: {selectedFlavors.length}/3
                       <span className="ml-2 text-turbo-text font-medium">
                         {selectedFlavors
-                          .filter(variantId => !blueIceFlavor || !variantId.startsWith(blueIceFlavor.id))
                           .map(variantId => {
                             const flavor = currentFlavors.find(f => f.variantId === variantId);
                             if (!flavor) return null;
@@ -730,10 +731,9 @@ const Index = () => {
                           .join(', ')
                         }
                       </span>
-                      {hasBlueIce && <span className="ml-2 text-blue-400">+ Ice</span>}
                     </p>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={clearSelections}
                       className="flex items-center gap-1 text-xs"
@@ -744,15 +744,9 @@ const Index = () => {
                   </div>
                 ) : (
                   <div className="mb-4 flex flex-wrap items-center gap-3">
-                    <p className="text-sm text-turbo-muted">
-                      Selected flavors: 0/3
-                      {hasBlueIce && <span className="ml-2 text-blue-400">+ Ice</span>}
-                      <span className="ml-2 text-turbo-text font-medium">
-                        {hasBlueIce && blueIceFlavor ? blueIceFlavor.name : ''}
-                      </span>
-                    </p>
-                    <Button 
-                      variant="outline" 
+                    <p className="text-sm text-turbo-muted">Selected flavors: 0/3</p>
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={clearSelections}
                       disabled
@@ -765,8 +759,8 @@ const Index = () => {
                 )}
 
                 <div className="mb-4 flex gap-2">
-                  <Button 
-                    variant="secondary" 
+                  <Button
+                    variant="secondary"
                     size="sm"
                     onClick={selectRandomFlavors}
                     className={`flex items-center gap-1 transition-transform duration-300 ${
@@ -776,17 +770,6 @@ const Index = () => {
                     <Shuffle className="h-4 w-4" />
                     Random Mix
                   </Button>
-                  
-                  {blueIceFlavor && (
-                    <Button 
-                      variant={hasBlueIce ? "default" : "outline"}
-                      size="sm"
-                      onClick={handleBlueIceToggle}
-                      className="flex items-center gap-1"
-                    >
-                      {hasBlueIce ? "Remove Ice" : "Add Ice"}
-                    </Button>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -889,7 +872,7 @@ const Index = () => {
                                   value={[pct]}
                                   min={FLAVOR_MIN}
                                   max={getFlavorMax(variantId)}
-                                  step={1}
+                                  step={10}
                                   onValueChange={([val]) => handlePercentageChange(variantId, val)}
                                   className="w-full"
                                 />
@@ -918,7 +901,7 @@ const Index = () => {
                   )}
                   <Button 
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" 
-                    onClick={addCustomMixToCart}
+                    onClick={requestAddToCart}
                   >
                     Add Custom Mix to Cart
                   </Button>
@@ -928,6 +911,52 @@ const Index = () => {
           )}
         </div>
       </main>
+      <OrderFooter
+        build={{
+          hookahName: selectedHookah ? hookahs.find(h => h.id === selectedHookah)?.name ?? null : null,
+          tobaccoLabel: selectedTobaccoType
+            ? `${tobaccoTypes.find(t => t.id === selectedTobaccoType)?.name ?? selectedTobaccoType} · ${getStrengthLabel(tobaccoStrength)}`
+            : null,
+          flavors: selectedFlavors.map(variantId => {
+            const flavor = currentFlavors.find(f => f.variantId === variantId);
+            const name = flavor
+              ? (flavor.variantType
+                  ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`
+                  : flavor.name)
+              : variantId;
+            return {
+              name,
+              percentage: selectedFlavors.length >= 2 ? flavorPercentages[variantId] : undefined,
+            };
+          }),
+          flavorMax: 3,
+          complete: !!selectedHookah && !!selectedTobaccoType && selectedFlavors.length > 0,
+          onAdd: requestAddToCart,
+        }}
+      />
+      <AlertDialog open={iceDialogOpen} onOpenChange={setIceDialogOpen}>
+        <AlertDialogContent className="bg-turbo-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add ice to your mix?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {blueIceFlavor
+                ? `${blueIceFlavor.name} adds a refreshing chill to your hookah.`
+                : 'Add a refreshing chill to your hookah.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => finalizeAddToCart(false)}>
+              No, thanks
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              onClick={() => finalizeAddToCart(true)}
+            >
+              Yes, add ice
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
