@@ -95,36 +95,38 @@ const Index = () => {
   // Create expanded flavor list with separate entries for dual-compatible flavors
   const getExpandedFlavors = () => {
     if (!selectedTobaccoType) return [];
-    
+
+    const MIX_TYPES: Array<'virginia' | 'darkblend'> = ['virginia', 'darkblend'];
+
     let baseFlavors = selectedTobaccoType === 'mix'
-      ? flavors.filter(flavor => flavor.isActive)
+      ? flavors.filter(flavor => flavor.isActive && flavor.compatibleTobaccoTypes.some(t => MIX_TYPES.includes(t as 'virginia' | 'darkblend')))
       : flavors.filter(flavor => flavor.isActive && flavor.compatibleTobaccoTypes.includes(selectedTobaccoType));
-    
-    // Expand flavors that are compatible with both types
+
     const expandedFlavors: Array<DatabaseFlavor & { variantType?: 'virginia' | 'darkblend', variantId: string }> = [];
-    
+
     baseFlavors.forEach(flavor => {
-      if (flavor.compatibleTobaccoTypes.length > 1) {
-        // Flavor is compatible with both - create separate variants only for Mix
-        if (selectedTobaccoType === 'mix') {
-          // For Mix: show both variants
-          flavor.compatibleTobaccoTypes.forEach(type => {
-            expandedFlavors.push({
-              ...flavor,
-              variantType: type,
-              variantId: `${flavor.id}-${type}`
-            });
-          });
-        } else {
-          // For single type selection: show only the selected type variant
+      if (selectedTobaccoType === 'mix') {
+        // Mix: emit one variant per supported (virginia/darkblend) compat type only
+        const validTypes = flavor.compatibleTobaccoTypes.filter(t =>
+          MIX_TYPES.includes(t as 'virginia' | 'darkblend')
+        ) as Array<'virginia' | 'darkblend'>;
+        validTypes.forEach(type => {
           expandedFlavors.push({
             ...flavor,
-            variantType: selectedTobaccoType as 'virginia' | 'darkblend',
-            variantId: `${flavor.id}-${selectedTobaccoType}`
+            variantType: type,
+            variantId: `${flavor.id}-${type}`
           });
-        }
+        });
+        return;
+      }
+
+      if (flavor.compatibleTobaccoTypes.length > 1) {
+        expandedFlavors.push({
+          ...flavor,
+          variantType: selectedTobaccoType as 'virginia' | 'darkblend',
+          variantId: `${flavor.id}-${selectedTobaccoType}`
+        });
       } else {
-        // Single compatibility - assign type and keep single entry
         expandedFlavors.push({
           ...flavor,
           variantType: flavor.compatibleTobaccoTypes[0],
@@ -132,7 +134,7 @@ const Index = () => {
         });
       }
     });
-    
+
     return expandedFlavors;
   };
 
