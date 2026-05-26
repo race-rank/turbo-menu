@@ -13,8 +13,15 @@ const Cart = () => {
   const { state, removeItem, updateQuantity, clearCart } = useCart();
   const { addOrder } = useOrderTracking();
 
+  const getTableHome = () => {
+    const stored = localStorage.getItem('turbo-table') || '';
+    return stored && (stored.includes('table-') || stored.includes('bar'))
+      ? (stored.startsWith('/') ? stored : `/${stored}`)
+      : '/';
+  };
+
   const navigateBack = () => {
-    navigate('/');
+    navigate(getTableHome());
   };
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
@@ -65,7 +72,7 @@ const Cart = () => {
       });
       
       setTimeout(() => {
-        navigate('/');
+        navigate(getTableHome());
       }, 2000);
       
     } catch (error) {
@@ -97,6 +104,7 @@ const Cart = () => {
             <Button onClick={navigateBack} className="bg-primary hover:bg-primary/90">
               Start Shopping
             </Button>
+
           </div>
         ) : (
           <div className="space-y-6">

@@ -12,6 +12,7 @@ import { OrderStatusTracker } from "@/components/OrderStatusTracker";
 import Index from "./pages/Index";
 import Cart from "./pages/Cart";
 import Admin from "./pages/Admin";
+import AdminLogin from "./pages/AdminLogin";
 import MenuManagement from "./pages/MenuManagement";
 import Statistics from "./pages/Statistics";
 import RedirectPage from "./pages/RedirectPage";
@@ -31,8 +32,8 @@ const App = () => {
                 <BrowserRouter>
                   <Routes>
                     <Route path="/" element={<RedirectPage />} />
-                    <Route path="*" element={<Index />} />
                     <Route path="/cart" element={<Cart />} />
+                    <Route path="/hookah-bar-admin" element={<AdminLogin />} />
                     <Route 
                       path="/admin" 
                       element={
@@ -49,14 +50,15 @@ const App = () => {
                         </AdminGuard>
                       } 
                     />
-                    <Route 
-                      path="/statistics" 
+                    <Route
+                      path="/statistics"
                       element={
                         <AdminGuard>
                           <Statistics />
                         </AdminGuard>
-                      } 
+                      }
                     />
+                    <Route path="*" element={<Index />} />
                   </Routes>
                   <OrderStatusTracker />
                 </BrowserRouter>

@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import Autoplay from 'embla-carousel-autoplay';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Search, ShoppingCart, Trash2, Shuffle } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
@@ -13,16 +15,7 @@ import { NavigationSidebar } from '@/components/NavigationSidebar';
 import { WelcomeHeader } from '@/components/WelcomeHeader';
 import { successHaptic, errorHaptic } from '@/utils/haptics';
 import { Slider } from "@/components/ui/slider";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { Switch } from "@/components/ui/switch";
 import { getHookahs, getTobaccoTypes, getFlavors, getRecommendedMixes } from '@/services/menuService';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 
@@ -49,7 +42,7 @@ const Index = () => {
   const [flavors, setFlavors] = useState<DatabaseFlavor[]>([]);
   const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [iceDialogOpen, setIceDialogOpen] = useState(false);
+  const [addIce, setAddIce] = useState(false);
   const [selectedAddons, setSelectedAddons] = useState({
     hasLED: false,
     hasColoredWater: false,
@@ -61,6 +54,7 @@ const Index = () => {
   const step1Ref = useRef<HTMLDivElement>(null);
   const step2Ref = useRef<HTMLDivElement>(null);
   const step3Ref = useRef<HTMLDivElement>(null);
+  const mixAutoplay = useRef(Autoplay({ delay: 4000, stopOnInteraction: false, stopOnMouseEnter: true }));
 
   useEffect(() => {
     const loadMenuData = async () => {
@@ -300,6 +294,23 @@ const Index = () => {
     return 'Very Strong';
   };
 
+  const formatFlavorLabel = (flavor: ReturnType<typeof getExpandedFlavors>[number]) => {
+    if (selectedTobaccoType === 'mix' && flavor.variantType) {
+      return `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`;
+    }
+    return flavor.name;
+  };
+
+  const resolveFinalTobaccoType = (): 'virginia' | 'darkblend' | 'mix' | null => {
+    if (selectedTobaccoType !== 'mix') return selectedTobaccoType;
+    const hasDB = selectedFlavors.some(id => id.endsWith('-darkblend'));
+    const hasV = selectedFlavors.some(id => id.endsWith('-virginia'));
+    if (hasDB && hasV) return 'mix';
+    if (hasDB) return 'darkblend';
+    if (hasV) return 'virginia';
+    return 'mix';
+  };
+
   const requestAddToCart = () => {
     const tableId = localStorage.getItem('turbo-table');
     if (!isValidTableId(tableId)) {
@@ -321,34 +332,21 @@ const Index = () => {
       return;
     }
 
-    if (selectedTobaccoType === 'mix') {
-      const hasDarkblendFlavor = selectedFlavors.some(variantId => variantId.endsWith('-darkblend'));
-      const hasVirginiaFlavor = selectedFlavors.some(variantId => variantId.endsWith('-virginia'));
-
-      if (!hasDarkblendFlavor || !hasVirginiaFlavor) {
-        errorHaptic();
-        toast({
-          title: "Invalid Mix Selection",
-          description: "For a Mix hookah, you must select at least one DARKBLEND and one VIRGINIA flavor.",
-          variant: "destructive"
-        });
-        return;
-      }
-    }
-
-    setIceDialogOpen(true);
+    finalizeAddToCart(addIce);
   };
 
   const finalizeAddToCart = (withIce: boolean) => {
-    setIceDialogOpen(false);
     const tableId = localStorage.getItem('turbo-table');
     const selectedHookahData = hookahs.find(h => h.id === selectedHookah);
     if (!selectedHookahData || !tableId || !selectedTobaccoType) return;
 
+    const finalTobaccoType = resolveFinalTobaccoType() ?? selectedTobaccoType;
+
     const selectedFlavorNames = selectedFlavors.map(variantId => {
       const flavor = currentFlavors.find(f => f.variantId === variantId);
       if (!flavor) return null;
-      return flavor.variantType ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})` : flavor.name;
+      const showVariant = finalTobaccoType === 'mix' && flavor.variantType;
+      return showVariant ? `${flavor.name} (${flavor.variantType!.charAt(0).toUpperCase() + flavor.variantType!.slice(1)})` : flavor.name;
     }).filter(Boolean) as string[];
 
     if (withIce && blueIceFlavor) {
@@ -368,7 +366,7 @@ const Index = () => {
       price: totalPrice,
       image: selectedHookahData.image,
       hookah: selectedHookahData.name,
-      tobaccoType: selectedTobaccoType,
+      tobaccoType: finalTobaccoType,
       tobaccoStrength: tobaccoStrength,
       flavors: selectedFlavorNames,
       flavorPercentages: selectedFlavors.length >= 2 ? flavorPercentages : undefined,
@@ -412,8 +410,6 @@ const Index = () => {
     if (location.pathname.includes('table-') || location.pathname.includes('bar')) {
       setTable(location.pathname);
       localStorage.setItem('turbo-table', location.pathname);
-    } else {
-      localStorage.setItem('turbo-table', '');
     }
   }, [location.pathname]);
 
@@ -493,55 +489,65 @@ const Index = () => {
           </section>
           <section>
             <h2 className="text-xl font-semibold mb-6">Recommended Mixes</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {recommendedMixes.map((mix) => (
-                <Card key={mix.id} className="bg-turbo-card border-border overflow-hidden">
-                  <CardContent className="p-0">
-                    <div className={`${mix.bgColor} p-4 text-center relative`}>
-                      <img 
-                        src={mix.mainImage} 
-                        alt={mix.name}
-                        className="w-24 h-28 object-cover mx-auto rounded"
-                      />
-                      <h3 className="text-white font-semibold mt-2">{mix.name}</h3>
-                      
-                      <div className="flex justify-center gap-1 mt-2">
-                        {mix.flavorImages.map((flavor, index) => (
-                          <img 
-                            key={index}
-                            src={flavor}
-                            alt="flavor"
-                            className="w-6 h-6 rounded-full object-cover"
+            <Carousel
+              opts={{ align: 'start', loop: true }}
+              plugins={[mixAutoplay.current as unknown as never]}
+              className="w-full"
+            >
+              <CarouselContent>
+                {recommendedMixes.map((mix) => (
+                  <CarouselItem key={mix.id} className="basis-full md:basis-1/2 lg:basis-1/3">
+                    <Card className="bg-turbo-card border-border overflow-hidden h-full">
+                      <CardContent className="p-0">
+                        <div className={`${mix.bgColor} p-4 text-center relative`}>
+                          <img
+                            src={mix.mainImage}
+                            alt={mix.name}
+                            className="w-24 h-28 object-cover mx-auto rounded"
                           />
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="p-4 space-y-2">
-                      {mix.promoText && (
-                        <div className="bg-primary-100 text-secondary-800 p-2 rounded-md text-xs mb-2">
-                          {mix.promoText}
+                          <h3 className="text-white font-semibold mt-2">{mix.name}</h3>
+
+                          <div className="flex justify-center gap-1 mt-2">
+                            {mix.flavorImages.map((flavor, index) => (
+                              <img
+                                key={index}
+                                src={flavor}
+                                alt="flavor"
+                                className="w-6 h-6 rounded-full object-cover"
+                              />
+                            ))}
+                          </div>
                         </div>
-                      )}
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-bold text-turbo-text">{mix.price} Lei</span>
-                        <span className="text-sm text-turbo-muted">Category</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-turbo-muted">{mix.category}</span>
-                        <Button 
-                          size="sm" 
-                          className="bg-amber-600 hover:bg-amber-700 text-white"
-                          onClick={() => addMixToCart(mix.id)}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+
+                        <div className="p-4 space-y-2">
+                          {mix.promoText && (
+                            <div className="bg-primary-100 text-secondary-800 p-2 rounded-md text-xs mb-2">
+                              {mix.promoText}
+                            </div>
+                          )}
+                          <div className="flex justify-between items-center">
+                            <span className="text-lg font-bold text-turbo-text">{mix.price} Lei</span>
+                            <span className="text-sm text-turbo-muted">Category</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-turbo-muted">{mix.category}</span>
+                            <Button
+                              size="sm"
+                              className="bg-amber-600 hover:bg-amber-700 text-white"
+                              onClick={() => addMixToCart(mix.id)}
+                            >
+                              Add
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="hidden md:flex" />
+              <CarouselNext className="hidden md:flex" />
+            </Carousel>
           </section>
           <section ref={step1Ref}>
             <h2 className="text-xl font-semibold mb-6">Step 1: Choose Hookah</h2>
@@ -594,7 +600,7 @@ const Index = () => {
                     <Button
                       variant={selectedAddons.hasLED ? "default" : "outline"}
                       size="lg"
-                      onClick={() => setSelectedAddons({ hasLED: !selectedAddons.hasLED, hasColoredWater: false, hasAlcohol: false, hasFruits: false })}
+                      onClick={(e) => { setSelectedAddons(prev => ({ ...prev, hasLED: !prev.hasLED })); e.currentTarget.blur(); }}
                       className="h-auto py-4 flex flex-col items-center gap-2"
                     >
                       <span className="text-2xl">💡</span>
@@ -604,7 +610,7 @@ const Index = () => {
                     <Button
                       variant={selectedAddons.hasColoredWater ? "default" : "outline"}
                       size="lg"
-                      onClick={() => setSelectedAddons({ hasLED: false, hasColoredWater: !selectedAddons.hasColoredWater, hasAlcohol: false, hasFruits: false })}
+                      onClick={(e) => { setSelectedAddons(prev => ({ ...prev, hasColoredWater: !prev.hasColoredWater })); e.currentTarget.blur(); }}
                       className="h-auto py-4 flex flex-col items-center gap-2"
                     >
                       <span className="text-2xl">🎨</span>
@@ -614,7 +620,7 @@ const Index = () => {
                     <Button
                       variant={selectedAddons.hasAlcohol ? "default" : "outline"}
                       size="lg"
-                      onClick={() => setSelectedAddons({ hasLED: false, hasColoredWater: false, hasAlcohol: !selectedAddons.hasAlcohol, hasFruits: false })}
+                      onClick={(e) => { setSelectedAddons(prev => ({ ...prev, hasAlcohol: !prev.hasAlcohol })); e.currentTarget.blur(); }}
                       className="h-auto py-4 flex flex-col items-center gap-2"
                     >
                       <span className="text-2xl">🍷</span>
@@ -624,7 +630,7 @@ const Index = () => {
                     <Button
                       variant={selectedAddons.hasFruits ? "default" : "outline"}
                       size="lg"
-                      onClick={() => setSelectedAddons({ hasLED: false, hasColoredWater: false, hasAlcohol: false, hasFruits: !selectedAddons.hasFruits })}
+                      onClick={(e) => { setSelectedAddons(prev => ({ ...prev, hasFruits: !prev.hasFruits })); e.currentTarget.blur(); }}
                       className="h-auto py-4 flex flex-col items-center gap-2"
                     >
                       <span className="text-2xl">🍊</span>
@@ -691,7 +697,7 @@ const Index = () => {
                           .map(variantId => {
                             const flavor = currentFlavors.find(f => f.variantId === variantId);
                             if (!flavor) return null;
-                            return flavor.variantType ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})` : flavor.name;
+                            return formatFlavorLabel(flavor);
                           })
                           .filter(Boolean)
                           .join(', ')
@@ -742,9 +748,8 @@ const Index = () => {
                   {filteredFlavors
                     .filter(flavor => !blueIceFlavor || flavor.id !== blueIceFlavor.id)
                     .map((flavor) => {
-                      const displayName = flavor.variantType 
-                        ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`
-                        : flavor.name;
+                      const displayName = formatFlavorLabel(flavor);
+                      const showVariantBadge = selectedTobaccoType === 'mix' && !!flavor.variantType;
                       
                       return (
                         <Card 
@@ -763,8 +768,7 @@ const Index = () => {
                               <div className="relative z-10 flex flex-col items-center justify-end h-full w-full p-1">
                                 <div className="w-full bg-black/60 rounded px-2 py-1 flex flex-col items-center">
                                   <h3 className="text-xs font-semibold text-white mb-1 truncate w-full">{displayName}</h3>
-                                  {/* Show tobacco type badge for variant */}
-                                  {flavor.variantType && (
+                                  {showVariantBadge && flavor.variantType && (
                                     <div className="flex gap-1 mb-1">
                                       <span className={`text-[9px] px-1.5 py-0.5 text-white rounded font-semibold ${
                                         flavor.variantType === 'virginia' ? 'bg-amber-500/80' : 'bg-purple-500/80'
@@ -824,9 +828,7 @@ const Index = () => {
                           {selectedFlavors.map(variantId => {
                             const flavor = currentFlavors.find(f => f.variantId === variantId);
                             if (!flavor) return null;
-                            const label = flavor.variantType
-                              ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`
-                              : flavor.name;
+                            const label = formatFlavorLabel(flavor);
                             const pct = flavorPercentages[variantId] ?? FLAVOR_MIN;
                             return (
                               <div key={variantId}>
@@ -857,16 +859,21 @@ const Index = () => {
                           Flavors: {selectedFlavors.map(variantId => {
                             const flavor = currentFlavors.find(f => f.variantId === variantId);
                             if (!flavor) return '';
-                            return flavor.variantType
-                              ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`
-                              : flavor.name;
+                            return formatFlavorLabel(flavor);
                           }).join(', ')}
                         </p>
                       )}
                     </div>
                   )}
-                  <Button 
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" 
+                  <div className="flex items-center justify-between mb-3 p-3 rounded-md border border-border bg-muted/30">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-turbo-text">Add Ice</span>
+                      <span className="text-xs text-turbo-muted">Refreshing chill on top of your mix</span>
+                    </div>
+                    <Switch checked={addIce} onCheckedChange={setAddIce} />
+                  </div>
+                  <Button
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                     onClick={requestAddToCart}
                   >
                     Add Custom Mix to Cart
@@ -885,11 +892,7 @@ const Index = () => {
             : null,
           flavors: selectedFlavors.map(variantId => {
             const flavor = currentFlavors.find(f => f.variantId === variantId);
-            const name = flavor
-              ? (flavor.variantType
-                  ? `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`
-                  : flavor.name)
-              : variantId;
+            const name = flavor ? formatFlavorLabel(flavor) : variantId;
             return {
               name,
               percentage: selectedFlavors.length >= 2 ? flavorPercentages[variantId] : undefined,
@@ -900,29 +903,6 @@ const Index = () => {
           onAdd: requestAddToCart,
         }}
       />
-      <AlertDialog open={iceDialogOpen} onOpenChange={setIceDialogOpen}>
-        <AlertDialogContent className="bg-turbo-card border-border">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Add ice to your mix?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {blueIceFlavor
-                ? `${blueIceFlavor.name} adds a refreshing chill to your hookah.`
-                : 'Add a refreshing chill to your hookah.'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => finalizeAddToCart(false)}>
-              No, thanks
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              onClick={() => finalizeAddToCart(true)}
-            >
-              Yes, add ice
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };

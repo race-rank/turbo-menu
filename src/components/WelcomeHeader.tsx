@@ -16,9 +16,22 @@ export const WelcomeHeader: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-b from-black/50 to-black/70" />
       
       {/* Content */}
-      <div className="relative z-10">
-        <h1 className="text-4xl font-bold text-white mb-3 drop-shadow-lg">Bine ai venit la Turbo!</h1>
-        <p className="text-white/90 text-lg drop-shadow-md">Îți mulțumim că ne-ai ales! Ce ai dori să comanzi astăzi?</p>
+      <div className="relative z-10 px-4">
+        <h1 className="text-4xl font-bold text-white mb-4 drop-shadow-lg tracking-wider">WELCOME TO TURBO</h1>
+        <p className="text-white/90 text-base md:text-lg drop-shadow-md leading-relaxed whitespace-pre-line">
+{`WHERE HOOKAH LOVERS
+COME TO RELAX,
+CONNECT AND ENJOY
+PREMIUM MIXES.
+
+EVERY SESSION
+CREATES MEMORIES.
+EVERY FLAVOUR
+BRINGS A NEW VIBE.
+
+TOGETHER WE SMOKE,
+TOGETHER WE FEEL.`}
+        </p>
       </div>
     </div>
   );

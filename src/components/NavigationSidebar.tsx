@@ -4,23 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Home, ShoppingCart, Settings, LogOut, Utensils, Star, BarChart2 } from 'lucide-react';
 import { useAuth } from "@/contexts/AuthContext";
-import { LoginDialog } from "./LoginDialog";
 import { cn } from "@/lib/utils";
 import { performRedirect } from "@/utils/redirects";
 
 export const NavigationSidebar = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [loginOpen, setLoginOpen] = useState(false);
   const { loggedIn, hasAdminRights, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-
-  const handleAdminClick = () => {
-    if (!loggedIn || !hasAdminRights) {
-      setLoginOpen(true);
-    }
-    setSidebarOpen(false);
-  };
 
   const handleLogout = () => {
     logout();
@@ -109,17 +100,6 @@ export const NavigationSidebar = () => {
                 </>
               )}
               
-              {(!loggedIn || !hasAdminRights) && (
-                <Button
-                  variant="ghost"
-                  onClick={handleAdminClick}
-                  className="w-full justify-start gap-3 px-3 py-2 h-auto text-sm font-medium"
-                >
-                  <Settings className="h-4 w-4" />
-                  Admin Panel
-                </Button>
-              )}
-              
               <button
                 onClick={() => performRedirect('google-reviews')}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground w-full text-left"
@@ -152,7 +132,6 @@ export const NavigationSidebar = () => {
         </SheetContent>
       </Sheet>
       
-      <LoginDialog open={loginOpen} onOpenChange={setLoginOpen} />
     </>
   );
 };
