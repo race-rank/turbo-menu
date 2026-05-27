@@ -128,16 +128,16 @@ const Cart = () => {
                             {(item.hasLED || item.hasColoredWater || item.hasAlcohol || item.hasFruits) && (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {item.hasLED && (
-                                  <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded">💡 LED</span>
+                                  <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded">LED</span>
                                 )}
                                 {item.hasColoredWater && (
-                                  <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">🎨 Colored</span>
+                                  <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">Colored Water</span>
                                 )}
                                 {item.hasAlcohol && (
-                                  <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">🍷 Alcohol</span>
+                                  <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">Alcohol</span>
                                 )}
                                 {item.hasFruits && (
-                                  <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">🍊 Fruits</span>
+                                  <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Fruits</span>
                                 )}
                               </div>
                             )}

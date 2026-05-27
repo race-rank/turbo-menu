@@ -19,12 +19,14 @@ import { Switch } from "@/components/ui/switch";
 import { getHookahs, getTobaccoTypes, getFlavors, getRecommendedMixes } from '@/services/menuService';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 
-const ADDON_PRICES = {
-  hasLED: 30,
-  hasColoredWater: 10,
-  hasFruits: 20,
-  hasAlcohol: 40
-};
+const ADDONS = [
+  { key: 'hasLED' as const, label: 'LED Hookah', price: 30, image: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=400&h=400&fit=crop' },
+  { key: 'hasColoredWater' as const, label: 'Colored Water', price: 10, image: 'https://images.unsplash.com/photo-1525385133512-2f3bdd585926?w=400&h=400&fit=crop' },
+  { key: 'hasAlcohol' as const, label: 'Alcohol in Vase', price: 40, image: 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=400&h=400&fit=crop' },
+  { key: 'hasFruits' as const, label: 'Fruits in Vase', price: 20, image: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&h=400&fit=crop' },
+] as const;
+
+const ADDON_PRICES = Object.fromEntries(ADDONS.map(a => [a.key, a.price])) as Record<typeof ADDONS[number]['key'], number>;
 
 const Index = () => {
   const navigate = useNavigate();
@@ -571,16 +573,16 @@ const Index = () => {
                     {(hookah.hasLED || hookah.hasColoredWater || hookah.hasAlcohol || hookah.hasFruits) && (
                       <div className="mt-2 flex flex-wrap gap-1 justify-center">
                         {hookah.hasLED && (
-                          <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">💡</span>
+                          <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">LED</span>
                         )}
                         {hookah.hasColoredWater && (
-                          <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">🎨</span>
+                          <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Color</span>
                         )}
                         {hookah.hasAlcohol && (
-                          <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">🍷</span>
+                          <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">Alcohol</span>
                         )}
                         {hookah.hasFruits && (
-                          <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">🍊</span>
+                          <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">Fruits</span>
                         )}
                       </div>
                     )}
@@ -597,46 +599,35 @@ const Index = () => {
                 <CardContent className="p-6">
                   <h3 className="font-medium mb-4 text-turbo-text">Select Add-ons (Optional)</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Button
-                      variant={selectedAddons.hasLED ? "default" : "outline"}
-                      size="lg"
-                      onClick={(e) => { setSelectedAddons(prev => ({ ...prev, hasLED: !prev.hasLED })); e.currentTarget.blur(); }}
-                      className="h-auto py-4 flex flex-col items-center gap-2"
-                    >
-                      <span className="text-2xl">💡</span>
-                      <span className="text-sm">LED Hookah</span>
-                      <span className="text-xs text-amber-400 font-bold">+{ADDON_PRICES.hasLED} Lei</span>
-                    </Button>
-                    <Button
-                      variant={selectedAddons.hasColoredWater ? "default" : "outline"}
-                      size="lg"
-                      onClick={(e) => { setSelectedAddons(prev => ({ ...prev, hasColoredWater: !prev.hasColoredWater })); e.currentTarget.blur(); }}
-                      className="h-auto py-4 flex flex-col items-center gap-2"
-                    >
-                      <span className="text-2xl">🎨</span>
-                      <span className="text-sm">Colored Water</span>
-                      <span className="text-xs text-amber-400 font-bold">+{ADDON_PRICES.hasColoredWater} Lei</span>
-                    </Button>
-                    <Button
-                      variant={selectedAddons.hasAlcohol ? "default" : "outline"}
-                      size="lg"
-                      onClick={(e) => { setSelectedAddons(prev => ({ ...prev, hasAlcohol: !prev.hasAlcohol })); e.currentTarget.blur(); }}
-                      className="h-auto py-4 flex flex-col items-center gap-2"
-                    >
-                      <span className="text-2xl">🍷</span>
-                      <span className="text-sm">Alcohol in Vase</span>
-                      <span className="text-xs text-amber-400 font-bold">+{ADDON_PRICES.hasAlcohol} Lei</span>
-                    </Button>
-                    <Button
-                      variant={selectedAddons.hasFruits ? "default" : "outline"}
-                      size="lg"
-                      onClick={(e) => { setSelectedAddons(prev => ({ ...prev, hasFruits: !prev.hasFruits })); e.currentTarget.blur(); }}
-                      className="h-auto py-4 flex flex-col items-center gap-2"
-                    >
-                      <span className="text-2xl">🍊</span>
-                      <span className="text-sm">Fruits in Vase</span>
-                      <span className="text-xs text-amber-400 font-bold">+{ADDON_PRICES.hasFruits} Lei</span>
-                    </Button>
+                    {ADDONS.map((addon) => (
+                      <Card
+                        key={addon.key}
+                        className={`bg-turbo-card border-border cursor-pointer transition-all overflow-hidden ${
+                          selectedAddons[addon.key] ? 'ring-2 ring-primary' : ''
+                        }`}
+                        onClick={() => setSelectedAddons(prev => ({ ...prev, [addon.key]: !prev[addon.key] }))}
+                      >
+                        <CardContent className="p-0">
+                          <div className="relative aspect-square w-full overflow-hidden">
+                            <div
+                              className="absolute inset-0 bg-center bg-cover"
+                              style={{ backgroundImage: `url(${addon.image})`, filter: 'brightness(0.5)' }}
+                            />
+                            <div className="relative z-10 flex flex-col items-center justify-end h-full p-2">
+                              <div className="w-full bg-black/60 rounded px-2 py-1.5 flex flex-col items-center">
+                                <h3 className="text-xs font-semibold text-white mb-0.5">{addon.label}</h3>
+                                <span className="text-xs text-amber-400 font-bold">+{addon.price} Lei</span>
+                              </div>
+                            </div>
+                            {selectedAddons[addon.key] && (
+                              <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg z-20">
+                                <span className="text-primary-foreground text-sm font-bold">✓</span>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
