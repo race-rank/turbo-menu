@@ -77,7 +77,7 @@ const MenuManagement = () => {
   const [tobaccoForm, setTobaccoForm] = useState({
     name: '',
     description: '',
-    type: 'virginia' as 'virginia' | 'darkblend' | 'mix',
+    type: 'virginia' as 'virginia' | 'darkblend' | 'cigarleaf' | 'mix',
     image: '',
     strengthRange: { min: '', max: '' },
     isActive: true
@@ -86,7 +86,7 @@ const MenuManagement = () => {
   const [flavorForm, setFlavorForm] = useState({
     name: '',
     image: '',
-    compatibleTobaccoTypes: ['virginia'] as ('virginia' | 'darkblend')[],
+    compatibleTobaccoTypes: ['virginia'] as ('virginia' | 'darkblend' | 'cigarleaf')[],
     isActive: true
   });
 
@@ -818,9 +818,9 @@ const MenuManagement = () => {
             </div>
             <div>
               <Label htmlFor="tobacco-type">Type</Label>
-              <Select 
-                value={tobaccoForm.type} 
-                onValueChange={(value: 'virginia' | 'darkblend' | 'mix') => setTobaccoForm({...tobaccoForm, type: value})}
+              <Select
+                value={tobaccoForm.type}
+                onValueChange={(value: 'virginia' | 'darkblend' | 'cigarleaf' | 'mix') => setTobaccoForm({...tobaccoForm, type: value})}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -828,6 +828,7 @@ const MenuManagement = () => {
                 <SelectContent>
                   <SelectItem value="virginia">Virginia</SelectItem>
                   <SelectItem value="darkblend">Darkblend</SelectItem>
+                  <SelectItem value="cigarleaf">Cigar Leaf</SelectItem>
                   <SelectItem value="mix">Mix</SelectItem>
                 </SelectContent>
               </Select>
@@ -968,6 +969,26 @@ const MenuManagement = () => {
                     }}
                   />
                   <Label htmlFor="darkblend-compatible">Darkblend</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="cigarleaf-compatible"
+                    checked={flavorForm.compatibleTobaccoTypes.includes('cigarleaf')}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setFlavorForm({
+                          ...flavorForm,
+                          compatibleTobaccoTypes: [...flavorForm.compatibleTobaccoTypes, 'cigarleaf']
+                        });
+                      } else {
+                        setFlavorForm({
+                          ...flavorForm,
+                          compatibleTobaccoTypes: flavorForm.compatibleTobaccoTypes.filter(t => t !== 'cigarleaf')
+                        });
+                      }
+                    }}
+                  />
+                  <Label htmlFor="cigarleaf-compatible">Cigar Leaf</Label>
                 </div>
               </div>
             </div>

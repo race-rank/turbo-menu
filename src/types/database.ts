@@ -21,7 +21,7 @@ export interface DatabaseOrderItem {
   price: number;
   image: string;
   hookah?: string;
-  tobaccoType?: 'virginia' | 'darkblend' | 'mix';
+  tobaccoType?: 'virginia' | 'darkblend' | 'cigarleaf' | 'mix';
   tobaccoStrength?: number;
   flavors?: string[];
   table?: string;
@@ -89,7 +89,7 @@ export interface DatabaseTobaccoType {
   id: string;
   name: string;
   description: string;
-  type: 'virginia' | 'darkblend' | 'mix';
+  type: 'virginia' | 'darkblend' | 'cigarleaf' | 'mix';
   image: string;
   strengthRange: {
     min: number;
@@ -104,7 +104,7 @@ export interface DatabaseFlavor {
   id: string;
   name: string;
   image: string;
-  compatibleTobaccoTypes: ('virginia' | 'darkblend')[];
+  compatibleTobaccoTypes: ('virginia' | 'darkblend' | 'cigarleaf')[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

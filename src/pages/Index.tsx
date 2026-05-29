@@ -34,7 +34,7 @@ const Index = () => {
   const location = useLocation();
   const { setTable } = useTable();
   const [selectedHookah, setSelectedHookah] = useState<string | null>(null);
-  const [selectedTobaccoType, setSelectedTobaccoType] = useState<'virginia' | 'darkblend' | 'mix' | null>(null);
+  const [selectedTobaccoType, setSelectedTobaccoType] = useState<'virginia' | 'darkblend' | 'cigarleaf' | 'mix' | null>(null);
   const [tobaccoStrength, setTobaccoStrength] = useState<number>(1);
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -98,7 +98,8 @@ const Index = () => {
       ? flavors.filter(flavor => flavor.isActive && flavor.compatibleTobaccoTypes.some(t => MIX_TYPES.includes(t as 'virginia' | 'darkblend')))
       : flavors.filter(flavor => flavor.isActive && flavor.compatibleTobaccoTypes.includes(selectedTobaccoType));
 
-    const expandedFlavors: Array<DatabaseFlavor & { variantType?: 'virginia' | 'darkblend', variantId: string }> = [];
+    type VariantType = 'virginia' | 'darkblend' | 'cigarleaf';
+    const expandedFlavors: Array<DatabaseFlavor & { variantType?: VariantType, variantId: string }> = [];
 
     baseFlavors.forEach(flavor => {
       if (selectedTobaccoType === 'mix') {
@@ -119,13 +120,13 @@ const Index = () => {
       if (flavor.compatibleTobaccoTypes.length > 1) {
         expandedFlavors.push({
           ...flavor,
-          variantType: selectedTobaccoType as 'virginia' | 'darkblend',
+          variantType: selectedTobaccoType as VariantType,
           variantId: `${flavor.id}-${selectedTobaccoType}`
         });
       } else {
         expandedFlavors.push({
           ...flavor,
-          variantType: flavor.compatibleTobaccoTypes[0],
+          variantType: flavor.compatibleTobaccoTypes[0] as VariantType,
           variantId: flavor.id
         });
       }
@@ -222,6 +223,8 @@ const Index = () => {
       setTobaccoStrength(3);
     } else if (selectedTobaccoType === 'darkblend') {
       setTobaccoStrength(8);
+    } else if (selectedTobaccoType === 'cigarleaf') {
+      setTobaccoStrength(9);
     } else if (selectedTobaccoType === 'mix') {
       setTobaccoStrength(5);
     }
@@ -303,7 +306,7 @@ const Index = () => {
     return flavor.name;
   };
 
-  const resolveFinalTobaccoType = (): 'virginia' | 'darkblend' | 'mix' | null => {
+  const resolveFinalTobaccoType = (): 'virginia' | 'darkblend' | 'cigarleaf' | 'mix' | null => {
     if (selectedTobaccoType !== 'mix') return selectedTobaccoType;
     const hasDB = selectedFlavors.some(id => id.endsWith('-darkblend'));
     const hasV = selectedFlavors.some(id => id.endsWith('-virginia'));
@@ -421,31 +424,22 @@ const Index = () => {
     }
   }, [selectedHookah]);
 
-  const getHookahTobaccoType = (hookahName: string): 'virginia' | 'darkblend' | 'mix' | null => {
-    if (hookahName.toLowerCase().includes('mix')) return 'mix';
-    if (hookahName.toLowerCase().includes('virginia')) return 'virginia';
-    if (hookahName.toLowerCase().includes('darkblend')) return 'darkblend';
+  const getHookahTobaccoType = (hookahName: string): 'virginia' | 'darkblend' | 'cigarleaf' | 'mix' | null => {
+    const n = hookahName.toLowerCase();
+    if (n.includes('cigar')) return 'cigarleaf';
+    if (n.includes('mix')) return 'mix';
+    if (n.includes('virginia')) return 'virginia';
+    if (n.includes('darkblend')) return 'darkblend';
     return null;
   };
 
-  const getHookahTypeBorder = (type: 'virginia' | 'darkblend' | 'mix' | null) => {
+  const getHookahTypeBorder = (type: 'virginia' | 'darkblend' | 'cigarleaf' | 'mix' | null) => {
     // Return only the border color (width is controlled on selection)
     if (type === 'virginia') return 'border-emerald-500';
     if (type === 'mix') return 'border-yellow-500';
     if (type === 'darkblend') return 'border-rose-500';
+    if (type === 'cigarleaf') return 'border-zinc-100';
     return 'border-border';
-  };
-
-  const getAvailableTobaccoTypes = () => {
-    if (!selectedHookah) return tobaccoTypes;
-    
-    const selectedHookahData = hookahs.find(h => h.id === selectedHookah);
-    if (!selectedHookahData) return tobaccoTypes;
-    
-    const hookahTobaccoType = getHookahTobaccoType(selectedHookahData.name);
-    if (!hookahTobaccoType) return tobaccoTypes;
-    
-    return tobaccoTypes.filter(tobacco => tobacco.type === hookahTobaccoType);
   };
 
   useEffect(() => {
