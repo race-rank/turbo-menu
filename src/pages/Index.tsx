@@ -307,13 +307,7 @@ const Index = () => {
   };
 
   const resolveFinalTobaccoType = (): 'virginia' | 'darkblend' | 'cigarleaf' | 'mix' | null => {
-    if (selectedTobaccoType !== 'mix') return selectedTobaccoType;
-    const hasDB = selectedFlavors.some(id => id.endsWith('-darkblend'));
-    const hasV = selectedFlavors.some(id => id.endsWith('-virginia'));
-    if (hasDB && hasV) return 'mix';
-    if (hasDB) return 'darkblend';
-    if (hasV) return 'virginia';
-    return 'mix';
+    return selectedTobaccoType;
   };
 
   const requestAddToCart = () => {
@@ -335,6 +329,20 @@ const Index = () => {
         description: "Please select a hookah, tobacco type, and at least one flavor.",
       });
       return;
+    }
+
+    if (selectedTobaccoType === 'mix') {
+      const hasDB = selectedFlavors.some(id => id.endsWith('-darkblend'));
+      const hasV = selectedFlavors.some(id => id.endsWith('-virginia'));
+      if (!hasDB || !hasV) {
+        errorHaptic();
+        toast({
+          title: "Mix requires both types",
+          description: "Pick at least 1 Darkblend and 1 Virginia flavor for a Mix hookah.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     finalizeAddToCart(addIce);
@@ -850,6 +858,17 @@ const Index = () => {
                       )}
                     </div>
                   )}
+                  {selectedTobaccoType === 'mix' && selectedFlavors.length > 0 && (() => {
+                    const hasDB = selectedFlavors.some(id => id.endsWith('-darkblend'));
+                    const hasV = selectedFlavors.some(id => id.endsWith('-virginia'));
+                    if (hasDB && hasV) return null;
+                    const missing = !hasDB ? 'Darkblend' : 'Virginia';
+                    return (
+                      <div className="mb-3 p-3 rounded-md border border-yellow-500/40 bg-yellow-500/10 text-xs text-yellow-200">
+                        Mix needs both Darkblend and Virginia. Add at least 1 {missing} flavor.
+                      </div>
+                    );
+                  })()}
                   <div className="flex items-center justify-between mb-3 p-3 rounded-md border border-border bg-muted/30">
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-turbo-text">Add Ice</span>
