@@ -20,10 +20,10 @@ import { getHookahs, getTobaccoTypes, getFlavors, getRecommendedMixes } from '@/
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 
 const ADDONS = [
-  { key: 'hasLED' as const, label: 'LED Hookah', price: 30, image: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=400&h=400&fit=crop' },
-  { key: 'hasColoredWater' as const, label: 'Colored Water', price: 10, image: 'https://images.unsplash.com/photo-1525385133512-2f3bdd585926?w=400&h=400&fit=crop' },
-  { key: 'hasAlcohol' as const, label: 'Alcohol in Vase', price: 40, image: 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=400&h=400&fit=crop' },
-  { key: 'hasFruits' as const, label: 'Fruits in Vase', price: 20, image: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&h=400&fit=crop' },
+  { key: 'hasLED' as const, label: 'LED Hookah', price: 30, image: '/led.jpeg' },
+  { key: 'hasColoredWater' as const, label: 'Colored Water', price: 10, image: '/colorant.jpeg' },
+  { key: 'hasAlcohol' as const, label: 'Alcohol in Vase', price: 40, image: '/alcool.jpeg' },
+  { key: 'hasFruits' as const, label: 'Fruits in Vase', price: 20, image: '/fruits.jpeg' },
 ] as const;
 
 const ADDON_PRICES = Object.fromEntries(ADDONS.map(a => [a.key, a.price])) as Record<typeof ADDONS[number]['key'], number>;
@@ -611,21 +611,20 @@ const Index = () => {
                       >
                         <CardContent className="p-0">
                           <div className="relative aspect-square w-full overflow-hidden">
-                            <div
-                              className="absolute inset-0 bg-center bg-cover"
-                              style={{ backgroundImage: `url(${addon.image})`, filter: 'brightness(0.5)' }}
+                            <img
+                              src={addon.image}
+                              alt={addon.label}
+                              className="absolute inset-0 w-full h-full object-cover"
                             />
-                            <div className="relative z-10 flex flex-col items-center justify-end h-full p-2">
-                              <div className="w-full bg-black/60 rounded px-2 py-1.5 flex flex-col items-center">
-                                <h3 className="text-xs font-semibold text-white mb-0.5">{addon.label}</h3>
-                                <span className="text-xs text-amber-400 font-bold">+{addon.price} Lei</span>
-                              </div>
-                            </div>
                             {selectedAddons[addon.key] && (
                               <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center shadow-lg z-20">
                                 <span className="text-primary-foreground text-sm font-bold">✓</span>
                               </div>
                             )}
+                          </div>
+                          <div className="px-2 py-2 flex flex-col items-center text-center">
+                            <h3 className="text-xs font-semibold text-turbo-text">{addon.label}</h3>
+                            <span className="text-xs text-amber-400 font-bold">+{addon.price} Lei</span>
                           </div>
                         </CardContent>
                       </Card>
