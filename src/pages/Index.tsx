@@ -601,7 +601,7 @@ const Index = () => {
                 <CardContent className="p-6">
                   <h3 className="font-medium mb-4 text-turbo-text">Select Add-ons (Optional)</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {ADDONS.map((addon) => (
+                    {[...ADDONS].sort((a, b) => b.price - a.price).map((addon) => (
                       <Card
                         key={addon.key}
                         className={`bg-turbo-card border-border cursor-pointer transition-all overflow-hidden ${
