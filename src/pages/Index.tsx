@@ -45,6 +45,7 @@ const Index = () => {
   const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addIce, setAddIce] = useState(false);
+  const [icePercentage, setIcePercentage] = useState(20);
   const [selectedAddons, setSelectedAddons] = useState({
     hasLED: false,
     hasColoredWater: false,
@@ -239,12 +240,14 @@ const Index = () => {
 
   const snap10 = (n: number) => Math.round(n / 10) * 10;
 
+  const flavorBudget = addIce ? 100 - icePercentage : 100;
+
   useEffect(() => {
     if (selectedFlavors.length === 0) {
       setFlavorPercentages({});
       return;
     }
-    // Default split (multiples of 10): 1→100, 2→50/50, 3→40/30/30
+    // Default split (multiples of 10) over 100: 1→100, 2→50/50, 3→40/30/30
     const defaults: Record<number, number[]> = {
       1: [100],
       2: [50, 50],
@@ -252,11 +255,39 @@ const Index = () => {
     };
     const split = defaults[selectedFlavors.length] ?? [];
     const next: Record<string, number> = {};
+    let assigned = 0;
     selectedFlavors.forEach((id, i) => {
-      next[id] = split[i] ?? FLAVOR_MIN;
+      if (i === selectedFlavors.length - 1) {
+        next[id] = Math.max(FLAVOR_MIN, flavorBudget - assigned);
+      } else {
+        const scaled = snap10((split[i] ?? FLAVOR_MIN) * flavorBudget / 100);
+        const clamped = Math.max(FLAVOR_MIN, Math.min(getFlavorMax(id), scaled));
+        next[id] = clamped;
+        assigned += clamped;
+      }
     });
     setFlavorPercentages(next);
   }, [selectedFlavors]);
+
+  useEffect(() => {
+    if (selectedFlavors.length === 0) return;
+    const currentSum = selectedFlavors.reduce((s, id) => s + (flavorPercentages[id] ?? FLAVOR_MIN), 0);
+    if (currentSum === flavorBudget) return;
+    const next: Record<string, number> = {};
+    let assigned = 0;
+    selectedFlavors.forEach((id, i) => {
+      if (i === selectedFlavors.length - 1) {
+        next[id] = Math.max(FLAVOR_MIN, flavorBudget - assigned);
+      } else {
+        const proportion = currentSum > 0 ? (flavorPercentages[id] ?? FLAVOR_MIN) / currentSum : 1 / selectedFlavors.length;
+        const scaled = snap10(proportion * flavorBudget);
+        const clamped = Math.max(FLAVOR_MIN, Math.min(getFlavorMax(id), scaled));
+        next[id] = clamped;
+        assigned += clamped;
+      }
+    });
+    setFlavorPercentages(next);
+  }, [addIce, icePercentage]);
 
   const handlePercentageChange = (changedId: string, newValue: number) => {
     const others = selectedFlavors.filter(id => id !== changedId);
@@ -266,11 +297,11 @@ const Index = () => {
     const othersMaxTotal = others.reduce((sum, id) => sum + getFlavorMax(id), 0);
     const clampedNew = Math.max(
       FLAVOR_MIN,
-      100 - othersMaxTotal,
-      Math.min(getFlavorMax(changedId), 100 - othersMinTotal, snap10(newValue))
+      flavorBudget - othersMaxTotal,
+      Math.min(getFlavorMax(changedId), flavorBudget - othersMinTotal, snap10(newValue))
     );
 
-    const remainingForOthers = 100 - clampedNew;
+    const remainingForOthers = flavorBudget - clampedNew;
     const currentOthersSum = others.reduce((sum, id) => sum + (flavorPercentages[id] ?? FLAVOR_MIN), 0);
 
     const next: Record<string, number> = { [changedId]: clampedNew };
@@ -355,15 +386,20 @@ const Index = () => {
 
     const finalTobaccoType = resolveFinalTobaccoType() ?? selectedTobaccoType;
 
+    const showPct = selectedFlavors.length >= 2 || withIce;
     const selectedFlavorNames = selectedFlavors.map(variantId => {
       const flavor = currentFlavors.find(f => f.variantId === variantId);
       if (!flavor) return null;
       const showVariant = finalTobaccoType === 'mix' && flavor.variantType;
-      return showVariant ? `${flavor.name} (${flavor.variantType!.charAt(0).toUpperCase() + flavor.variantType!.slice(1)})` : flavor.name;
+      const base = showVariant
+        ? `${flavor.name} (${flavor.variantType!.charAt(0).toUpperCase() + flavor.variantType!.slice(1)})`
+        : flavor.name;
+      const pct = flavorPercentages[variantId];
+      return showPct && pct != null ? `${base} ${pct}%` : base;
     }).filter(Boolean) as string[];
 
     if (withIce && blueIceFlavor) {
-      selectedFlavorNames.push(blueIceFlavor.name);
+      selectedFlavorNames.push(`${blueIceFlavor.name} (${icePercentage}%)`);
     }
 
     let totalPrice = selectedHookahData.price || 0;
@@ -815,7 +851,7 @@ const Index = () => {
                   )}
                   {selectedFlavors.length > 0 && (
                     <div className="mb-4">
-                      {selectedFlavors.length >= 2 ? (
+                      {selectedFlavors.length >= 2 || addIce ? (
                         <div className="space-y-4">
                           {selectedFlavors.map(variantId => {
                             const flavor = currentFlavors.find(f => f.variantId === variantId);
@@ -839,10 +875,16 @@ const Index = () => {
                               </div>
                             );
                           })}
+                          {addIce && (
+                            <div className="flex justify-between">
+                              <span className="text-turbo-muted text-sm">Ice</span>
+                              <span className="text-primary font-semibold text-sm">{icePercentage}%</span>
+                            </div>
+                          )}
                           <div className="flex justify-between pt-2 border-t border-border">
                             <span className="text-turbo-muted text-sm">Total</span>
                             <span className="text-white font-bold text-sm">
-                              {selectedFlavors.reduce((sum, id) => sum + (flavorPercentages[id] ?? 0), 0)}%
+                              {selectedFlavors.reduce((sum, id) => sum + (flavorPercentages[id] ?? 0), 0) + (addIce ? icePercentage : 0)}%
                             </span>
                           </div>
                         </div>
@@ -868,12 +910,30 @@ const Index = () => {
                       </div>
                     );
                   })()}
-                  <div className="flex items-center justify-between mb-3 p-3 rounded-md border border-border bg-muted/30">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-turbo-text">Add Ice</span>
-                      <span className="text-xs text-turbo-muted">Refreshing chill on top of your mix</span>
+                  <div className="mb-3 p-3 rounded-md border border-border bg-muted/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-turbo-text">Add Ice</span>
+                        <span className="text-xs text-turbo-muted">Refreshing chill on top of your mix</span>
+                      </div>
+                      <Switch checked={addIce} onCheckedChange={setAddIce} />
                     </div>
-                    <Switch checked={addIce} onCheckedChange={setAddIce} />
+                    {addIce && (
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-xs text-turbo-muted">Ice amount</span>
+                          <span className="text-xs text-primary font-semibold">{icePercentage}%</span>
+                        </div>
+                        <Slider
+                          value={[icePercentage]}
+                          min={10}
+                          max={40}
+                          step={10}
+                          onValueChange={([val]) => setIcePercentage(val)}
+                          className="w-full"
+                        />
+                      </div>
+                    )}
                   </div>
                   <Button
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"

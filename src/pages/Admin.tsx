@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Bell, MoreHorizontal, RefreshCw, Filter, Clock, CheckCircle, Package, Sparkles, List, History } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Bell, MoreHorizontal, RefreshCw, Filter, Clock, CheckCircle, Package, Sparkles, List, History, Volume2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,6 +24,54 @@ const Admin = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
+  const knownOrderIds = useRef<Set<string> | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const ensureAudioCtx = () => {
+    if (!audioCtxRef.current) {
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AC) return null;
+      audioCtxRef.current = new AC();
+    }
+    if (audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume().catch(() => {});
+    }
+    return audioCtxRef.current;
+  };
+
+  const playNewOrderSound = () => {
+    try {
+      const ctx = ensureAudioCtx();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      [880, 1320].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0, now + i * 0.18);
+        gain.gain.linearRampToValueAtTime(0.25, now + i * 0.18 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.18 + 0.25);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + i * 0.18);
+        osc.stop(now + i * 0.18 + 0.3);
+      });
+    } catch (err) {
+      console.warn('Failed to play notification sound:', err);
+    }
+  };
+
+  useEffect(() => {
+    const unlock = () => {
+      ensureAudioCtx();
+    };
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
 
   const statusOptions = [
     { value: 'pending', label: 'Pending', color: 'bg-yellow-500' },
@@ -108,6 +156,18 @@ const Admin = () => {
     loadNotifications();
   }, [activeTab]);
 
+  useEffect(() => {
+    if (knownOrderIds.current === null) {
+      knownOrderIds.current = new Set(orders.map(o => o.orderId));
+      return;
+    }
+    const fresh = orders.filter(o => !knownOrderIds.current!.has(o.orderId));
+    if (fresh.length > 0) {
+      playNewOrderSound();
+    }
+    knownOrderIds.current = new Set(orders.map(o => o.orderId));
+  }, [orders]);
+
   // Silent refresh of orders only (no loading state)
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -117,7 +177,7 @@ const Admin = () => {
       } catch (error) {
         console.error('Failed to refresh orders:', error);
       }
-    }, 30000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, []);
@@ -171,8 +231,17 @@ const Admin = () => {
             </DropdownMenuContent>
           </DropdownMenu>
           
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={playNewOrderSound}
+            title="Test sound"
+          >
+            <Volume2 className="h-5 w-5" />
+          </Button>
+
+          <Button
+            variant="ghost"
             size="icon"
             onClick={() => {
               loadOrders();
