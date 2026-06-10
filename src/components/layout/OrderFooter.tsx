@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,12 @@ import { StickyFooter } from './StickyFooter';
 export interface BuildState {
   hookahName?: string | null;
   tobaccoLabel?: string | null;
-  flavors: { name: string; percentage?: number }[];
+  flavors: { id: string; name: string; percentage?: number }[];
   flavorMax: number;
   complete: boolean;
   onAdd: () => void;
+  onRemoveFlavor?: (id: string) => void;
+  onJump?: () => void;
 }
 
 interface OrderFooterProps {
@@ -32,7 +34,10 @@ export const OrderFooter: React.FC<OrderFooterProps> = ({ build, primaryAction }
   if (hasBuild && build) {
     return (
       <StickyFooter>
-        <div className="flex items-center justify-between gap-3">
+        <div
+          className={`flex items-center justify-between gap-3 ${build.onJump ? 'cursor-pointer' : ''}`}
+          onClick={build.onJump}
+        >
           <div className="flex-1 min-w-0 text-xs">
             <div className="flex items-center gap-2 text-turbo-muted truncate">
               {build.hookahName && <span className="text-turbo-text font-medium truncate">{build.hookahName}</span>}
@@ -41,13 +46,18 @@ export const OrderFooter: React.FC<OrderFooterProps> = ({ build, primaryAction }
             </div>
             {build.flavors.length > 0 ? (
               <div className="flex flex-wrap items-center gap-1 mt-1">
-                {build.flavors.map((f, i) => (
+                {build.flavors.map((f) => (
                   <span
-                    key={`${f.name}-${i}`}
-                    className="px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 text-[11px] font-medium"
+                    key={f.id}
+                    className="px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 text-[11px] font-medium inline-flex items-center gap-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      build.onRemoveFlavor?.(f.id);
+                    }}
                   >
                     {f.name}
                     {typeof f.percentage === 'number' ? ` ${f.percentage}%` : ''}
+                    {build.onRemoveFlavor && <X className="h-3 w-3" />}
                   </span>
                 ))}
               </div>
@@ -58,7 +68,10 @@ export const OrderFooter: React.FC<OrderFooterProps> = ({ build, primaryAction }
           <Button
             size="sm"
             className="bg-primary hover:bg-primary/90 text-primary-foreground shrink-0"
-            onClick={build.onAdd}
+            onClick={(e) => {
+              e.stopPropagation();
+              build.onAdd();
+            }}
             disabled={!build.complete}
           >
             Add to Cart

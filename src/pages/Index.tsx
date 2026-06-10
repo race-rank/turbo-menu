@@ -16,6 +16,7 @@ import { WelcomeHeader } from '@/components/WelcomeHeader';
 import { successHaptic, errorHaptic } from '@/utils/haptics';
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getHookahs, getTobaccoTypes, getFlavors, getRecommendedMixes } from '@/services/menuService';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 
@@ -57,7 +58,9 @@ const Index = () => {
   const step1Ref = useRef<HTMLDivElement>(null);
   const step2Ref = useRef<HTMLDivElement>(null);
   const step3Ref = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
   const mixAutoplay = useRef(Autoplay({ delay: 4000, stopOnInteraction: false, stopOnMouseEnter: true }));
+  const [mixDialogId, setMixDialogId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadMenuData = async () => {
@@ -159,7 +162,6 @@ const Index = () => {
     !!tableId && (tableId.includes('table-') || tableId.includes('bar'));
 
   const addMixToCart = (mixId: string) => {
-    const mix = recommendedMixes.find(m => m.id === mixId);
     const tableId = localStorage.getItem('turbo-table');
 
     if (!isValidTableId(tableId)) {
@@ -172,25 +174,35 @@ const Index = () => {
       return;
     }
 
-    if (mix && tableId) {
-      addItem({
-        id: `mix-${mixId}`,
-        type: 'mix',
-        name: mix.name,
-        price: mix.price,
-        image: mix.mainImage,
-        table: tableId
-      });
-      
-      successHaptic();
-      
-      toast({
-        title: "Added to cart",
-        description: `${mix.name} has been added to your cart!`,
-      });
+    setMixDialogId(mixId);
+  };
 
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+  const confirmMixToCart = (category: 'virginia' | 'darkblend' | 'mix') => {
+    const mix = recommendedMixes.find(m => m.id === mixDialogId);
+    const tableId = localStorage.getItem('turbo-table');
+    setMixDialogId(null);
+    if (!mix || !tableId) return;
+
+    const categoryLabels = { virginia: 'Virginia', darkblend: 'Darkblend', mix: 'Mix' };
+
+    addItem({
+      id: `mix-${mix.id}-${category}`,
+      type: 'mix',
+      name: `${mix.name} (${categoryLabels[category]})`,
+      price: mix.price,
+      image: mix.mainImage,
+      tobaccoType: category,
+      table: tableId
+    });
+
+    successHaptic();
+
+    toast({
+      title: "Added to cart",
+      description: `${mix.name} (${categoryLabels[category]}) has been added to your cart!`,
+    });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const selectRandomFlavors = () => {
@@ -330,12 +342,8 @@ const Index = () => {
     return 'Very Strong';
   };
 
-  const formatFlavorLabel = (flavor: ReturnType<typeof getExpandedFlavors>[number]) => {
-    if (selectedTobaccoType === 'mix' && flavor.variantType) {
-      return `${flavor.name} (${flavor.variantType.charAt(0).toUpperCase() + flavor.variantType.slice(1)})`;
-    }
-    return flavor.name;
-  };
+  // Plain name in client UI — tobacco variant shows only as the badge on the flavor card
+  const formatFlavorLabel = (flavor: ReturnType<typeof getExpandedFlavors>[number]) => flavor.name;
 
   const resolveFinalTobaccoType = (): 'virginia' | 'darkblend' | 'cigarleaf' | 'mix' | null => {
     return selectedTobaccoType;
@@ -398,8 +406,8 @@ const Index = () => {
       return showPct && pct != null ? `${base} ${pct}%` : base;
     }).filter(Boolean) as string[];
 
-    if (withIce && blueIceFlavor) {
-      selectedFlavorNames.push(`${blueIceFlavor.name} (${icePercentage}%)`);
+    if (withIce) {
+      selectedFlavorNames.push(`Ice (${icePercentage}%)`);
     }
 
     let totalPrice = selectedHookahData.price || 0;
@@ -445,11 +453,6 @@ const Index = () => {
   };
 
   const cartItemCount = getItemCount();
-
-  const blueIceFlavor = flavors.find(flavor =>
-    flavor.name.toLowerCase().includes('blue ice') ||
-    flavor.name.toLowerCase().includes('ice')
-  );
 
   const clearSelections = () => {
     setSelectedFlavors([]);
@@ -774,7 +777,6 @@ const Index = () => {
 
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                   {filteredFlavors
-                    .filter(flavor => !blueIceFlavor || flavor.id !== blueIceFlavor.id)
                     .map((flavor) => {
                       const displayName = formatFlavorLabel(flavor);
                       const showVariantBadge = selectedTobaccoType === 'mix' && !!flavor.variantType;
@@ -830,7 +832,7 @@ const Index = () => {
           </section>
 
           {(selectedHookah || selectedTobaccoType || selectedFlavors.length > 0) && (
-            <section className="mt-8">
+            <section className="mt-8" ref={summaryRef}>
               <Card className="bg-turbo-card border-border">
                 <CardContent className="p-6">
                   <h3 className="text-lg font-semibold mb-4">Your Selection</h3>
@@ -957,6 +959,7 @@ const Index = () => {
             const flavor = currentFlavors.find(f => f.variantId === variantId);
             const name = flavor ? formatFlavorLabel(flavor) : variantId;
             return {
+              id: variantId,
               name,
               percentage: selectedFlavors.length >= 2 ? flavorPercentages[variantId] : undefined,
             };
@@ -964,8 +967,43 @@ const Index = () => {
           flavorMax: 3,
           complete: !!selectedHookah && !!selectedTobaccoType && selectedFlavors.length > 0,
           onAdd: requestAddToCart,
+          onRemoveFlavor: handleFlavorSelect,
+          onJump: () => summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
         }}
       />
+      <Dialog open={mixDialogId !== null} onOpenChange={(open) => { if (!open) setMixDialogId(null); }}>
+        <DialogContent className="sm:max-w-md bg-turbo-card border-border">
+          <DialogHeader>
+            <DialogTitle>Choose tobacco category</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-turbo-muted">
+            Which tobacco should we use for {recommendedMixes.find(m => m.id === mixDialogId)?.name ?? 'this mix'}?
+          </p>
+          <div className="grid grid-cols-1 gap-2">
+            <Button
+              variant="outline"
+              className="justify-between border-rose-500"
+              onClick={() => confirmMixToCart('darkblend')}
+            >
+              Darkblend <span className="text-xs text-turbo-muted">strong</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-between border-yellow-500"
+              onClick={() => confirmMixToCart('mix')}
+            >
+              Mix <span className="text-xs text-turbo-muted">Darkblend + Virginia</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-between border-emerald-500"
+              onClick={() => confirmMixToCart('virginia')}
+            >
+              Virginia <span className="text-xs text-turbo-muted">mild</span>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
