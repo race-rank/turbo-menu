@@ -13,6 +13,21 @@ import {
 } from '@/types/analytics';
 import { CartItem } from '@/contexts/CartContext';
 
+// Orders carry createdAt (Date from Firestore) — timestamp is rarely set, so prefer createdAt
+const getOrderDate = (order: OrderDetails): Date | null => {
+  const raw = order.createdAt ?? order.timestamp;
+  if (!raw) return null;
+  const date = raw instanceof Date ? raw : new Date(raw);
+  return isNaN(date.getTime()) ? null : date;
+};
+
+const toLocalDateStr = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 export const analyticsService = {
   /**
    * Calculate all analytics from a list of orders
@@ -155,9 +170,10 @@ export const analyticsService = {
     orders.forEach(order => {
       order.items.forEach(item => {
         if (item.hookah) {
+          const qty = item.quantity || 1;
           const existing = hookahMap.get(item.hookah) || { count: 0, revenue: 0 };
-          existing.count++;
-          existing.revenue += item.price;
+          existing.count += qty;
+          existing.revenue += item.price * qty;
           hookahMap.set(item.hookah, existing);
         }
       });
@@ -180,9 +196,10 @@ export const analyticsService = {
 
     orders.forEach(order => {
       order.items.forEach(item => {
+        const qty = item.quantity || 1;
         const existing = productMap.get(item.name) || { quantity: 0, revenue: 0 };
-        existing.quantity++;
-        existing.revenue += item.price;
+        existing.quantity += qty;
+        existing.revenue += item.price * qty;
         productMap.set(item.name, existing);
       });
     });
@@ -211,7 +228,8 @@ export const analyticsService = {
     }
 
     orders.forEach(order => {
-      const date = new Date(order.timestamp || 0);
+      const date = getOrderDate(order);
+      if (!date) return;
       const hour = date.getHours();
       const existing = hourlyData.get(hour) || { orders: 0, revenue: 0 };
       existing.orders++;
@@ -235,8 +253,10 @@ export const analyticsService = {
     const dailyMap = new Map<string, { orders: number; revenue: number }>();
 
     orders.forEach(order => {
-      const date = new Date(order.timestamp || 0);
-      const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const date = getOrderDate(order);
+      if (!date) return;
+      // Local date, not toISOString() — UTC would shift post-midnight orders to the previous day
+      const dateStr = toLocalDateStr(date);
       const existing = dailyMap.get(dateStr) || { orders: 0, revenue: 0 };
       existing.orders++;
       existing.revenue += order.total;
@@ -271,9 +291,10 @@ export const analyticsService = {
    * Format currency
    */
   formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('ro-RO', {
       style: 'currency',
       currency: 'RON',
+      maximumFractionDigits: 0,
     }).format(amount);
   },
 

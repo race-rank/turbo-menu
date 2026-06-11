@@ -271,10 +271,11 @@ export const AnalyticsDashboard = ({ orders, isLoading = false }: AnalyticsDashb
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={timeBasedAnalytics}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
+                  <XAxis
                     dataKey="hour"
                     label={{ value: 'Hour of Day', position: 'insideBottom', offset: -5 }}
                     tick={{ fontSize: 12 }}
+                    tickFormatter={(h: number) => `${String(h).padStart(2, '0')}:00`}
                   />
                   <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
                   <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
@@ -463,10 +464,11 @@ export const AnalyticsDashboard = ({ orders, isLoading = false }: AnalyticsDashb
               <ResponsiveContainer width="100%" height={400}>
                 <LineChart data={timeBasedAnalytics}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
+                  <XAxis
                     dataKey="hour"
                     label={{ value: 'Hour of Day', position: 'insideBottom', offset: -5 }}
                     tick={{ fontSize: 12 }}
+                    tickFormatter={(h: number) => `${String(h).padStart(2, '0')}:00`}
                   />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip />
