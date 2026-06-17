@@ -7,7 +7,7 @@ export const WelcomeHeader: React.FC = () => {
       <div 
         className="absolute inset-0 bg-cover bg-center"
         style={{ 
-          backgroundImage: 'url(https://images.unsplash.com/photo-1544148103-0773bf10d330?w=1200&h=400&fit=crop)',
+          backgroundImage: 'url(/header.jpeg)',
           filter: 'brightness(0.4)'
         }}
       />
