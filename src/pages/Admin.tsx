@@ -19,6 +19,7 @@ import {
 } from '@/services/orderService';
 import { toast } from '@/hooks/use-toast';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
+import { NewOrderFlash, FlashOrder } from '@/components/NewOrderFlash';
 
 const Admin = () => {
   const [orders, setOrders] = useState<OrderDetails[]>([]);
@@ -27,6 +28,7 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState('all');
   const knownOrderIds = useRef<Set<string> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const [flashOrder, setFlashOrder] = useState<FlashOrder | null>(null);
 
   const ensureAudioCtx = () => {
     if (!audioCtxRef.current) {
@@ -164,6 +166,11 @@ const Admin = () => {
     const fresh = orders.filter(o => !knownOrderIds.current!.has(o.orderId));
     if (fresh.length > 0) {
       playNewOrderSound();
+      setFlashOrder({
+        orderId: fresh[0].orderId,
+        table: fresh[0].table,
+        total: fresh[0].total
+      });
     }
     knownOrderIds.current = new Set(orders.map(o => o.orderId));
   }, [orders]);
@@ -178,6 +185,7 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-turbo-dark text-turbo-text pb-20">
+      <NewOrderFlash order={flashOrder} onDismiss={() => setFlashOrder(null)} />
       <header className="flex items-center justify-between p-4 border-b border-border">
         <NavigationSidebar />
 
