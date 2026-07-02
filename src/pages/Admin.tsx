@@ -14,6 +14,7 @@ import {
   getAdminOrders,
   getAdminNotifications,
   updateOrderStatus,
+  subscribeToAdminOrders,
   OrderDetails
 } from '@/services/orderService';
 import { toast } from '@/hooks/use-toast';
@@ -152,7 +153,6 @@ const Admin = () => {
   };
 
   useEffect(() => {
-    loadOrders();
     loadNotifications();
   }, [activeTab]);
 
@@ -168,18 +168,12 @@ const Admin = () => {
     knownOrderIds.current = new Set(orders.map(o => o.orderId));
   }, [orders]);
 
-  // Silent refresh of orders only (no loading state)
   useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await getAdminOrders();
-        setOrders(response.orders);
-      } catch (error) {
-        console.error('Failed to refresh orders:', error);
-      }
-    }, 10000);
-
-    return () => clearInterval(interval);
+    const unsubscribe = subscribeToAdminOrders((newOrders) => {
+      setOrders(newOrders);
+      setIsLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   return (
