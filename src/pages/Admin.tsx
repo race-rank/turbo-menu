@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, MoreHorizontal, RefreshCw, Filter, Clock, CheckCircle, Package, Sparkles, List, History, Volume2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ const Admin = () => {
   const knownOrderIds = useRef<Set<string> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const [flashOrder, setFlashOrder] = useState<FlashOrder | null>(null);
+  const dismissFlash = useCallback(() => setFlashOrder(null), []);
 
   const ensureAudioCtx = () => {
     if (!audioCtxRef.current) {
@@ -185,7 +186,7 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-turbo-dark text-turbo-text pb-20">
-      <NewOrderFlash order={flashOrder} onDismiss={() => setFlashOrder(null)} />
+      <NewOrderFlash order={flashOrder} onDismiss={dismissFlash} />
       <header className="flex items-center justify-between p-4 border-b border-border">
         <NavigationSidebar />
 
