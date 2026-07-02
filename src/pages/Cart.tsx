@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { ArrowLeft, Minus, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
@@ -12,6 +13,8 @@ const Cart = () => {
   const navigate = useNavigate();
   const { state, removeItem, updateQuantity, clearCart } = useCart();
   const { addOrder } = useOrderTracking();
+  const isSubmittingRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const getTableHome = () => {
     const stored = localStorage.getItem('turbo-table') || '';
@@ -45,10 +48,14 @@ const Cart = () => {
   };
 
   const handleOrderSubmission = async () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+
     try {
       const customerId = `customer-${Math.random().toString(36).substr(2, 9)}`;
       const tableId = localStorage.getItem('turbo-table') || '';
-      
+
       const orderData = {
         items: state.items,
         total: state.total,
@@ -57,26 +64,35 @@ const Cart = () => {
           id: customerId
         }
       };
-      
+
       const result = await submitOrder(orderData);
-      
+
       // Add the order to tracking
       addOrder(result);
-      
+
       clearCart();
-      
+
       toast({
         title: "Order complete!",
         description: "Someone is actively reviewing it.",
         duration: 5000,
       });
-      
+
       setTimeout(() => {
         navigate(getTableHome());
       }, 2000);
-      
+
+      // Keep the button disabled for a short cooldown after success,
+      // in case the user re-opens the cart before the redirect above fires.
+      setTimeout(() => {
+        isSubmittingRef.current = false;
+        setIsSubmitting(false);
+      }, 3000);
+
     } catch (error) {
       console.error('Error submitting order:', error);
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
       toast({
         title: "Order submission failed",
         description: "Please try again or contact support.",
@@ -187,11 +203,12 @@ const Cart = () => {
                   <span className="text-2xl font-bold text-amber-400">{state.total} Lei</span>
                 </div>
                 <div className="space-y-2">
-                  <Button 
+                  <Button
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                     onClick={handleOrderSubmission}
+                    disabled={isSubmitting}
                   >
-                    Submit Order
+                    {isSubmitting ? 'Submitting...' : 'Submit Order'}
                   </Button>
                   <Button 
                     variant="outline" 
@@ -208,7 +225,11 @@ const Cart = () => {
       </div>
       {state.items.length > 0 && (
         <OrderFooter
-          primaryAction={{ label: 'Submit Order', onClick: handleOrderSubmission }}
+          primaryAction={{
+            label: isSubmitting ? 'Submitting...' : 'Submit Order',
+            onClick: handleOrderSubmission,
+            disabled: isSubmitting
+          }}
         />
       )}
     </div>
