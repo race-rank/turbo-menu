@@ -160,24 +160,21 @@ const Admin = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    if (knownOrderIds.current === null) {
-      knownOrderIds.current = new Set(orders.map(o => o.orderId));
-      return;
-    }
-    const fresh = orders.filter(o => !knownOrderIds.current!.has(o.orderId));
-    if (fresh.length > 0) {
-      playNewOrderSound();
-      setFlashOrder({
-        orderId: fresh[0].orderId,
-        table: fresh[0].table,
-        total: fresh[0].total
-      });
-    }
-    knownOrderIds.current = new Set(orders.map(o => o.orderId));
-  }, [orders]);
-
-  useEffect(() => {
     const unsubscribe = subscribeToAdminOrders((newOrders) => {
+      if (knownOrderIds.current === null) {
+        knownOrderIds.current = new Set(newOrders.map(o => o.orderId));
+      } else {
+        const fresh = newOrders.filter(o => !knownOrderIds.current!.has(o.orderId));
+        if (fresh.length > 0) {
+          playNewOrderSound();
+          setFlashOrder({
+            orderId: fresh[0].orderId,
+            table: fresh[0].table,
+            total: fresh[0].total
+          });
+        }
+        knownOrderIds.current = new Set(newOrders.map(o => o.orderId));
+      }
       setOrders(newOrders);
       setIsLoading(false);
     });
