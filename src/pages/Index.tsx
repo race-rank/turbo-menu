@@ -8,6 +8,7 @@ import { useTable } from '@/contexts/TableContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
 import { StickyHeader } from '@/components/layout/StickyHeader';
 import { OrderFooter } from '@/components/layout/OrderFooter';
@@ -17,17 +18,50 @@ import { successHaptic, errorHaptic } from '@/utils/haptics';
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getHookahs, getTobaccoTypes, getFlavors, getRecommendedMixes } from '@/services/menuService';
+import { getMenuData } from '@/services/menuService';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 
 const ADDONS = [
-  { key: 'hasLED' as const, label: 'LED Hookah', price: 30, image: '/led.jpeg' },
-  { key: 'hasColoredWater' as const, label: 'Colored Water', price: 10, image: '/colorant.jpeg' },
-  { key: 'hasAlcohol' as const, label: 'Alcohol in Vase', price: 40, image: '/alcool.jpeg' },
-  { key: 'hasFruits' as const, label: 'Fruits in Vase', price: 20, image: '/fruits.jpeg' },
+  { key: 'hasLED' as const, label: 'LED Hookah', price: 30, image: '/img/led.webp' },
+  { key: 'hasColoredWater' as const, label: 'Colored Water', price: 10, image: '/img/colorant.webp' },
+  { key: 'hasAlcohol' as const, label: 'Alcohol in Vase', price: 40, image: '/img/alcool.webp' },
+  { key: 'hasFruits' as const, label: 'Fruits in Vase', price: 20, image: '/img/fruits.webp' },
 ] as const;
 
 const ADDON_PRICES = Object.fromEntries(ADDONS.map(a => [a.key, a.price])) as Record<typeof ADDONS[number]['key'], number>;
+
+const MixSkeletons = () => (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {Array.from({ length: 3 }).map((_, i) => (
+      <Card key={i} className="bg-turbo-card border-border overflow-hidden">
+        <CardContent className="p-0">
+          <div className="p-4 flex flex-col items-center gap-2">
+            <Skeleton className="w-24 h-28 rounded" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+          <div className="p-4 space-y-2">
+            <Skeleton className="h-6 w-20" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);
+
+const HookahSkeletons = () => (
+  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    {Array.from({ length: 6 }).map((_, i) => (
+      <Card key={i} className="bg-turbo-card border-2 border-border">
+        <CardContent className="p-4 text-center space-y-2">
+          <Skeleton className="w-full h-24 rounded" />
+          <Skeleton className="h-4 w-3/4 mx-auto" />
+          <Skeleton className="h-5 w-1/2 mx-auto" />
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);
 
 const Index = () => {
   const navigate = useNavigate();
@@ -66,17 +100,12 @@ const Index = () => {
     const loadMenuData = async () => {
       try {
         setIsLoading(true);
-        const [hookahsData, tobaccoData, flavorsData, mixesData] = await Promise.all([
-          getHookahs(),
-          getTobaccoTypes(),
-          getFlavors(),
-          getRecommendedMixes()
-        ]);
-        
-        setHookahs(hookahsData);
-        setTobaccoTypes(tobaccoData);
-        setFlavors(flavorsData);
-        setRecommendedMixes(mixesData);
+        const menu = await getMenuData();
+
+        setHookahs(menu.hookahs);
+        setTobaccoTypes(menu.tobaccoTypes);
+        setFlavors(menu.flavors);
+        setRecommendedMixes(menu.recommendedMixes);
       } catch (error) {
         console.error('Error loading menu data:', error);
         toast({
@@ -501,14 +530,9 @@ const Index = () => {
     }
   }, [selectedHookah]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-lg">Loading menu...</p>
-      </div>
-    );
-  }
-
+  // No full-page loading gate: the shell, hero and section headings paint
+  // immediately and only the data-driven sections show skeletons. This keeps
+  // LCP off the Firestore round trip.
   return (
     <div className="min-h-screen pb-24">
       <StickyHeader>
@@ -532,6 +556,7 @@ const Index = () => {
           </section>
           <section>
             <h2 className="text-xl font-semibold mb-6">Recommended Mixes</h2>
+            {isLoading ? <MixSkeletons /> : (
             <Carousel
               opts={{ align: 'start', loop: true }}
               plugins={[mixAutoplay.current as unknown as never]}
@@ -546,6 +571,9 @@ const Index = () => {
                           <img
                             src={mix.mainImage}
                             alt={mix.name}
+                            width={96}
+                            height={112}
+                            decoding="async"
                             className="w-24 h-28 object-cover mx-auto rounded"
                           />
                           <h3 className="text-white font-semibold mt-2">{mix.name}</h3>
@@ -556,6 +584,10 @@ const Index = () => {
                                 key={index}
                                 src={flavor}
                                 alt="flavor"
+                                width={24}
+                                height={24}
+                                loading="lazy"
+                                decoding="async"
                                 className="w-6 h-6 rounded-full object-cover"
                               />
                             ))}
@@ -591,9 +623,11 @@ const Index = () => {
               <CarouselPrevious className="hidden md:flex" />
               <CarouselNext className="hidden md:flex" />
             </Carousel>
+            )}
           </section>
           <section ref={step1Ref}>
             <h2 className="text-xl font-semibold mb-6">Step 1: Choose Hookah</h2>
+            {isLoading ? <HookahSkeletons /> : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {hookahs.map((hookah) => (
                 <Card 
@@ -604,9 +638,12 @@ const Index = () => {
                   onClick={() => setSelectedHookah(hookah.id)}
                 >
                   <CardContent className="p-4 text-center">
-                    <img 
-                      src={hookah.image} 
+                    <img
+                      src={hookah.image}
                       alt={hookah.name}
+                      height={96}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-24 object-cover mx-auto mb-2 rounded"
                     />
                     <h3 className="text-sm font-medium text-turbo-text mb-1">{hookah.name}</h3>
@@ -631,8 +668,9 @@ const Index = () => {
                 </Card>
               ))}
             </div>
+            )}
           </section>
-          
+
           {selectedHookah && (
             <section className="mt-8">
               <h2 className="text-xl font-semibold mb-6">Customize Your Hookah</h2>
@@ -653,6 +691,10 @@ const Index = () => {
                             <img
                               src={addon.image}
                               alt={addon.label}
+                              width={400}
+                              height={400}
+                              loading="lazy"
+                              decoding="async"
                               className="absolute inset-0 w-full h-full object-cover"
                             />
                             {selectedAddons[addon.key] && (

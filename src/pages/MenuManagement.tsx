@@ -31,7 +31,8 @@ import {
   deleteHookah,
   deleteTobaccoType,
   deleteFlavor,
-  deleteRecommendedMix
+  deleteRecommendedMix,
+  publishMenuSnapshot
 } from '@/services/menuService';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -141,6 +142,22 @@ const MenuManagement = () => {
     }
   };
 
+  // Guests read a denormalized snapshot, so every mutation has to republish it.
+  // Local state is refreshed either way so the admin never sees stale rows.
+  const publishAndReload = async () => {
+    try {
+      await publishMenuSnapshot();
+    } catch (error) {
+      console.error('Error publishing menu snapshot:', error);
+      toast({
+        title: "Saved, but not published",
+        description: "Guests may see the previous menu. Try saving again.",
+        variant: "destructive"
+      });
+    }
+    await loadMenuData();
+  };
+
   const handleEditHookah = (hookah: DatabaseHookah) => {
     setEditingHookah(hookah);
     setHookahForm({
@@ -221,7 +238,7 @@ const MenuManagement = () => {
       setIsHookahModalOpen(false);
       setEditingHookah(null);
       setHookahForm({ name: '', price: '', image: '', isActive: true, hasLED: false, hasColoredWater: false, hasAlcohol: false, hasFruits: false });
-      loadMenuData();
+      publishAndReload();
     } catch (error) {
       toast({
         title: "Error",
@@ -264,7 +281,7 @@ const MenuManagement = () => {
         strengthRange: { min: '', max: '' },
         isActive: true
       });
-      loadMenuData();
+      publishAndReload();
     } catch (error) {
       toast({
         title: "Error",
@@ -297,7 +314,7 @@ const MenuManagement = () => {
         compatibleTobaccoTypes: ['virginia'],
         isActive: true
       });
-      loadMenuData();
+      publishAndReload();
     } catch (error) {
       toast({
         title: "Error",
@@ -339,7 +356,7 @@ const MenuManagement = () => {
         promoText: '',
         isActive: true
       });
-      loadMenuData();
+      publishAndReload();
     } catch (error) {
       toast({
         title: "Error",
@@ -357,7 +374,7 @@ const MenuManagement = () => {
           title: "Success",
           description: "Hookah deleted successfully!"
         });
-        loadMenuData();
+        publishAndReload();
       } catch (error) {
         toast({
           title: "Error",
@@ -376,7 +393,7 @@ const MenuManagement = () => {
           title: "Success",
           description: "Tobacco type deleted successfully!"
         });
-        loadMenuData();
+        publishAndReload();
       } catch (error) {
         toast({
           title: "Error",
@@ -395,7 +412,7 @@ const MenuManagement = () => {
           title: "Success",
           description: "Flavor deleted successfully!"
         });
-        loadMenuData();
+        publishAndReload();
       } catch (error) {
         toast({
           title: "Error",
@@ -414,7 +431,7 @@ const MenuManagement = () => {
           title: "Success",
           description: "Recommended mix deleted successfully!"
         });
-        loadMenuData();
+        publishAndReload();
       } catch (error) {
         toast({
           title: "Error",

@@ -3,8 +3,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Hero is the LCP element but is rendered by JS, so the preload scanner
+         would otherwise only discover it after the bundle executes. -->
+    <link
+      rel="preload"
+      as="image"
+      href="/img/header-1066.webp"
+      imagesrcset="/img/header-640.webp 640w, /img/header-800.webp 800w, /img/header-1066.webp 1066w"
+      imagesizes="100vw"
+      fetchpriority="high"
+    />
     <title>Turbo Cafe - Hookah selection</title>
     <meta name="description" content="Discover the finest selection of traditional and modern hookahs, crafted for the ultimate smoking experience" />
     <meta name="author" content="HookahRoyale" />

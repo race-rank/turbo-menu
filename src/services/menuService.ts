@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   getDoc,
@@ -22,6 +23,18 @@ const MENU_COLLECTIONS = {
   FLAVORS: 'flavors',
   RECOMMENDED_MIXES: 'recommendedMixes'
 } as const;
+
+// Denormalized copy of the four menu collections. Guests read this single
+// document instead of running four queries on a cold Firestore connection.
+const MENU_SNAPSHOT_COLLECTION = 'menu';
+const MENU_SNAPSHOT_ID = 'current';
+
+export interface MenuData {
+  hookahs: DatabaseHookah[];
+  tobaccoTypes: DatabaseTobaccoType[];
+  flavors: DatabaseFlavor[];
+  recommendedMixes: DatabaseRecommendedMix[];
+}
 
 // Hookah operations
 export const createHookah = async (hookahData: Omit<DatabaseHookah, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -180,6 +193,78 @@ export const getRecommendedMixes = async (): Promise<DatabaseRecommendedMix[]> =
     console.error('Error getting recommended mixes:', error);
     throw error;
   }
+};
+
+// Menu snapshot (single-document read path for guests)
+
+const fetchMenuCollections = async (): Promise<MenuData> => {
+  const [hookahs, tobaccoTypes, flavors, recommendedMixes] = await Promise.all([
+    getHookahs(),
+    getTobaccoTypes(),
+    getFlavors(),
+    getRecommendedMixes()
+  ]);
+  return { hookahs, tobaccoTypes, flavors, recommendedMixes };
+};
+
+const reviveMenuItems = <T,>(items: unknown): T[] =>
+  (Array.isArray(items) ? items : []).map((item: any) => ({
+    ...item,
+    createdAt: safeConvertTimestamp(item?.createdAt),
+    updatedAt: safeConvertTimestamp(item?.updatedAt)
+  })) as T[];
+
+// Firestore rejects undefined. cleanObject() can't be reused here because it
+// flattens Date instances to {} - menu items carry real Dates.
+const stripUndefined = (value: any): any => {
+  if (Array.isArray(value)) return value.map(stripUndefined);
+  if (value instanceof Date) return value;
+  if (value && typeof value === 'object') {
+    const out: Record<string, any> = {};
+    for (const [key, nested] of Object.entries(value)) {
+      if (nested !== undefined) out[key] = stripUndefined(nested);
+    }
+    return out;
+  }
+  return value;
+};
+
+/**
+ * Read the whole menu. Costs one document read when the snapshot exists, and
+ * falls back to the four collection queries when it doesn't (never published,
+ * or security rules deny it), so the menu always renders.
+ */
+export const getMenuData = async (): Promise<MenuData> => {
+  try {
+    const snapshot = await getDoc(doc(firestore, MENU_SNAPSHOT_COLLECTION, MENU_SNAPSHOT_ID));
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      return {
+        hookahs: reviveMenuItems<DatabaseHookah>(data.hookahs),
+        tobaccoTypes: reviveMenuItems<DatabaseTobaccoType>(data.tobaccoTypes),
+        flavors: reviveMenuItems<DatabaseFlavor>(data.flavors),
+        recommendedMixes: reviveMenuItems<DatabaseRecommendedMix>(data.recommendedMixes)
+      };
+    }
+  } catch (error) {
+    console.warn('Menu snapshot unavailable, falling back to collection queries:', error);
+  }
+
+  return fetchMenuCollections();
+};
+
+/**
+ * Rebuild the snapshot guests read. Must run after every menu mutation,
+ * otherwise guests keep seeing the previously published menu.
+ */
+export const publishMenuSnapshot = async (): Promise<void> => {
+  const menu = await fetchMenuCollections();
+
+  // serverTimestamp() is added outside stripUndefined so the sentinel survives.
+  await setDoc(doc(firestore, MENU_SNAPSHOT_COLLECTION, MENU_SNAPSHOT_ID), {
+    ...stripUndefined(menu),
+    publishedAt: serverTimestamp()
+  });
 };
 
 // Update operations
