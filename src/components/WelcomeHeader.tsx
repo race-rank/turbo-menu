@@ -13,7 +13,9 @@ export const WelcomeHeader: React.FC = () => {
         aria-hidden="true"
         width={1066}
         height={1600}
-        fetchPriority="high"
+        // React 18.3 warns on the camelCase prop but emits the attribute either
+        // way; spreading the lowercase form keeps the console clean.
+        {...{ fetchpriority: 'high' }}
         decoding="async"
         className="absolute inset-0 w-full h-full object-cover object-center brightness-[0.4]"
       />
