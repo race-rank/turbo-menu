@@ -19,4 +19,16 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split the long-lived vendors out of the entry chunk so app changes
+        // don't invalidate them, and so they download in parallel.
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          firebase: ["firebase/app", "firebase/firestore"],
+        },
+      },
+    },
+  },
 }));

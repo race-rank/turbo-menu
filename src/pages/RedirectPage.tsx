@@ -12,6 +12,27 @@ const redirectTargets: Record<string, string> = {
     'https://www.tripadvisor.com/Restaurant_Review-g298474-d26352926-Reviews-Hookah_Tabacu-Cluj_Napoca_Cluj_County_Northwest_Romania_Transylvania.html',
 };
 
+/**
+ * crypto.randomUUID() only exists in a secure context, so it is undefined when
+ * the app is served over plain http - e.g. a phone opening the dev server by
+ * LAN IP. crypto.getRandomValues() has no such restriction.
+ */
+const createSessionId = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
+  return `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 const RedirectPage = () => {
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +48,7 @@ const RedirectPage = () => {
     const existing = sessionStorage.getItem('redirect_session');
     if (existing) return existing;
 
-    const id = crypto.randomUUID();
+    const id = createSessionId();
     sessionStorage.setItem('redirect_session', id);
     return id;
   }, []);
