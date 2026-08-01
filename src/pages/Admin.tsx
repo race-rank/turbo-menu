@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, MoreHorizontal, RefreshCw, Filter, Clock, CheckCircle, Package, Sparkles, List, History, Volume2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,12 @@ import {
   getAdminOrders,
   getAdminNotifications,
   updateOrderStatus,
+  subscribeToAdminOrders,
   OrderDetails
 } from '@/services/orderService';
 import { toast } from '@/hooks/use-toast';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
+import { NewOrderFlash, FlashOrder } from '@/components/NewOrderFlash';
 
 const Admin = () => {
   const [orders, setOrders] = useState<OrderDetails[]>([]);
@@ -26,6 +28,8 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState('all');
   const knownOrderIds = useRef<Set<string> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const [flashOrder, setFlashOrder] = useState<FlashOrder | null>(null);
+  const dismissFlash = useCallback(() => setFlashOrder(null), []);
 
   const ensureAudioCtx = () => {
     if (!audioCtxRef.current) {
@@ -152,38 +156,34 @@ const Admin = () => {
   };
 
   useEffect(() => {
-    loadOrders();
     loadNotifications();
   }, [activeTab]);
 
   useEffect(() => {
-    if (knownOrderIds.current === null) {
-      knownOrderIds.current = new Set(orders.map(o => o.orderId));
-      return;
-    }
-    const fresh = orders.filter(o => !knownOrderIds.current!.has(o.orderId));
-    if (fresh.length > 0) {
-      playNewOrderSound();
-    }
-    knownOrderIds.current = new Set(orders.map(o => o.orderId));
-  }, [orders]);
-
-  // Silent refresh of orders only (no loading state)
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await getAdminOrders();
-        setOrders(response.orders);
-      } catch (error) {
-        console.error('Failed to refresh orders:', error);
+    const unsubscribe = subscribeToAdminOrders((newOrders) => {
+      if (knownOrderIds.current === null) {
+        knownOrderIds.current = new Set(newOrders.map(o => o.orderId));
+      } else {
+        const fresh = newOrders.filter(o => !knownOrderIds.current!.has(o.orderId));
+        if (fresh.length > 0) {
+          playNewOrderSound();
+          setFlashOrder({
+            orderId: fresh[0].orderId,
+            table: fresh[0].table,
+            total: fresh[0].total
+          });
+        }
+        knownOrderIds.current = new Set(newOrders.map(o => o.orderId));
       }
-    }, 10000);
-
-    return () => clearInterval(interval);
+      setOrders(newOrders);
+      setIsLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   return (
     <div className="min-h-screen bg-turbo-dark text-turbo-text pb-20">
+      <NewOrderFlash order={flashOrder} onDismiss={dismissFlash} />
       <header className="flex items-center justify-between p-4 border-b border-border">
         <NavigationSidebar />
 

@@ -1,12 +1,13 @@
 import { CartItem } from '@/contexts/CartContext';
-import { 
-  createOrderRecord, 
-  getOrderRecord, 
-  getOrdersByStatus, 
+import {
+  createOrderRecord,
+  getOrderRecord,
+  getOrdersByStatus,
   updateOrderRecord,
   createNotificationRecord,
   getUnreadNotifications,
-  getOrdersByDateRange
+  getOrdersByDateRange,
+  subscribeToOrders
 } from './firebaseService';
 
 export interface OrderDetails {
@@ -112,6 +113,24 @@ export const getAdminOrders = async (status?: string): Promise<{orders: OrderDet
     console.error('Error getting admin orders from Firebase:', error);
     throw error;
   }
+};
+
+export const subscribeToAdminOrders = (
+  callback: (orders: OrderDetails[]) => void
+): (() => void) => {
+  return subscribeToOrders((dbOrders) => {
+    const orders = dbOrders.map(order => ({
+      orderId: order.orderId,
+      items: order.items as CartItem[],
+      total: order.total,
+      table: order.table,
+      customerInfo: order.customerInfo,
+      status: order.status,
+      updatedAt: order.updatedAt,
+      createdAt: order.createdAt
+    }));
+    callback(orders);
+  });
 };
 
 export const getOrderStatus = async (orderId: string): Promise<OrderDetails> => {
