@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { submitOrder } from '@/services/orderService';
+import { ensureSignedIn } from '@/services/authService';
 import { OrderFooter } from '@/components/layout/OrderFooter';
 
 const Cart = () => {
@@ -53,7 +54,7 @@ const Cart = () => {
     setIsSubmitting(true);
 
     try {
-      const customerId = `customer-${Math.random().toString(36).substr(2, 9)}`;
+      const user = await ensureSignedIn();
       const tableId = localStorage.getItem('turbo-table') || '';
 
       const orderData = {
@@ -61,7 +62,7 @@ const Cart = () => {
         total: state.total,
         table: tableId,
         customerInfo: {
-          id: customerId
+          uid: user.uid
         }
       };
 

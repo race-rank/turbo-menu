@@ -17,9 +17,9 @@ export interface OrderDetails {
   total: number;
   table?: string;
   customerInfo: {
-    id: string;
+    uid: string;
+    id?: string;
     name?: string;
-    phone?: string;
     table?: string;
   };
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed';

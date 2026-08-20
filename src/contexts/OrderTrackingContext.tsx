@@ -10,7 +10,8 @@ interface ActiveOrder {
   items: CartItem[];
   total: number;
   customerInfo: {
-    id: string;
+    uid: string;
+    id?: string;
     name?: string;
     table?: string;
   };

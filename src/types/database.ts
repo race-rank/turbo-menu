@@ -5,7 +5,8 @@ export interface DatabaseOrder {
   timestamp: number | Date;
   table?: string;
   customerInfo: {
-    id: string;
+    uid: string;
+    id?: string;
     name?: string;
     phone?: string;
   };
