@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   addDoc,
+  setDoc,
   updateDoc,
   getDoc,
   getDocs,
@@ -55,16 +56,18 @@ export const safeConvertTimestamp = (timestamp: any): Date => {
 export const createOrderRecord = async (orderData: Omit<DatabaseOrder, 'orderId' | 'createdAt' | 'updatedAt' | 'timestamp'>) => {
   try {
     const cleanedOrderData = cleanObject(orderData);
-    
-    const docRef = await addDoc(collection(firestore, COLLECTIONS.ORDERS), {
+
+    // One atomic write. The previous addDoc + updateDoc(orderId) sequence needed
+    // an update, which security rules allow only for admins.
+    const orderRef = doc(collection(firestore, COLLECTIONS.ORDERS));
+    await setDoc(orderRef, {
       ...cleanedOrderData,
+      orderId: orderRef.id,
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()    
+      updatedAt: serverTimestamp()
     });
-    
-    await updateDoc(docRef, { orderId: docRef.id });
-    
-    return docRef.id;
+
+    return orderRef.id;
   } catch (error) {
     console.error('Error creating order:', error);
     throw error;

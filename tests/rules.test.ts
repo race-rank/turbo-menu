@@ -169,3 +169,46 @@ describe('admins collection', () => {
     await assertFails(getDoc(doc(anon(), 'admins/one')));
   });
 });
+
+describe('regression coverage', () => {
+  // The bare-setDoc create test did not model submitOrder's real write path.
+  test('a guest can complete the real order submission sequence', async () => {
+    const db = guest();
+    const ref = doc(collection(db, 'orders'));
+    await assertSucceeds(setDoc(ref, {
+      orderId: ref.id, total: 50, status: 'pending',
+      customerInfo: { uid: 'guest-uid' },
+    }));
+    await assertSucceeds(addDoc(collection(db, 'notifications'), {
+      type: 'new_order', title: 'New Order Received', message: 'x', isRead: false,
+    }));
+  });
+
+  test('a guest cannot inject an order that is already completed', async () => {
+    const db = guest();
+    const ref = doc(collection(db, 'orders'));
+    await assertFails(setDoc(ref, {
+      orderId: ref.id, total: 50, status: 'completed',
+      customerInfo: { uid: 'guest-uid' },
+    }));
+  });
+
+  // Orders written before this slice have no customerInfo.uid at all.
+  test('an admin still reads a legacy order with no customerInfo.uid', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'orders/legacy'), { total: 50, status: 'pending' });
+    });
+    await assertSucceeds(getDoc(doc(admin(), 'orders/legacy')));
+    await assertFails(getDoc(doc(alice(), 'orders/legacy')));
+  });
+
+  test('reading a non-existent order denies for a user and succeeds empty for an admin', async () => {
+    await assertFails(getDoc(doc(alice(), 'orders/does-not-exist')));
+    await assertSucceeds(getDoc(doc(admin(), 'orders/does-not-exist')));
+  });
+
+  test('a guest cannot read redirect analytics but can still log one', async () => {
+    await assertSucceeds(addDoc(collection(guest(), 'redirects'), { target: 'tripadvisor' }));
+    await assertFails(getDoc(doc(guest(), 'redirects/seeded')));
+  });
+});
