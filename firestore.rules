@@ -24,8 +24,17 @@ service cloud.firestore {
       // status and total are pinned at creation: update is admin-only, so without
       // this a customer could inject an order that already reads "completed", or
       // an arbitrary total that flows straight into revenue analytics.
+      // The uid check is deliberately tolerant. Browsers that loaded the app
+      // before the uid deploy still write customerInfo.id, and in a bar those
+      // tabs stay open for hours - a strict check turns every one of them into
+      // a failed checkout at the till. So: a missing uid is accepted, but a
+      // uid that IS present must be the caller's, so nobody can file an order
+      // into someone else's history. .get() with a default rather than a bare
+      // access, which would raise on the old shape instead of evaluating.
+      // Tighten to a required uid once the old bundle is out of circulation.
       allow create: if isSignedIn()
-        && request.resource.data.customerInfo.uid == request.auth.uid
+        && request.resource.data.get('customerInfo', {}).get('uid', request.auth.uid)
+             == request.auth.uid
         && request.resource.data.status == 'pending'
         && request.resource.data.total is number
         && request.resource.data.total >= 0;

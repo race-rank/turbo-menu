@@ -85,6 +85,31 @@ describe('orders', () => {
     await assertSucceeds(getDoc(doc(guest(), 'orders/guest-one')));
   });
 
+  // Regression: the strict uid check took production down. Every browser still
+  // running the pre-uid bundle wrote customerInfo.id, and each of those
+  // checkouts failed with permission-denied.
+  test('a guest creates an order in the old pre-uid shape', async () => {
+    await assertSucceeds(setDoc(doc(guest(), 'orders/legacy-shape'), {
+      total: 50, status: 'pending', customerInfo: { id: 'customer-rynict0gq' },
+    }));
+  });
+
+  test('a guest creates an order with no customerInfo at all', async () => {
+    await assertSucceeds(setDoc(doc(guest(), 'orders/no-customer-info'), {
+      total: 50, status: 'pending',
+    }));
+  });
+
+  test('an order created in the old shape is not readable by its placer', async () => {
+    // The tolerance above buys order placement, not ownership: with no uid
+    // there is nothing to match on, so the live tracker degrades. Documented
+    // here so the trade-off is not mistaken for a bug.
+    await assertSucceeds(setDoc(doc(guest(), 'orders/legacy-unowned'), {
+      total: 50, status: 'pending', customerInfo: { id: 'customer-abc' },
+    }));
+    await assertFails(getDoc(doc(guest(), 'orders/legacy-unowned')));
+  });
+
   test('a user cannot create an order carrying another uid', async () => {
     await assertFails(setDoc(doc(alice(), 'orders/spoofed'), {
       total: 50, status: 'pending', customerInfo: { uid: BOB },
