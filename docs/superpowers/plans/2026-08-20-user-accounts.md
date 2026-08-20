@@ -445,6 +445,188 @@ git commit -m "feat: enforce per-user access in firestore rules"
 
 ---
 
+### Task 3b: Close the rules review findings
+
+A review of Task 3 found that the rules, as written, **break customer order
+submission in production**. This task fixes that and four smaller findings.
+
+**Files:**
+- Modify: `firestore.rules`, `src/services/firebaseService.ts`, `tests/rules.test.ts`
+
+#### Why this exists
+
+`createOrderRecord` writes an order in TWO steps: `addDoc(...)` then
+`updateDoc(docRef, { orderId: docRef.id })`. Under `allow update: if isAdmin()`
+that second write is denied for every customer. `submitOrder` then calls
+`createNotificationRecord`, which writes to the admin-only `notifications`
+collection - also denied. Both re-throw, so the order document is written and
+the customer still sees "Failed to submit order", retries, and creates
+duplicates with `orderId` undefined.
+
+The Task 2 suite missed this because its create test uses `setDoc` on a fresh
+path - a pure create - which never models the app's real two-write sequence.
+
+- [ ] **Step 1: Make order creation a single write**
+
+In `src/services/firebaseService.ts`, replace the body of `createOrderRecord`:
+
+```ts
+export const createOrderRecord = async (orderData: Omit<DatabaseOrder, 'orderId' | 'createdAt' | 'updatedAt' | 'timestamp'>) => {
+  try {
+    const cleanedOrderData = cleanObject(orderData);
+
+    // One atomic write. The previous addDoc + updateDoc(orderId) sequence needed
+    // an update, which security rules allow only for admins.
+    const orderRef = doc(collection(firestore, COLLECTIONS.ORDERS));
+    await setDoc(orderRef, {
+      ...cleanedOrderData,
+      orderId: orderRef.id,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+
+    return orderRef.id;
+  } catch (error) {
+    console.error('Error creating order:', error);
+    throw error;
+  }
+};
+```
+
+Add `setDoc` to the `firebase/firestore` import list in that file.
+
+- [ ] **Step 2: Replace `firestore.rules` with the amended version**
+
+```
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // isSignedIn() is TRUE for anonymous users - request.auth is non-null for them.
+    // This is load-bearing: it lets guests create and track orders under rules that
+    // never allow a fully unauthenticated write.
+    function isSignedIn() { return request.auth != null; }
+
+    // .get() with a default, not .admin: a bare property access RAISES on tokens
+    // without the claim. Outcomes happen to be correct today, but any negation
+    // (!isAdmin(), isAdmin() == false, a ternary) would then deny instead of
+    // allow, and every ordinary denial logs "Property admin is undefined".
+    function isAdmin()    { return request.auth != null && request.auth.token.get('admin', false) == true; }
+    function ownsOrder()  { return resource.data.customerInfo.uid == request.auth.uid; }
+
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+      allow read: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      // status and total are pinned at creation: update is admin-only, so without
+      // this a customer could inject an order that already reads "completed", or
+      // an arbitrary total that flows straight into revenue analytics.
+      allow create: if isSignedIn()
+        && request.resource.data.customerInfo.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.total is number
+        && request.resource.data.total >= 0;
+      allow read: if isAdmin() || (isSignedIn() && ownsOrder());
+      allow update, delete: if isAdmin();
+    }
+
+    match /menu/{document}             { allow read: if true; allow write: if isAdmin(); }
+    match /hookahs/{document}          { allow read: if true; allow write: if isAdmin(); }
+    match /tobaccoTypes/{document}     { allow read: if true; allow write: if isAdmin(); }
+    match /flavors/{document}          { allow read: if true; allow write: if isAdmin(); }
+    match /recommendedMixes/{document} { allow read: if true; allow write: if isAdmin(); }
+
+    // The public QR landing page logs redirects before anonymous sign-in can
+    // race, so create stays open - but bounded, since it is the only fully
+    // unauthenticated write in the ruleset.
+    match /redirects/{document} {
+      allow create: if request.resource.data.keys().size() <= 25
+        && request.resource.data.target is string
+        && request.resource.data.target.size() <= 100;
+      allow read: if isAdmin();
+    }
+
+    // submitOrder writes a new_order notification as the customer, so create is
+    // narrowly permitted. Reads stay admin-only.
+    match /notifications/{document} {
+      allow create: if isSignedIn() && request.resource.data.type == 'new_order';
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Legacy bcrypt admin store. Sealed; removed once Task 11 lands.
+    match /admins/{document} { allow read, write: if false; }
+
+    // Deliberately absent, so default-deny applies: products, sessions and
+    // tables. Verified dead - products and sessions are referenced nowhere in
+    // src/, and tables only by updateTableStatus, which has no callers.
+  }
+}
+```
+
+- [ ] **Step 3: Add the missing tests to `tests/rules.test.ts`**
+
+```ts
+describe('regression coverage', () => {
+  // The bare-setDoc create test did not model submitOrder's real write path.
+  test('a guest can complete the real order submission sequence', async () => {
+    const db = guest();
+    const ref = doc(collection(db, 'orders'));
+    await assertSucceeds(setDoc(ref, {
+      orderId: ref.id, total: 50, status: 'pending',
+      customerInfo: { uid: 'guest-uid' },
+    }));
+    await assertSucceeds(addDoc(collection(db, 'notifications'), {
+      type: 'new_order', title: 'New Order Received', message: 'x', isRead: false,
+    }));
+  });
+
+  test('a guest cannot inject an order that is already completed', async () => {
+    const db = guest();
+    const ref = doc(collection(db, 'orders'));
+    await assertFails(setDoc(ref, {
+      orderId: ref.id, total: 50, status: 'completed',
+      customerInfo: { uid: 'guest-uid' },
+    }));
+  });
+
+  // Orders written before this slice have no customerInfo.uid at all.
+  test('an admin still reads a legacy order with no customerInfo.uid', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'orders/legacy'), { total: 50, status: 'pending' });
+    });
+    await assertSucceeds(getDoc(doc(admin(), 'orders/legacy')));
+    await assertFails(getDoc(doc(alice(), 'orders/legacy')));
+  });
+
+  test('reading a non-existent order denies for a user and succeeds empty for an admin', async () => {
+    await assertFails(getDoc(doc(alice(), 'orders/does-not-exist')));
+    await assertSucceeds(getDoc(doc(admin(), 'orders/does-not-exist')));
+  });
+
+  test('a guest cannot read redirect analytics but can still log one', async () => {
+    await assertSucceeds(addDoc(collection(guest(), 'redirects'), { target: 'tripadvisor' }));
+    await assertFails(getDoc(doc(guest(), 'redirects/seeded')));
+  });
+});
+```
+
+- [ ] **Step 4: Run the tests**
+
+Run: `npm test`
+Expected: PASS, all 25 tests.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add firestore.rules tests/rules.test.ts src/services/firebaseService.ts
+git commit -m "fix: make order submission survive locked-down rules"
+```
+
+---
+
 ### Task 4: Expose Firebase Auth
 
 **Files:**
@@ -1501,6 +1683,12 @@ Open a PR, merge to `main`, and let Vercel deploy. Confirm on production that pl
 Sign in at `/hookah-bar-admin` on the deployed site and open `/admin`. If this fails, **stop** — deploying rules now would lock the admin out of their own database.
 
 - [ ] **Step 5: Deploy the rules**
+
+Deploy during a quiet period with no in-flight orders. Orders placed before the
+Task 7 deploy have no `customerInfo.uid`, so their owners get permission-denied
+on their own live tracker. Admins still read them fine, so the dashboard and
+analytics are unaffected. There is no backfill - those orders have no uid to
+stamp.
 
 ```bash
 npm run rules:deploy
