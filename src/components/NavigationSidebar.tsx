@@ -4,17 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Home, ShoppingCart, Settings, LogOut, Utensils, Star, BarChart2, Receipt, UserCircle } from 'lucide-react';
 import { useAuth } from "@/contexts/AuthContext";
+import { logout } from "@/services/authService";
 import { cn } from "@/lib/utils";
 import { performRedirect } from "@/utils/redirects";
 
 export const NavigationSidebar = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { loggedIn, hasAdminRights, logout } = useAuth();
+  const { user, isAdmin, isAnonymous } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/');
     setSidebarOpen(false);
   };
@@ -58,7 +59,7 @@ export const NavigationSidebar = () => {
                 </Link>
               ))}
               
-              {loggedIn && hasAdminRights && (
+              {isAdmin && (
                 <>
                   <Link
                     to="/admin"
@@ -118,7 +119,7 @@ export const NavigationSidebar = () => {
               </button>
             </nav>
             
-            {loggedIn && (
+            {user && !isAnonymous && (
               <div className="mt-auto pt-4 border-t">
                 <Button
                   variant="ghost"

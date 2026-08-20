@@ -5,31 +5,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
+import { signInWithEmail } from '@/services/authService';
 import { toast } from "sonner";
 
 const AdminLogin: React.FC = () => {
   const [userInput, setUserInput] = useState('');
   const [passInput, setPassInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { login, loggedIn, hasAdminRights } = useAuth();
+  const { isAdmin, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (loggedIn && hasAdminRights) {
+    if (!loading && isAdmin) {
       navigate('/admin', { replace: true });
     }
-  }, [loggedIn, hasAdminRights, navigate]);
+  }, [isAdmin, loading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const ok = await login(userInput, passInput);
-    setSubmitting(false);
-    if (ok) {
+    try {
+      await signInWithEmail(userInput, passInput);
       toast.success('Access granted!');
       navigate('/admin', { replace: true });
-    } else {
+    } catch {
       toast.error('Access denied - check credentials');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -40,12 +42,13 @@ const AdminLogin: React.FC = () => {
           <h1 className="text-2xl font-bold mb-6 text-center">Hookah Bar Admin</h1>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="user">Username</Label>
+              <Label htmlFor="user">Email</Label>
               <Input
                 id="user"
+                type="email"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
-                placeholder="Enter username"
+                placeholder="Enter email"
                 autoComplete="username"
                 required
               />

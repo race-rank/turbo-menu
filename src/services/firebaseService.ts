@@ -15,8 +15,6 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase'
 import { DatabaseOrder, DatabaseNotification } from '@/types/database';
-// bcryptjs is imported dynamically in validateAdminCredentials: this module is on the
-// guest path (menuService re-uses its helpers), and bcryptjs is ~9 kB gz of admin-only code.
 
 const COLLECTIONS = {
   ORDERS: 'orders',
@@ -237,24 +235,6 @@ export const getUnreadNotifications = async (): Promise<DatabaseNotification[]> 
   } catch (error) {
     console.error('Error getting notifications:', error);
     throw error;
-  }
-};
-
-export const validateAdminCredentials = async (username: string, password: string): Promise<boolean> => {
-  try {
-    const adminsRef = collection(firestore, "admins");
-    const q = query(adminsRef, where("username", "==", username));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return false;
-    const adminDoc = snapshot.docs[0];
-    const adminData = adminDoc.data();
-
-    if (!adminData.password) return false;
-    const { default: bcrypt } = await import('bcryptjs');
-    return await bcrypt.compare(password, adminData.password);
-  } catch (error) {
-    console.error('Error validating admin credentials:', error);
-    return false;
   }
 };
 
