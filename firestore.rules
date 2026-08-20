@@ -50,9 +50,15 @@ service cloud.firestore {
     }
 
     // submitOrder writes a new_order notification as the customer, so create is
-    // narrowly permitted. Reads stay admin-only.
+    // narrowly permitted - shape-pinned, so a visitor cannot mint arbitrary
+    // documents. Admins create too (updateOrderStatus writes order_update).
+    // Reads stay admin-only.
     match /notifications/{document} {
-      allow create: if isSignedIn() && request.resource.data.type == 'new_order';
+      allow create: if isAdmin() || (isSignedIn()
+        && request.resource.data.type == 'new_order'
+        && request.resource.data.isRead == false
+        && request.resource.data.keys().hasOnly(
+             ['type','title','message','isRead','orderId','createdAt']));
       allow read, update, delete: if isAdmin();
     }
 

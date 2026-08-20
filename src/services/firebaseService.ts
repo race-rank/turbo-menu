@@ -11,7 +11,8 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  type FirestoreError
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase'
 import { DatabaseOrder, DatabaseNotification } from '@/types/database';
@@ -278,18 +279,29 @@ export const getOrdersByDateRange = async (start: Date, end: Date): Promise<Data
 export const subscribeToOrder = (
   orderId: string,
   callback: (order: DatabaseOrder | null) => void,
+  // Without an error callback onSnapshot swallows the failure: a uid change
+  // makes a persisted order unreadable, and it stays pinned as "in progress"
+  // forever. The caller decides what to do - normally stop tracking it.
+  onError?: (error: FirestoreError) => void,
 ) => {
-  return onSnapshot(doc(firestore, COLLECTIONS.ORDERS, orderId), (snapshot) => {
-    if (!snapshot.exists()) {
-      callback(null);
-      return;
-    }
-    const data = snapshot.data();
-    callback({
-      ...data,
-      timestamp: safeConvertTimestamp(data.timestamp),
-      createdAt: safeConvertTimestamp(data.createdAt),
-      updatedAt: safeConvertTimestamp(data.updatedAt),
-    } as DatabaseOrder);
-  });
+  return onSnapshot(
+    doc(firestore, COLLECTIONS.ORDERS, orderId),
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        callback(null);
+        return;
+      }
+      const data = snapshot.data();
+      callback({
+        ...data,
+        timestamp: safeConvertTimestamp(data.timestamp),
+        createdAt: safeConvertTimestamp(data.createdAt),
+        updatedAt: safeConvertTimestamp(data.updatedAt),
+      } as DatabaseOrder);
+    },
+    (error) => {
+      console.error(`Order subscription failed for ${orderId}:`, error);
+      onError?.(error);
+    },
+  );
 };

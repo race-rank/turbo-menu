@@ -67,14 +67,17 @@ export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'sta
     
     const orderId = await createOrderRecord(dbOrderData);
     
-    // Create notification for admin
+    // Create notification for admin. Deliberately non-fatal: the order is
+    // already committed, and a throw here would surface as "submission failed"
+    // and get the same hookah ordered twice. Admin's new-order sound and flash
+    // come from the orders listener, not from this record.
     await createNotificationRecord({
       type: 'new_order',
       title: 'New Order Received',
       message: `Order from table ${orderData.table || 'Unknown'} - ${orderData.total} Lei`,
       isRead: false,
       orderId: orderId
-    });
+    }).catch(() => undefined);
     
     console.log('=== ORDER CREATED IN FIREBASE ===');
     console.log('Order ID:', orderId);

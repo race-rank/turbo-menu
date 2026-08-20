@@ -161,6 +161,21 @@ describe('notifications', () => {
   test('a user cannot write notifications', async () => {
     await assertFails(setDoc(doc(alice(), 'notifications/two'), { message: 'x' }));
   });
+
+  // updateOrderStatus writes this one, and it is not a 'new_order'.
+  test('an admin creates an order_update notification', async () => {
+    await assertSucceeds(addDoc(collection(admin(), 'notifications'), {
+      type: 'order_update', title: 'Order Status Updated',
+      message: 'Order alice-or is now ready', isRead: false, orderId: 'alice-order',
+    }));
+  });
+
+  test('a guest cannot create a notification carrying unexpected extra fields', async () => {
+    await assertFails(addDoc(collection(guest(), 'notifications'), {
+      type: 'new_order', title: 'New Order Received', message: 'x', isRead: false,
+      orderId: 'guest-one', payload: 'x'.repeat(500),
+    }));
+  });
 });
 
 describe('admins collection', () => {

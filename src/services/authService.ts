@@ -22,14 +22,36 @@ export class AccountExistsError extends Error {
   }
 }
 
+// linkWithPopup reports an existing Google account as
+// 'auth/credential-already-in-use', but linkWithCredential with an
+// EmailAuthProvider credential reports an existing email as
+// 'auth/email-already-in-use', and a second attempt on an already-upgraded
+// session as 'auth/provider-already-linked'. All three mean "there is already
+// an account here", so all three take the existing-account fallback rather
+// than surfacing a raw FirebaseError.
+const ALREADY_IN_USE_CODES = [
+  'auth/credential-already-in-use',
+  'auth/email-already-in-use',
+  'auth/provider-already-linked',
+];
+
 const isAlreadyInUse = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'code' in error &&
-  (error as { code: string }).code === 'auth/credential-already-in-use';
+  ALREADY_IN_USE_CODES.includes((error as { code: string }).code);
+
+// signOut() makes AuthContext bootstrap a fresh session, and StrictMode mounts
+// that effect twice, so unmemoised callers raced and left an orphan anonymous
+// account behind on every sign-out.
+let pendingAnonymousSignIn: Promise<User> | null = null;
 
 export const ensureSignedIn = async (): Promise<User> => {
   if (auth.currentUser) return auth.currentUser;
-  const credential = await signInAnonymously(auth);
-  return credential.user;
+  if (!pendingAnonymousSignIn) {
+    pendingAnonymousSignIn = signInAnonymously(auth)
+      .then((credential) => credential.user)
+      .finally(() => { pendingAnonymousSignIn = null; });
+  }
+  return pendingAnonymousSignIn;
 };
 
 /**
@@ -92,8 +114,11 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 export const resetPassword = (email: string): Promise<void> =>
   sendPasswordResetEmail(auth, email);
 
-/** Signing out returns the visitor to a fresh anonymous session, not to nothing. */
+/**
+ * Signing out returns the visitor to a fresh anonymous session, not to nothing -
+ * but AuthContext's listener does that bootstrap itself, so signing in again
+ * here would just race it into a duplicate anonymous account.
+ */
 export const logout = async (): Promise<void> => {
   await signOut(auth);
-  await signInAnonymously(auth);
 };

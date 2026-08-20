@@ -27,7 +27,10 @@ const AdminLogin: React.FC = () => {
     try {
       await signInWithEmail(userInput, passInput);
       toast.success('Access granted!');
-      navigate('/admin', { replace: true });
+      // No navigate() here: AuthContext is still awaiting getIdTokenResult(), so
+      // AdminGuard would see loading === false with isAdmin still false and
+      // bounce the admin we just signed in. The effect above, gated on
+      // !loading && isAdmin, redirects as soon as the claim lands.
     } catch {
       toast.error('Access denied - check credentials');
     } finally {

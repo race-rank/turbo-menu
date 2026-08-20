@@ -96,30 +96,40 @@ export const OrderTrackingProvider: React.FC<OrderTrackingProviderProps> = ({
     // One listener per tracked order. A collection-wide listener would leak
     // every customer's order and is rejected by security rules.
     const unsubscribes = activeOrders.map((tracked) =>
-      subscribeToOrder(tracked.orderId, (updated) => {
-        if (!updated) return;
-        setActiveOrders((prev) =>
-          prev
-            .map((order) =>
-              order.orderId === updated.orderId
-                ? {
-                    orderId: updated.orderId,
-                    status: updated.status,
-                    timestamp: safeToEpochTime(updated.timestamp),
-                    items: updated.items as CartItem[],
-                    total: updated.total,
-                    customerInfo: updated.customerInfo,
-                  }
-                : order,
-            )
-            .filter((order) => {
-              if (order.status === 'completed') {
-                return Date.now() - order.timestamp <= 2 * 60 * 1000;
-              }
-              return true;
-            }),
-        );
-      }),
+      subscribeToOrder(
+        tracked.orderId,
+        (updated) => {
+          if (!updated) return;
+          setActiveOrders((prev) =>
+            prev
+              .map((order) =>
+                order.orderId === updated.orderId
+                  ? {
+                      orderId: updated.orderId,
+                      status: updated.status,
+                      timestamp: safeToEpochTime(updated.timestamp),
+                      items: updated.items as CartItem[],
+                      total: updated.total,
+                      customerInfo: updated.customerInfo,
+                    }
+                  : order,
+              )
+              .filter((order) => {
+                if (order.status === 'completed') {
+                  return Date.now() - order.timestamp <= 2 * 60 * 1000;
+                }
+                return true;
+              }),
+          );
+        },
+        // Unreadable now - typically a permission-denied after the uid changed.
+        // Drop it rather than leave a phantom order stuck "in progress".
+        () => {
+          setActiveOrders((prev) =>
+            prev.filter((order) => order.orderId !== tracked.orderId),
+          );
+        },
+      ),
     );
 
     return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
