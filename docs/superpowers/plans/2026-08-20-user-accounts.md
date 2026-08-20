@@ -56,7 +56,7 @@
 - [ ] **Step 1: Install dev dependencies**
 
 ```bash
-npm i -D vitest@^2 @firebase/rules-unit-testing@^4 firebase-tools@^13
+npm i -D vitest@^2 @firebase/rules-unit-testing@^5 firebase-tools@^13
 ```
 
 - [ ] **Step 2: Create `vitest.config.ts`**
@@ -69,6 +69,7 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.ts'],
     testTimeout: 15000,
+    hookTimeout: 15000,
     fileParallelism: false,
   },
 });
@@ -127,9 +128,9 @@ service cloud.firestore {
 - [ ] **Step 6: Add scripts to `package.json`**
 
 ```json
-"test": "firebase emulators:exec --only firestore \"vitest run\"",
-"test:watch": "firebase emulators:exec --only firestore \"vitest\"",
-"rules:deploy": "firebase deploy --only firestore:rules,firestore:indexes"
+"test": "firebase emulators:exec --only firestore --project demo-turbo-menu \"vitest run\"",
+"test:watch": "firebase emulators:exec --only firestore --project demo-turbo-menu \"vitest\"",
+"rules:deploy": "firebase deploy --only firestore:rules,firestore:indexes --project turbo-menu-30079"
 ```
 
 - [ ] **Step 7: Add the service account key to `.gitignore`**
@@ -153,12 +154,14 @@ let testEnv: RulesTestEnvironment;
 
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
-    projectId: 'turbo-menu-test',
-    firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 },
+    projectId: 'demo-turbo-menu-test',
+    // No host/port: firebase.json is the single source of truth, and omitting
+    // them keeps the library's "emulator not running" guard active.
+    firestore: { rules: loadRules() },
   });
 });
 
-afterAll(async () => { await testEnv.cleanup(); });
+afterAll(async () => { await testEnv?.cleanup(); });
 
 test('emulator harness works', async () => {
   const db = testEnv.authenticatedContext('alice').firestore();
@@ -202,14 +205,24 @@ let testEnv: RulesTestEnvironment;
 const ALICE = 'alice-uid';
 const BOB = 'bob-uid';
 
+const loadRules = (): string => {
+  const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
+  if (!rules.trim()) {
+    throw new Error('firestore.rules is empty - refusing to test against default allow-all rules');
+  }
+  return rules;
+};
+
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
-    projectId: 'turbo-menu-test',
-    firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 },
+    projectId: 'demo-turbo-menu-test',
+    // No host/port: firebase.json is the single source of truth, and omitting
+    // them keeps the library's "emulator not running" guard active.
+    firestore: { rules: loadRules() },
   });
 });
 
-afterAll(async () => { await testEnv.cleanup(); });
+afterAll(async () => { await testEnv?.cleanup(); });
 
 beforeEach(async () => {
   await testEnv.clearFirestore();
@@ -722,14 +735,22 @@ import { beforeAll, afterAll, beforeEach, test } from 'vitest';
 let testEnv: RulesTestEnvironment;
 const ALICE = 'alice-uid';
 
+const loadRules = (): string => {
+  const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
+  if (!rules.trim()) {
+    throw new Error('firestore.rules is empty - refusing to test against default allow-all rules');
+  }
+  return rules;
+};
+
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
-    projectId: 'turbo-menu-history',
-    firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 },
+    projectId: 'demo-turbo-menu-history',
+    firestore: { rules: loadRules() },
   });
 });
 
-afterAll(async () => { await testEnv.cleanup(); });
+afterAll(async () => { await testEnv?.cleanup(); });
 
 beforeEach(async () => {
   await testEnv.clearFirestore();
