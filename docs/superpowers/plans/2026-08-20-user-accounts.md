@@ -421,6 +421,10 @@ service cloud.firestore {
 
     // Legacy bcrypt admin store. Sealed; removed once Task 11 lands.
     match /admins/{document} { allow read, write: if false; }
+
+    // Deliberately absent, so default-deny applies: products, sessions and
+    // tables. Verified dead - products and sessions are referenced nowhere in
+    // src/, and tables only by updateTableStatus, which has no callers.
   }
 }
 ```
