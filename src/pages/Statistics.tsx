@@ -30,20 +30,6 @@ const Statistics = () => {
     loadOrders();
   }, []);
 
-  // Silent refresh of orders only (no loading state, no toast)
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await getAdminOrders();
-        setOrders(response.orders);
-      } catch (error) {
-        console.error('Failed to refresh orders:', error);
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
-
   return (
     <div className="min-h-screen bg-turbo-dark text-turbo-text pb-20">
       <header className="flex items-center justify-between p-4 border-b border-border">

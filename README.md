@@ -71,3 +71,24 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Testing
+
+Firestore security rules are covered by a test suite in `tests/`.
+
+```sh
+npm test
+```
+
+This starts the Firestore emulator on port **8085** (configured in `firebase.json`),
+runs the suite against it, and shuts the emulator down again. Nothing touches the
+production project, and no network access or Firebase login is required.
+
+**Prerequisite:** the Firestore emulator is a Java program, so a JDK (version 11 or
+newer) must be installed and on your `PATH`. Verify with `java -version`. If that
+command reports no runtime, install a JDK via your platform's usual package manager
+and make sure its `bin` directory is on your `PATH`.
+
+Use `npm run test:watch` to re-run the suite as you edit rules, and
+`npm run rules:deploy` to publish `firestore.rules` and `firestore.indexes.json`
+to the production project.

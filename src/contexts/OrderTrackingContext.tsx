@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { OrderDetails } from '@/services/orderService';
-import { subscribeToOrders } from '@/services/firebaseService';
+import { subscribeToOrder } from '@/services/firebaseService';
 import { CartItem } from '@/contexts/CartContext';
 
 interface ActiveOrder {
@@ -10,7 +10,8 @@ interface ActiveOrder {
   items: CartItem[];
   total: number;
   customerInfo: {
-    id: string;
+    uid: string;
+    id?: string;
     name?: string;
     table?: string;
   };
@@ -92,34 +93,47 @@ export const OrderTrackingProvider: React.FC<OrderTrackingProviderProps> = ({
   useEffect(() => {
     if (activeOrders.length === 0) return;
 
-    const unsubscribe = subscribeToOrders((updatedOrders) => {
-      setActiveOrders(prevOrders => {
-        return prevOrders.map(prevOrder => {
-          const updatedOrder = updatedOrders.find(order => order.orderId === prevOrder.orderId);
-          if (updatedOrder) {
-            return {
-              orderId: updatedOrder.orderId,
-              status: updatedOrder.status,
-              timestamp: safeToEpochTime(updatedOrder.timestamp),
-              items: updatedOrder.items as CartItem[],
-              total: updatedOrder.total,
-              customerInfo: updatedOrder.customerInfo
-            };
-          }
-          return prevOrder;
-        }).filter(order => {
-          if (order.status === 'completed') {
-            const completionTime = new Date(order.timestamp).getTime();
-            const currentTime = new Date().getTime();
-            return (currentTime - completionTime) <= 2 * 60 * 1000;
-          }
-          return true;
-        });
-      });
-    });
+    // One listener per tracked order. A collection-wide listener would leak
+    // every customer's order and is rejected by security rules.
+    const unsubscribes = activeOrders.map((tracked) =>
+      subscribeToOrder(
+        tracked.orderId,
+        (updated) => {
+          if (!updated) return;
+          setActiveOrders((prev) =>
+            prev
+              .map((order) =>
+                order.orderId === updated.orderId
+                  ? {
+                      orderId: updated.orderId,
+                      status: updated.status,
+                      timestamp: safeToEpochTime(updated.timestamp),
+                      items: updated.items as CartItem[],
+                      total: updated.total,
+                      customerInfo: updated.customerInfo,
+                    }
+                  : order,
+              )
+              .filter((order) => {
+                if (order.status === 'completed') {
+                  return Date.now() - order.timestamp <= 2 * 60 * 1000;
+                }
+                return true;
+              }),
+          );
+        },
+        // Unreadable now - typically a permission-denied after the uid changed.
+        // Drop it rather than leave a phantom order stuck "in progress".
+        () => {
+          setActiveOrders((prev) =>
+            prev.filter((order) => order.orderId !== tracked.orderId),
+          );
+        },
+      ),
+    );
 
-    return () => unsubscribe();
-  }, [activeOrders.map(o => o.orderId).join(',')]);
+    return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+  }, [activeOrders.map((o) => o.orderId).join(',')]);
 
   const addOrder = (order: OrderDetails) => {
     const timestamp = order.createdAt || new Date();

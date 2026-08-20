@@ -2,20 +2,35 @@ import {
   collection,
   doc,
   addDoc,
+  setDoc,
   updateDoc,
   getDoc,
   getDocs,
   query,
   where,
   orderBy,
+  limit,
   onSnapshot,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  type FirestoreError
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase'
 import { DatabaseOrder, DatabaseNotification } from '@/types/database';
-// bcryptjs is imported dynamically in validateAdminCredentials: this module is on the
-// guest path (menuService re-uses its helpers), and bcryptjs is ~9 kB gz of admin-only code.
+
+/**
+ * Upper bound on the live admin order listener.
+ *
+ * The dashboard filters by status client-side, so this window has to hold every
+ * order staff might still act on - a few days' worth at this venue's volume.
+ * Without a bound the listener streamed the entire collection on every load and
+ * grew forever. Older orders remain reachable through Statistics, which queries
+ * by date range.
+ *
+ * Deliberately not applied to getOrdersByStatus: Statistics shares that helper
+ * and a hidden limit there would silently under-report revenue.
+ */
+const ADMIN_ORDER_LIMIT = 200;
 
 const COLLECTIONS = {
   ORDERS: 'orders',
@@ -55,16 +70,18 @@ export const safeConvertTimestamp = (timestamp: any): Date => {
 export const createOrderRecord = async (orderData: Omit<DatabaseOrder, 'orderId' | 'createdAt' | 'updatedAt' | 'timestamp'>) => {
   try {
     const cleanedOrderData = cleanObject(orderData);
-    
-    const docRef = await addDoc(collection(firestore, COLLECTIONS.ORDERS), {
+
+    // One atomic write. The previous addDoc + updateDoc(orderId) sequence needed
+    // an update, which security rules allow only for admins.
+    const orderRef = doc(collection(firestore, COLLECTIONS.ORDERS));
+    await setDoc(orderRef, {
       ...cleanedOrderData,
+      orderId: orderRef.id,
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()    
+      updatedAt: serverTimestamp()
     });
-    
-    await updateDoc(docRef, { orderId: docRef.id });
-    
-    return docRef.id;
+
+    return orderRef.id;
   } catch (error) {
     console.error('Error creating order:', error);
     throw error;
@@ -136,32 +153,48 @@ export const getOrdersByStatus = async (status?: string): Promise<DatabaseOrder[
   }
 };
 
-export const subscribeToOrders = (callback: (orders: DatabaseOrder[]) => void, status?: string) => {
+export const subscribeToOrders = (
+  callback: (orders: DatabaseOrder[]) => void,
+  status?: string,
+  // Without this onSnapshot swallows the failure and the dashboard sits on its
+  // loading spinner forever - the exact symptom when an admin's token lacks the
+  // claim the security rules require.
+  onError?: (error: FirestoreError) => void,
+) => {
   let ordersQuery = query(
     collection(firestore, COLLECTIONS.ORDERS),
-    orderBy('createdAt', 'desc')
+    orderBy('createdAt', 'desc'),
+    limit(ADMIN_ORDER_LIMIT)
   );
-  
+
   if (status) {
     ordersQuery = query(
       collection(firestore, COLLECTIONS.ORDERS),
       where('status', '==', status),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(ADMIN_ORDER_LIMIT)
     );
   }
   
-  return onSnapshot(ordersQuery, (querySnapshot) => {
-    const orders = querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        timestamp: safeConvertTimestamp(data.timestamp),
-        createdAt: safeConvertTimestamp(data.createdAt),
-        updatedAt: safeConvertTimestamp(data.updatedAt)
-      } as DatabaseOrder;
-    });
-    callback(orders);
-  });
+  return onSnapshot(
+    ordersQuery,
+    (querySnapshot) => {
+      const orders = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          timestamp: safeConvertTimestamp(data.timestamp),
+          createdAt: safeConvertTimestamp(data.createdAt),
+          updatedAt: safeConvertTimestamp(data.updatedAt)
+        } as DatabaseOrder;
+      });
+      callback(orders);
+    },
+    (error) => {
+      console.error('Orders subscription failed:', error);
+      onError?.(error);
+    },
+  );
 };
 
 export const updateTableStatus = async (tableId: string, isOccupied: boolean) => {
@@ -237,24 +270,6 @@ export const getUnreadNotifications = async (): Promise<DatabaseNotification[]> 
   }
 };
 
-export const validateAdminCredentials = async (username: string, password: string): Promise<boolean> => {
-  try {
-    const adminsRef = collection(firestore, "admins");
-    const q = query(adminsRef, where("username", "==", username));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return false;
-    const adminDoc = snapshot.docs[0];
-    const adminData = adminDoc.data();
-
-    if (!adminData.password) return false;
-    const { default: bcrypt } = await import('bcryptjs');
-    return await bcrypt.compare(password, adminData.password);
-  } catch (error) {
-    console.error('Error validating admin credentials:', error);
-    return false;
-  }
-};
-
 export const generateOrderId = (): string => {
   return `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`.toUpperCase();
 };
@@ -286,4 +301,38 @@ export const getOrdersByDateRange = async (start: Date, end: Date): Promise<Data
     console.error('Error getting orders by date range:', error);
     throw error;
   }
+};
+
+/**
+ * Watch a single order. Guests must use this rather than subscribeToOrders,
+ * which reads the whole collection and is rejected by security rules.
+ */
+export const subscribeToOrder = (
+  orderId: string,
+  callback: (order: DatabaseOrder | null) => void,
+  // Without an error callback onSnapshot swallows the failure: a uid change
+  // makes a persisted order unreadable, and it stays pinned as "in progress"
+  // forever. The caller decides what to do - normally stop tracking it.
+  onError?: (error: FirestoreError) => void,
+) => {
+  return onSnapshot(
+    doc(firestore, COLLECTIONS.ORDERS, orderId),
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        callback(null);
+        return;
+      }
+      const data = snapshot.data();
+      callback({
+        ...data,
+        timestamp: safeConvertTimestamp(data.timestamp),
+        createdAt: safeConvertTimestamp(data.createdAt),
+        updatedAt: safeConvertTimestamp(data.updatedAt),
+      } as DatabaseOrder);
+    },
+    (error) => {
+      console.error(`Order subscription failed for ${orderId}:`, error);
+      onError?.(error);
+    },
+  );
 };

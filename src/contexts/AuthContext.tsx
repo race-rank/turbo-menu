@@ -1,13 +1,13 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { validateAdminCredentials } from '@/services/firebaseService';
-
-const AUTH_KEY = 'turbo-admin-auth';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { onIdTokenChanged, type User } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { ensureSignedIn } from '@/services/authService';
 
 interface AuthContextType {
-  loggedIn: boolean;
-  hasAdminRights: boolean;
-  logout: () => void;
-  login: (username: string, password: string) => Promise<boolean>;
+  user: User | null;
+  isAnonymous: boolean;
+  isAdmin: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,42 +20,45 @@ export const useAuth = () => {
   return context;
 };
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  // Held as its own state, never derived from `user`: linking an anonymous
+  // account mutates the SAME UserImpl instance in place, so setUser(next) is
+  // Object.is-equal to the current state and React bails out of re-rendering.
+  // A false/true flip is a real value change, so it forces the render.
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-const readPersistedAuth = () => {
-  try {
-    return sessionStorage.getItem(AUTH_KEY) === '1';
-  } catch {
-    return false;
-  }
-};
+  useEffect(() => {
+    // onIdTokenChanged, NOT onAuthStateChanged: the SDK's notifyAuthListeners
+    // only pushes to auth-state listeners when the uid changes, and linking a
+    // guest to a real account deliberately keeps the uid, so the upgrade would
+    // never reach the UI. Id-token listeners are notified unconditionally.
+    const unsubscribe = onIdTokenChanged(auth, async (next) => {
+      if (!next) {
+        // No session yet: create an anonymous one. The listener fires again.
+        setIsAdmin(false);
+        setIsAnonymous(false);
+        setUser(null);
+        await ensureSignedIn().catch(() => undefined);
+        setLoading(false);
+        return;
+      }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const initial = readPersistedAuth();
-  const [loggedIn, setLoggedIn] = useState(initial);
-  const [hasAdminRights, setHasAdminRights] = useState(initial);
+      // Claims live on the token, never in a readable document.
+      const token = await next.getIdTokenResult().catch(() => null);
+      setIsAdmin(token?.claims?.admin === true);
+      setIsAnonymous(next.isAnonymous);
+      setUser(next);
+      setLoading(false);
+    });
 
-  const login = async (username: string, password: string): Promise<boolean> => {
-    const valid = await validateAdminCredentials(username, password);
-    if (valid) {
-      setLoggedIn(true);
-      setHasAdminRights(true);
-      try { sessionStorage.setItem(AUTH_KEY, '1'); } catch {}
-      return true;
-    }
-    return false;
-  };
-
-  const logout = () => {
-    setLoggedIn(false);
-    setHasAdminRights(false);
-    try { sessionStorage.removeItem(AUTH_KEY); } catch {}
-  };
+    return () => unsubscribe();
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ loggedIn, hasAdminRights, login, logout }}>
+    <AuthContext.Provider value={{ user, isAnonymous, isAdmin, loading }}>
       {children}
     </AuthContext.Provider>
   );

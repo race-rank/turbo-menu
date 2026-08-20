@@ -7,9 +7,16 @@ interface AdminGuardProps {
 }
 
 export const AdminGuard: React.FC<AdminGuardProps> = ({ children }) => {
-  const { loggedIn, hasAdminRights } = useAuth();
+  const { isAdmin, loading } = useAuth();
 
-  if (!loggedIn || !hasAdminRights) {
+  // Without this the guard redirects before the token has been read.
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">
+      <p className="text-turbo-muted">Loading…</p>
+    </div>;
+  }
+
+  if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
 

@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => ({
         // don't invalidate them, and so they download in parallel.
         manualChunks: {
           react: ["react", "react-dom", "react-router-dom"],
-          firebase: ["firebase/app", "firebase/firestore"],
+          firebase: ["firebase/app", "firebase/firestore", "firebase/auth"],
         },
       },
     },

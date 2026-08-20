@@ -5,7 +5,8 @@ export interface DatabaseOrder {
   timestamp: number | Date;
   table?: string;
   customerInfo: {
-    id: string;
+    uid: string;
+    id?: string;
     name?: string;
     phone?: string;
   };
@@ -19,11 +20,15 @@ export interface DatabaseOrderItem {
   type: 'mix' | 'custom';
   name: string;
   price: number;
-  image: string;
+  quantity: number;
+  // No `image` here on purpose. Menu images are base64 data URIs of roughly
+  // 900KB, so carrying one per item put order documents at 91% of Firestore's
+  // 1MiB limit. Staff need the name, hookah and flavors, never a photo.
   hookah?: string;
   tobaccoType?: 'virginia' | 'darkblend' | 'cigarleaf' | 'mix';
   tobaccoStrength?: number;
   flavors?: string[];
+  flavorPercentages?: Record<string, number>;
   table?: string;
   hasLED?: boolean;
   hasColoredWater?: boolean;

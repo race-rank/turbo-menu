@@ -1,0 +1,72 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // isSignedIn() is TRUE for anonymous users - request.auth is non-null for them.
+    // This is load-bearing: it lets guests create and track orders under rules that
+    // never allow a fully unauthenticated write.
+    function isSignedIn() { return request.auth != null; }
+
+    // .get() with a default, not .admin: a bare property access RAISES on tokens
+    // without the claim. Outcomes happen to be correct today, but any negation
+    // (!isAdmin(), isAdmin() == false, a ternary) would then deny instead of
+    // allow, and every ordinary denial logs "Property admin is undefined".
+    function isAdmin()    { return request.auth != null && request.auth.token.get('admin', false) == true; }
+    function ownsOrder()  { return resource.data.customerInfo.uid == request.auth.uid; }
+
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+      allow read: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      // status and total are pinned at creation: update is admin-only, so without
+      // this a customer could inject an order that already reads "completed", or
+      // an arbitrary total that flows straight into revenue analytics.
+      allow create: if isSignedIn()
+        && request.resource.data.customerInfo.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.total is number
+        && request.resource.data.total >= 0;
+      allow read: if isAdmin() || (isSignedIn() && ownsOrder());
+      allow update, delete: if isAdmin();
+    }
+
+    match /menu/{document}             { allow read: if true; allow write: if isAdmin(); }
+    match /hookahs/{document}          { allow read: if true; allow write: if isAdmin(); }
+    match /tobaccoTypes/{document}     { allow read: if true; allow write: if isAdmin(); }
+    match /flavors/{document}          { allow read: if true; allow write: if isAdmin(); }
+    match /recommendedMixes/{document} { allow read: if true; allow write: if isAdmin(); }
+
+    // The public QR landing page logs redirects before anonymous sign-in can
+    // race, so create stays open - but bounded, since it is the only fully
+    // unauthenticated write in the ruleset.
+    match /redirects/{document} {
+      allow create: if request.resource.data.keys().size() <= 25
+        && request.resource.data.target is string
+        && request.resource.data.target.size() <= 100;
+      allow read: if isAdmin();
+    }
+
+    // submitOrder writes a new_order notification as the customer, so create is
+    // narrowly permitted - shape-pinned, so a visitor cannot mint arbitrary
+    // documents. Admins create too (updateOrderStatus writes order_update).
+    // Reads stay admin-only.
+    match /notifications/{document} {
+      allow create: if isAdmin() || (isSignedIn()
+        && request.resource.data.type == 'new_order'
+        && request.resource.data.isRead == false
+        && request.resource.data.keys().hasOnly(
+             ['type','title','message','isRead','orderId','createdAt']));
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Legacy bcrypt admin store. Sealed; removed once Task 11 lands.
+    match /admins/{document} { allow read, write: if false; }
+
+    // Deliberately absent, so default-deny applies: products, sessions and
+    // tables. Verified dead - products and sessions are referenced nowhere in
+    // src/, and tables only by updateTableStatus, which has no callers.
+  }
+}
