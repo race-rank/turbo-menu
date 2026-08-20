@@ -83,7 +83,8 @@ export default defineConfig({
     "indexes": "firestore.indexes.json"
   },
   "emulators": {
-    "firestore": { "port": 8080 },
+    "firestore": { "port": 8085 },
+    "singleProjectMode": false,
     "ui": { "enabled": false }
   }
 }
@@ -153,7 +154,7 @@ let testEnv: RulesTestEnvironment;
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: 'turbo-menu-test',
-    firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8080 },
+    firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 },
   });
 });
 
@@ -204,7 +205,7 @@ const BOB = 'bob-uid';
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: 'turbo-menu-test',
-    firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8080 },
+    firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 },
   });
 });
 
@@ -724,7 +725,7 @@ const ALICE = 'alice-uid';
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: 'turbo-menu-history',
-    firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8080 },
+    firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8085 },
   });
 });
 
