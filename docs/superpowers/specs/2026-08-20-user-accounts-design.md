@@ -78,6 +78,33 @@ This requires one composite index. History is deliberately **not** denormalized 
 history is written once and read occasionally, so duplication would add a sync failure
 mode for no gain.
 
+### Decisions an implementer would otherwise have to guess
+
+- **Email verification is not required to order.** Blocking on a verification email at a
+  bar table would defeat the point. `sendEmailVerification` is called on signup, but
+  nothing gates on it in this slice.
+- **Password reset** lives on the email/password sign-in form as a "Forgot password?"
+  link calling `resetPassword`. No separate route.
+- **`orderCount` and `lastOrderAt`** are updated by the client on successful order
+  submit, in the same call site that writes the order. Rules permit it because a user
+  may write their own `users/{uid}` document. They are display counters, not a source
+  of truth; the orders collection remains authoritative.
+
+### Known limitation: upgrading into an existing account
+
+If an anonymous user signs up with a Google account or email that **already exists**,
+`linkWithCredential` fails with `auth/credential-already-in-use`. This happens whenever
+someone already has an account and returns on a second device.
+
+Behaviour for this slice: sign the user in to the existing account, discard the
+anonymous one, and tell them plainly that guest orders from this device could not be
+merged.
+
+Merging would mean reassigning order documents from the anonymous uid to the real one.
+Rules allow order updates only by an admin, so a correct merge needs a server-side
+function with a service account. That is out of scope here and should be revisited if
+it turns out to happen often.
+
 ### Order tracking
 
 `subscribeToOrders` (all orders) becomes admin-only. A new `subscribeToOrder(orderId, cb)`
@@ -109,6 +136,9 @@ upgrade path.
 `firebase deploy --only firestore:rules`.
 
 ```
+// isSignedIn() is true for anonymous users too - request.auth is non-null for them.
+// This is load-bearing: it is what lets guests create and track orders under rules
+// that never allow a fully unauthenticated write.
 function isAdmin()    { return request.auth != null && request.auth.token.admin == true; }
 function isSignedIn() { return request.auth != null; }
 
@@ -119,9 +149,9 @@ match /orders/{id}   { allow create: if isSignedIn()
                        allow read:   if isAdmin()
                          || (isSignedIn() && resource.data.customerInfo.uid == request.auth.uid);
                        allow update, delete: if isAdmin(); }
+// One block each - rules have no comma-separated match paths:
+// menu, hookahs, tobaccoTypes, flavors, recommendedMixes
 match /menu/{d}      { allow read: if true; allow write: if isAdmin(); }
-match /hookahs/{d}, /tobaccoTypes/{d}, /flavors/{d}, /recommendedMixes/{d}
-                     { allow read: if true; allow write: if isAdmin(); }
 match /redirects/{d} { allow create: if true; allow read: if isAdmin(); }
 match /notifications/{d} { allow read, write: if isAdmin(); }
 match /admins/{d}    { allow read, write: if false; }
