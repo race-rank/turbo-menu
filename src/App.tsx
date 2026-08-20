@@ -21,6 +21,7 @@ const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const MenuManagement = lazy(() => import("./pages/MenuManagement"));
 const Statistics = lazy(() => import("./pages/Statistics"));
 const Account = lazy(() => import("./pages/Account"));
+const MyOrders = lazy(() => import("./pages/MyOrders"));
 
 const queryClient = new QueryClient();
 
@@ -71,6 +72,7 @@ const App = () => {
                         }
                       />
                       <Route path="/account" element={<Account />} />
+                      <Route path="/my-orders" element={<MyOrders />} />
                       <Route path="*" element={<Index />} />
                     </Routes>
                   </Suspense>

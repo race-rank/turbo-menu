@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { submitOrder } from '@/services/orderService';
 import { ensureSignedIn } from '@/services/authService';
+import { recordOrderPlaced } from '@/services/userService';
 import { OrderFooter } from '@/components/layout/OrderFooter';
 
 const Cart = () => {
@@ -67,6 +68,7 @@ const Cart = () => {
       };
 
       const result = await submitOrder(orderData);
+      await recordOrderPlaced(user).catch(() => undefined);
 
       // Add the order to tracking
       addOrder(result);
