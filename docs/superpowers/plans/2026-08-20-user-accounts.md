@@ -197,7 +197,7 @@ import { readFileSync } from 'fs';
 import {
   initializeTestEnvironment, assertSucceeds, assertFails, RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { beforeAll, afterAll, beforeEach, describe, test } from 'vitest';
 
 let testEnv: RulesTestEnvironment;
@@ -207,6 +207,9 @@ const BOB = 'bob-uid';
 
 const loadRules = (): string => {
   const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
+  // initializeTestEnvironment skips BOTH the rules upload and its own emulator
+  // liveness check when the rules string is falsy - a blank file would silently
+  // run the whole suite against the emulator's default allow-all ruleset.
   if (!rules.trim()) {
     throw new Error('firestore.rules is empty - refusing to test against default allow-all rules');
   }
@@ -233,6 +236,8 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, 'admins/one'), { username: 'root', password: 'hash' });
     await setDoc(doc(db, 'menu/current'), { hookahs: [] });
+    await setDoc(doc(db, 'redirects/seeded'), { target: 'google-reviews' });
+    await setDoc(doc(db, 'notifications/one'), { message: 'new order' });
   });
 });
 
@@ -240,6 +245,12 @@ const alice = () => testEnv.authenticatedContext(ALICE).firestore();
 const bob = () => testEnv.authenticatedContext(BOB).firestore();
 const admin = () => testEnv.authenticatedContext('admin-uid', { admin: true }).firestore();
 const anon = () => testEnv.unauthenticatedContext().firestore();
+// authenticatedContext() defaults to sign_in_provider 'custom'. Guests sign in
+// anonymously, so model that explicitly or a provider-sensitive rule could kill
+// every guest order while this suite stayed green.
+const guest = () => testEnv.authenticatedContext('guest-uid', {
+  firebase: { sign_in_provider: 'anonymous', identities: {} },
+}).firestore();
 
 describe('orders', () => {
   test('a user reads their own order', async () => {
@@ -276,6 +287,23 @@ describe('orders', () => {
     await assertFails(updateDoc(doc(alice(), 'orders/alice-order'), { status: 'ready' }));
     await assertSucceeds(updateDoc(doc(admin(), 'orders/alice-order'), { status: 'ready' }));
   });
+
+  test('nobody but an admin deletes an order', async () => {
+    await assertFails(deleteDoc(doc(bob(), 'orders/alice-order')));
+    await assertFails(deleteDoc(doc(alice(), 'orders/alice-order'))); // not even the owner
+    await assertSucceeds(deleteDoc(doc(admin(), 'orders/alice-order')));
+  });
+
+  test('an anonymous guest creates and reads back their own order', async () => {
+    await assertSucceeds(setDoc(doc(guest(), 'orders/guest-one'), {
+      total: 50, status: 'pending', customerInfo: { uid: 'guest-uid' },
+    }));
+    await assertSucceeds(getDoc(doc(guest(), 'orders/guest-one')));
+  });
+
+  test('a user cannot seize another order by rewriting its uid', async () => {
+    await assertFails(updateDoc(doc(bob(), 'orders/alice-order'), { 'customerInfo.uid': BOB }));
+  });
 });
 
 describe('users', () => {
@@ -306,6 +334,28 @@ describe('menu', () => {
   });
 });
 
+describe('redirects', () => {
+  test('anyone can log a redirect event', async () => {
+    await assertSucceeds(addDoc(collection(anon(), 'redirects'), { target: 'google-reviews' }));
+  });
+
+  test('only an admin reads redirect analytics', async () => {
+    await assertFails(getDoc(doc(alice(), 'redirects/seeded')));
+    await assertSucceeds(getDoc(doc(admin(), 'redirects/seeded')));
+  });
+});
+
+describe('notifications', () => {
+  test('only an admin reads notifications', async () => {
+    await assertFails(getDoc(doc(alice(), 'notifications/one')));
+    await assertSucceeds(getDoc(doc(admin(), 'notifications/one')));
+  });
+
+  test('a user cannot write notifications', async () => {
+    await assertFails(setDoc(doc(alice(), 'notifications/two'), { message: 'x' }));
+  });
+});
+
 describe('admins collection', () => {
   test('nobody reads the legacy admins collection', async () => {
     await assertFails(getDoc(doc(alice(), 'admins/one')));
@@ -317,7 +367,7 @@ describe('admins collection', () => {
 - [ ] **Step 2: Run the tests to confirm they fail**
 
 Run: `npm test`
-Expected: FAIL. The `assertFails` cases fail because the permissive rules allow everything. Roughly 7 failures; the `assertSucceeds` cases pass.
+Expected: FAIL. Every `assertFails` case fails because the permissive rules allow everything. Around 12 failures across 19 tests; the `assertSucceeds` cases pass.
 
 - [ ] **Step 3: Commit the failing tests**
 
@@ -737,6 +787,9 @@ const ALICE = 'alice-uid';
 
 const loadRules = (): string => {
   const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
+  // initializeTestEnvironment skips BOTH the rules upload and its own emulator
+  // liveness check when the rules string is falsy - a blank file would silently
+  // run the whole suite against the emulator's default allow-all ruleset.
   if (!rules.trim()) {
     throw new Error('firestore.rules is empty - refusing to test against default allow-all rules');
   }
