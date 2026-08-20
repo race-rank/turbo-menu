@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  getAdminOrders,
   getAdminNotifications,
   updateOrderStatus,
   subscribeToAdminOrders,
@@ -111,23 +110,6 @@ const Admin = () => {
     }
   };
 
-  const loadOrders = async () => {
-    setIsLoading(true);
-    try {
-      const response = await getAdminOrders();
-      setOrders(response.orders);
-    } catch (error) {
-      console.error('Failed to load orders:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load orders. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const loadNotifications = async () => {
     try {
       const response = await getAdminNotifications();
@@ -144,7 +126,8 @@ const Admin = () => {
         title: "Status Updated",
         description: `Order ${orderId} status changed to ${newStatus}`,
       });
-      loadOrders();
+      // No refetch: the live listener already delivers this update. The call
+      // that used to sit here re-read the whole orders collection per click.
     } catch (error) {
       console.error('Failed to update status:', error);
       toast({
@@ -177,6 +160,14 @@ const Admin = () => {
       }
       setOrders(newOrders);
       setIsLoading(false);
+    }, (error) => {
+      console.error('Orders listener failed:', error);
+      setIsLoading(false);
+      toast({
+        title: "Error",
+        description: "Failed to load orders. Please try again.",
+        variant: "destructive"
+      });
     });
     return () => unsubscribe();
   }, []);
@@ -244,7 +235,8 @@ const Admin = () => {
             variant="ghost"
             size="icon"
             onClick={() => {
-              loadOrders();
+              // Orders arrive through the live listener, so only the
+              // notification badge needs a manual re-pull.
               loadNotifications();
               toast({
                 title: "Refreshed",

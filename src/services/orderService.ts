@@ -12,6 +12,7 @@ import {
   subscribeToOrders,
   safeConvertTimestamp
 } from './firebaseService';
+import { convertCartItemToDbItem } from './orderItem';
 
 export interface OrderDetails {
   orderId: string;
@@ -28,24 +29,6 @@ export interface OrderDetails {
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed';
   createdAt?: Date;
 }
-
-const convertCartItemToDbItem = (item: CartItem) => ({
-  id: item.id,
-  type: item.type,
-  name: item.name,
-  price: item.price,
-  quantity: item.quantity,
-  image: item.image,
-  hookah: item.hookah,
-  tobaccoType: item.tobaccoType,
-  tobaccoStrength: item.tobaccoStrength,
-  flavors: item.flavors,
-  flavorPercentages: item.flavorPercentages,
-  hasLED: item.hasLED,
-  hasColoredWater: item.hasColoredWater,
-  hasAlcohol: item.hasAlcohol,
-  hasFruits: item.hasFruits
-});
 
 export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'status'>): Promise<OrderDetails> => {
   try {
@@ -122,21 +105,26 @@ export const getAdminOrders = async (status?: string): Promise<{orders: OrderDet
 };
 
 export const subscribeToAdminOrders = (
-  callback: (orders: OrderDetails[]) => void
+  callback: (orders: OrderDetails[]) => void,
+  onError?: (error: Error) => void
 ): (() => void) => {
-  return subscribeToOrders((dbOrders) => {
-    const orders = dbOrders.map(order => ({
-      orderId: order.orderId,
-      items: order.items as CartItem[],
-      total: order.total,
-      table: order.table,
-      customerInfo: order.customerInfo,
-      status: order.status,
-      updatedAt: order.updatedAt,
-      createdAt: order.createdAt
-    }));
-    callback(orders);
-  });
+  return subscribeToOrders(
+    (dbOrders) => {
+      const orders = dbOrders.map(order => ({
+        orderId: order.orderId,
+        items: order.items as CartItem[],
+        total: order.total,
+        table: order.table,
+        customerInfo: order.customerInfo,
+        status: order.status,
+        updatedAt: order.updatedAt,
+        createdAt: order.createdAt
+      }));
+      callback(orders);
+    },
+    undefined,
+    onError
+  );
 };
 
 export const getOrderStatus = async (orderId: string): Promise<OrderDetails> => {

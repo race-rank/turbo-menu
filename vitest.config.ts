@@ -1,6 +1,11 @@
+import path from 'path';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // Mirrors the '@' alias in vite.config.ts so tests can import app modules.
+  resolve: {
+    alias: { '@': path.resolve(__dirname, './src') },
+  },
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],

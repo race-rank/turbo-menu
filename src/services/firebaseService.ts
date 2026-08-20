@@ -9,6 +9,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   onSnapshot,
   serverTimestamp,
   Timestamp,
@@ -16,6 +17,20 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase'
 import { DatabaseOrder, DatabaseNotification } from '@/types/database';
+
+/**
+ * Upper bound on the live admin order listener.
+ *
+ * The dashboard filters by status client-side, so this window has to hold every
+ * order staff might still act on - a few days' worth at this venue's volume.
+ * Without a bound the listener streamed the entire collection on every load and
+ * grew forever. Older orders remain reachable through Statistics, which queries
+ * by date range.
+ *
+ * Deliberately not applied to getOrdersByStatus: Statistics shares that helper
+ * and a hidden limit there would silently under-report revenue.
+ */
+const ADMIN_ORDER_LIMIT = 200;
 
 const COLLECTIONS = {
   ORDERS: 'orders',
@@ -138,32 +153,48 @@ export const getOrdersByStatus = async (status?: string): Promise<DatabaseOrder[
   }
 };
 
-export const subscribeToOrders = (callback: (orders: DatabaseOrder[]) => void, status?: string) => {
+export const subscribeToOrders = (
+  callback: (orders: DatabaseOrder[]) => void,
+  status?: string,
+  // Without this onSnapshot swallows the failure and the dashboard sits on its
+  // loading spinner forever - the exact symptom when an admin's token lacks the
+  // claim the security rules require.
+  onError?: (error: FirestoreError) => void,
+) => {
   let ordersQuery = query(
     collection(firestore, COLLECTIONS.ORDERS),
-    orderBy('createdAt', 'desc')
+    orderBy('createdAt', 'desc'),
+    limit(ADMIN_ORDER_LIMIT)
   );
-  
+
   if (status) {
     ordersQuery = query(
       collection(firestore, COLLECTIONS.ORDERS),
       where('status', '==', status),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(ADMIN_ORDER_LIMIT)
     );
   }
   
-  return onSnapshot(ordersQuery, (querySnapshot) => {
-    const orders = querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        ...data,
-        timestamp: safeConvertTimestamp(data.timestamp),
-        createdAt: safeConvertTimestamp(data.createdAt),
-        updatedAt: safeConvertTimestamp(data.updatedAt)
-      } as DatabaseOrder;
-    });
-    callback(orders);
-  });
+  return onSnapshot(
+    ordersQuery,
+    (querySnapshot) => {
+      const orders = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          timestamp: safeConvertTimestamp(data.timestamp),
+          createdAt: safeConvertTimestamp(data.createdAt),
+          updatedAt: safeConvertTimestamp(data.updatedAt)
+        } as DatabaseOrder;
+      });
+      callback(orders);
+    },
+    (error) => {
+      console.error('Orders subscription failed:', error);
+      onError?.(error);
+    },
+  );
 };
 
 export const updateTableStatus = async (tableId: string, isOccupied: boolean) => {
