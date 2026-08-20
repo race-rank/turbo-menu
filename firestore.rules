@@ -2,8 +2,40 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // isSignedIn() is TRUE for anonymous users - request.auth is non-null for them.
+    // This is load-bearing: it lets guests create and track orders under rules that
+    // never allow a fully unauthenticated write.
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin()    { return request.auth != null && request.auth.token.admin == true; }
+    function ownsOrder()  { return resource.data.customerInfo.uid == request.auth.uid; }
+
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+      allow read: if isAdmin();
     }
+
+    match /orders/{orderId} {
+      allow create: if isSignedIn()
+        && request.resource.data.customerInfo.uid == request.auth.uid;
+      allow read: if isAdmin() || (isSignedIn() && ownsOrder());
+      allow update, delete: if isAdmin();
+    }
+
+    match /menu/{document}             { allow read: if true; allow write: if isAdmin(); }
+    match /hookahs/{document}          { allow read: if true; allow write: if isAdmin(); }
+    match /tobaccoTypes/{document}     { allow read: if true; allow write: if isAdmin(); }
+    match /flavors/{document}          { allow read: if true; allow write: if isAdmin(); }
+    match /recommendedMixes/{document} { allow read: if true; allow write: if isAdmin(); }
+
+    match /redirects/{document}     { allow create: if true; allow read: if isAdmin(); }
+    match /notifications/{document} { allow read, write: if isAdmin(); }
+
+    // Legacy bcrypt admin store. Sealed; removed once Task 11 lands.
+    match /admins/{document} { allow read, write: if false; }
+
+    // Deliberately absent, so default-deny applies: products, sessions and
+    // tables. Verified dead - products and sessions are referenced nowhere in
+    // src/, and tables only by updateTableStatus, which has no callers.
   }
 }
