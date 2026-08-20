@@ -1,4 +1,6 @@
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { CartItem } from '@/contexts/CartContext';
+import { firestore } from '@/lib/firebase';
 import {
   createOrderRecord,
   getOrderRecord,
@@ -7,7 +9,8 @@ import {
   createNotificationRecord,
   getUnreadNotifications,
   getOrdersByDateRange,
-  subscribeToOrders
+  subscribeToOrders,
+  safeConvertTimestamp
 } from './firebaseService';
 
 export interface OrderDetails {
@@ -220,5 +223,24 @@ export const getOrdersInRange = async (start: Date, end: Date): Promise<OrderDet
       timestamp: timestamp,
       createdAt: order.createdAt,
     };
+  });
+};
+
+export const getOrdersForUser = async (uid: string): Promise<OrderDetails[]> => {
+  const ordersQuery = query(
+    collection(firestore, 'orders'),
+    where('customerInfo.uid', '==', uid),
+    orderBy('createdAt', 'desc'),
+  );
+  const snapshot = await getDocs(ordersQuery);
+  return snapshot.docs.map((docSnap) => {
+    const data = docSnap.data();
+    return {
+      ...data,
+      orderId: data.orderId ?? docSnap.id,
+      // Without this the value stays a Firestore Timestamp and MyOrders
+      // renders "Invalid Date".
+      createdAt: safeConvertTimestamp(data.createdAt),
+    } as OrderDetails;
   });
 };

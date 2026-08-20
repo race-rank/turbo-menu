@@ -290,3 +290,26 @@ export const getOrdersByDateRange = async (start: Date, end: Date): Promise<Data
     throw error;
   }
 };
+
+/**
+ * Watch a single order. Guests must use this rather than subscribeToOrders,
+ * which reads the whole collection and is rejected by security rules.
+ */
+export const subscribeToOrder = (
+  orderId: string,
+  callback: (order: DatabaseOrder | null) => void,
+) => {
+  return onSnapshot(doc(firestore, COLLECTIONS.ORDERS, orderId), (snapshot) => {
+    if (!snapshot.exists()) {
+      callback(null);
+      return;
+    }
+    const data = snapshot.data();
+    callback({
+      ...data,
+      timestamp: safeConvertTimestamp(data.timestamp),
+      createdAt: safeConvertTimestamp(data.createdAt),
+      updatedAt: safeConvertTimestamp(data.updatedAt),
+    } as DatabaseOrder);
+  });
+};
