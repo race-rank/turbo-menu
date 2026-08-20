@@ -5,6 +5,8 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.ts'],
     testTimeout: 15000,
+    // clearFirestore + seeding on a cold JVM can approach the 10s default.
+    hookTimeout: 15000,
     fileParallelism: false,
   },
 });

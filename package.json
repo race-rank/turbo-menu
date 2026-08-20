@@ -9,9 +9,9 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "firebase emulators:exec --only firestore \"vitest run\"",
-    "test:watch": "firebase emulators:exec --only firestore \"vitest\"",
-    "rules:deploy": "firebase deploy --only firestore:rules,firestore:indexes"
+    "test": "firebase emulators:exec --only firestore --project demo-turbo-menu \"vitest run\"",
+    "test:watch": "firebase emulators:exec --only firestore --project demo-turbo-menu \"vitest\"",
+    "rules:deploy": "firebase deploy --only firestore:rules,firestore:indexes --project turbo-menu-30079"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
