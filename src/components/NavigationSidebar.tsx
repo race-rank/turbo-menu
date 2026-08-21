@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Home, ShoppingCart, Settings, LogOut, Utensils, Star, BarChart2, Receipt, UserCircle } from 'lucide-react';
+import { Menu, Home, ShoppingCart, Settings, LogOut, LogIn, Utensils, Star, BarChart2, Receipt, UserCircle } from 'lucide-react';
 import { useAuth } from "@/contexts/AuthContext";
 import { logout } from "@/services/authService";
 import { cn } from "@/lib/utils";
@@ -24,8 +24,16 @@ export const NavigationSidebar = () => {
     { path: '/', label: 'Home', icon: Home },
     { path: '/cart', label: 'Cart', icon: ShoppingCart },
     { path: '/my-orders', label: 'My orders', icon: Receipt },
-    { path: '/account', label: 'Account', icon: UserCircle },
+    // Account deliberately absent: it lives in the footer next to Sign Out,
+    // where people look for it, rather than in the middle of the nav list.
   ];
+
+  const footerItemClass = (path: string) => cn(
+    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+    location.pathname === path
+      ? "bg-primary text-primary-foreground"
+      : "hover:bg-accent hover:text-accent-foreground",
+  );
 
   return (
     <>
@@ -119,18 +127,41 @@ export const NavigationSidebar = () => {
               </button>
             </nav>
             
-            {user && !isAnonymous && (
-              <div className="mt-auto pt-4 border-t">
-                <Button
-                  variant="ghost"
-                  onClick={handleLogout}
-                  className="w-full justify-start gap-3 px-3 py-2 h-auto text-sm font-medium"
+            <div className="mt-auto pt-4 border-t space-y-1">
+              {user && !isAnonymous ? (
+                <>
+                  <Link
+                    to="/account"
+                    onClick={() => setSidebarOpen(false)}
+                    className={footerItemClass('/account')}
+                  >
+                    <UserCircle className="h-4 w-4 shrink-0" />
+                    <span className="truncate">
+                      {user.displayName || user.email || 'Profile'}
+                    </span>
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    onClick={handleLogout}
+                    className="w-full justify-start gap-3 px-3 py-2 h-auto text-sm font-medium"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                // Anonymous visitors are signed in as far as Firebase is
+                // concerned, so this keys off isAnonymous rather than !user.
+                <Link
+                  to="/account"
+                  onClick={() => setSidebarOpen(false)}
+                  className={footerItemClass('/account')}
                 >
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </Button>
-              </div>
-            )}
+                  <LogIn className="h-4 w-4 shrink-0" />
+                  Sign in
+                </Link>
+              )}
+            </div>
           </div>
         </SheetContent>
       </Sheet>

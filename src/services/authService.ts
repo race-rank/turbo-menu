@@ -4,6 +4,7 @@ import {
   signInAnonymously,
   signInWithPopup,
   signInWithEmailAndPassword,
+  signInWithCredential,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   sendEmailVerification,
@@ -12,6 +13,7 @@ import {
   updateProfile,
   signOut,
   type User,
+  type AuthError,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
@@ -70,12 +72,39 @@ export const signUpWithGoogle = async (): Promise<User> => {
       return result.user;
     } catch (error) {
       if (!isAlreadyInUse(error)) throw error;
-      const fallback = await signInWithPopup(auth, new GoogleAuthProvider());
-      throw Object.assign(new AccountExistsError(), { user: fallback.user });
+
+      // Sign in to the existing account with the credential the failure
+      // carries, NOT a second popup. By this point the click that opened the
+      // first popup is several awaits in the past, so no user activation is
+      // left and the browser blocks a new window with auth/popup-blocked -
+      // which is not an already-in-use code, so it surfaced as a raw "Google
+      // sign-in failed". That is why registering worked and every later login
+      // did not. signInWithCredential needs no window at all.
+      const credential = GoogleAuthProvider.credentialFromError(error as AuthError);
+      const result = credential
+        ? await signInWithCredential(auth, credential)
+        // No credential on the error (auth/provider-already-linked carries
+        // none). A popup is the only route left and may well be blocked, but
+        // failing loudly beats returning a half-signed-in session.
+        : await signInWithPopup(auth, new GoogleAuthProvider());
+
+      throw Object.assign(new AccountExistsError(), { user: result.user });
     }
   }
   const result = await signInWithPopup(auth, new GoogleAuthProvider());
   return result.user;
+};
+
+/**
+ * Renames the account. Firebase mutates the existing User object in place and
+ * fires no auth-state event, so callers must not expect a re-render from
+ * AuthContext - hold the new name in local state.
+ */
+export const updateDisplayName = async (name: string): Promise<User> => {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not signed in.');
+  await updateProfile(user, { displayName: name });
+  return user;
 };
 
 export const signUpWithEmail = async (
