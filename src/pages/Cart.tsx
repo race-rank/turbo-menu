@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ArrowLeft, Minus, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
@@ -10,6 +10,7 @@ import { submitOrder } from '@/services/orderService';
 import { ensureSignedIn } from '@/services/authService';
 import { recordOrderPlaced } from '@/services/userService';
 import { OrderFooter } from '@/components/layout/OrderFooter';
+import { OrderPlacedOverlay } from '@/components/OrderPlacedOverlay';
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -17,6 +18,11 @@ const Cart = () => {
   const { addOrder } = useOrderTracking();
   const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [placedOrder, setPlacedOrder] = useState<{
+    orderId: string;
+    total: number;
+    table?: string;
+  } | null>(null);
 
   const getTableHome = () => {
     const stored = localStorage.getItem('turbo-table') || '';
@@ -28,6 +34,12 @@ const Cart = () => {
   const navigateBack = () => {
     navigate(getTableHome());
   };
+
+  // Stable identity: the overlay restarts its countdown timer whenever this
+  // changes, so a fresh arrow every render would keep resetting it.
+  const returnToMenu = useCallback(() => {
+    navigate(getTableHome());
+  }, [navigate]);
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) {
@@ -75,22 +87,15 @@ const Cart = () => {
 
       clearCart();
 
-      toast({
-        title: "Order complete!",
-        description: "Someone is actively reviewing it.",
-        duration: 5000,
+      // The overlay owns the confirmation and the trip back to the menu, so no
+      // toast and no bare timer here. isSubmitting deliberately stays set: the
+      // overlay covers the page until it navigates away, so there is nothing
+      // left to double-submit.
+      setPlacedOrder({
+        orderId: result.orderId,
+        total: result.total,
+        table: result.table,
       });
-
-      setTimeout(() => {
-        navigate(getTableHome());
-      }, 2000);
-
-      // Keep the button disabled for a short cooldown after success,
-      // in case the user re-opens the cart before the redirect above fires.
-      setTimeout(() => {
-        isSubmittingRef.current = false;
-        setIsSubmitting(false);
-      }, 3000);
 
     } catch (error) {
       console.error('Error submitting order:', error);
@@ -103,6 +108,17 @@ const Cart = () => {
       });
     }
   };
+
+  if (placedOrder) {
+    return (
+      <OrderPlacedOverlay
+        orderId={placedOrder.orderId}
+        total={placedOrder.total}
+        table={placedOrder.table}
+        onDone={returnToMenu}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-turbo-dark text-turbo-text pb-24">
