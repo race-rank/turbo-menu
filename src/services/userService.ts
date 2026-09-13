@@ -2,6 +2,7 @@ import { doc, getDoc, setDoc, serverTimestamp, increment } from 'firebase/firest
 import type { User } from 'firebase/auth';
 import { firestore } from '@/lib/firebase';
 import { getOrdersForUser } from '@/services/orderService';
+import { upsertPublicProfile } from '@/services/profileService';
 
 export interface UserProfile {
   displayName: string | null;
@@ -27,6 +28,10 @@ export const upsertUserProfile = async (user: User): Promise<void> => {
     },
     { merge: true },
   );
+
+  // The friend-readable copy. Kept in step here so there is one place that
+  // knows an account changed.
+  await upsertPublicProfile(user);
 };
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
