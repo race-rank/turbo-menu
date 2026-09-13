@@ -15,6 +15,31 @@ service cloud.firestore {
     function isAdmin()    { return request.auth != null && request.auth.token.get('admin', false) == true; }
     function ownsOrder()  { return resource.data.customerInfo.uid == request.auth.uid; }
 
+    // pairId is the two uids sorted ascending and joined with '_', so a rule can
+    // derive the friendship document key from the two participants rather than
+    // needing it passed in and then trusting it.
+    function friendPairId(a, b) {
+      return a < b ? a + '_' + b : b + '_' + a;
+    }
+
+    function friendshipPath(owner) {
+      return /databases/$(database)/documents/friendships/$(friendPairId(request.auth.uid, owner));
+    }
+
+    // exists() before get(): get() on a missing document raises rather than
+    // returning null, and a raise inside a helper denies the read for a reason
+    // that has nothing to do with friendship.
+    function sharesFriendshipWith(owner) {
+      return request.auth != null
+        && request.auth.uid != owner
+        && exists(friendshipPath(owner));
+    }
+
+    function isFriendOf(owner) {
+      return sharesFriendshipWith(owner)
+        && get(friendshipPath(owner)).data.status == 'accepted';
+    }
+
     match /users/{uid} {
       allow read, write: if isSignedIn() && request.auth.uid == uid;
       allow read: if isAdmin();
@@ -77,5 +102,17 @@ service cloud.firestore {
     // Deliberately absent, so default-deny applies: products, sessions and
     // tables. Verified dead - products and sessions are referenced nowhere in
     // src/, and tables only by updateTableStatus, which has no callers.
+
+    // Split from users/{uid} because Firestore has no field-level read
+    // security: a friend-read on the user document would hand over the email
+    // address, order count and total spend along with the display name.
+    // Readable on ANY friendship including pending, so the recipient of a
+    // request can see who is asking.
+    match /profiles/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || sharesFriendshipWith(uid));
+      allow create, update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['displayName', 'photoURL', 'updatedAt']);
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
   }
 }
