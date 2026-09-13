@@ -3,7 +3,7 @@ import {
   initializeTestEnvironment, assertSucceeds, assertFails, RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
-  deleteDoc, doc, getDoc, serverTimestamp, setDoc,
+  collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc,
 } from 'firebase/firestore';
 import { beforeAll, afterAll, beforeEach, describe, test } from 'vitest';
 
@@ -329,5 +329,49 @@ describe('favourites and ratings', () => {
   test('friends still cannot read the private user document', async () => {
     await seedFriendship(ALICE, BOB, 'accepted');
     await assertFails(getDoc(doc(bob(), 'users', ALICE)));
+  });
+
+  // listFavorites/listRatings and the friend-profile page call getDocs on the
+  // whole collection, which the getDoc tests above never exercise.
+  test('an accepted friend can LIST favourites and ratings', async () => {
+    await seedFriendship(ALICE, BOB, 'accepted');
+    await assertSucceeds(getDocs(collection(bob(), `users/${ALICE}/favorites`)));
+    await assertSucceeds(getDocs(collection(bob(), `users/${ALICE}/ratings`)));
+  });
+
+  test('a stranger and a pending friend cannot LIST favourites', async () => {
+    await assertFails(getDocs(collection(carol(), `users/${ALICE}/favorites`)));
+    await seedFriendship(ALICE, BOB, 'pending');
+    await assertFails(getDocs(collection(bob(), `users/${ALICE}/favorites`)));
+  });
+
+  // Confirmed accepted before the payload was bounded.
+  test('an oversized label is rejected on both collections', async () => {
+    await assertFails(setDoc(doc(alice(), favPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'x'.repeat(700_000), kind: 'mix',
+    }));
+    await assertFails(setDoc(doc(alice(), ratingPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'x'.repeat(700_000), score: 3,
+    }));
+  });
+
+  test('unexpected fields are rejected on both collections', async () => {
+    await assertFails(setDoc(doc(alice(), favPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', kind: 'mix', junk: 'x',
+    }));
+    await assertFails(setDoc(doc(alice(), ratingPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', score: 3, junk: 'x',
+    }));
+  });
+
+  // The full favourite shape a custom build produces must still be writable.
+  test('a full custom-build favourite is accepted', async () => {
+    await assertSucceeds(setDoc(doc(alice(), `users/${ALICE}/favorites/custom:abc`), {
+      comboId: 'custom:abc', label: 'Khalil Mamoon - Mint, Lemon', kind: 'custom',
+      hookahId: 'h1', tobaccoType: 'virginia', flavorIds: ['mint:virginia'],
+      tobaccoStrength: 6, flavorPercentages: { 'mint:virginia': 100 },
+      withIce: true, hasLED: true, hasColoredWater: false,
+      hasAlcohol: false, hasFruits: false, createdAt: serverTimestamp(),
+    }));
   });
 });
