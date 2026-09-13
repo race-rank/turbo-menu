@@ -23,6 +23,7 @@ import { comboIdForCustom, comboIdForMix } from '@/services/comboId';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { addFavorite, listFavorites, removeFavorite } from '@/services/favoritesService';
+import type { FavoriteCombo } from '@/services/favoritesService';
 import { useAuth } from '@/contexts/AuthContext';
 
 const ADDONS = [
@@ -74,6 +75,7 @@ const Index = () => {
   const { setTable } = useTable();
   const { user } = useAuth();
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [lastBuild, setLastBuild] = useState<FavoriteCombo | null>(null);
   const [selectedHookah, setSelectedHookah] = useState<string | null>(null);
   const [selectedTobaccoType, setSelectedTobaccoType] = useState<'virginia' | 'darkblend' | 'cigarleaf' | 'mix' | null>(null);
   const [tobaccoStrength, setTobaccoStrength] = useState<number>(1);
@@ -513,6 +515,24 @@ const Index = () => {
       hasColoredWater: selectedAddons.hasColoredWater,
       hasAlcohol: selectedAddons.hasAlcohol,
       hasFruits: selectedAddons.hasFruits
+    });
+
+    // Offered rather than automatic: not every build is worth keeping, and a
+    // favourites list that fills itself is noise.
+    setLastBuild({
+      comboId: comboIdForCustom(selectedHookahData.id, finalTobaccoType, flavorIds),
+      label: `${selectedHookahData.name} · ${selectedFlavorNames.join(', ')}`,
+      kind: 'custom',
+      hookahId: selectedHookahData.id,
+      tobaccoType: finalTobaccoType,
+      flavorIds,
+      tobaccoStrength,
+      flavorPercentages: selectedFlavors.length >= 2 ? flavorPercentages : undefined,
+      withIce,
+      hasLED: selectedAddons.hasLED,
+      hasColoredWater: selectedAddons.hasColoredWater,
+      hasAlcohol: selectedAddons.hasAlcohol,
+      hasFruits: selectedAddons.hasFruits,
     });
 
     successHaptic();
@@ -1106,6 +1126,34 @@ const Index = () => {
           </div>
         </DialogContent>
       </Dialog>
+      {user && lastBuild && (
+        <div className="fixed bottom-24 left-0 right-0 z-40 px-4">
+          <Card className="bg-turbo-card border-primary">
+            <CardContent className="flex items-center gap-3 p-4">
+              <p className="flex-1 text-sm">Save this combo to your favourites?</p>
+              <Button variant="ghost" size="sm" onClick={() => setLastBuild(null)}>
+                No thanks
+              </Button>
+              <Button
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await addFavorite(user.uid, lastBuild);
+                    setFavoriteIds((current) => new Set(current).add(lastBuild.comboId));
+                    toast({ title: 'Saved to favourites' });
+                  } catch {
+                    toast({ title: 'Could not save', variant: 'destructive' });
+                  } finally {
+                    setLastBuild(null);
+                  }
+                }}
+              >
+                Save
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
