@@ -128,5 +128,40 @@ service cloud.firestore {
                 && request.resource.data.photoURL.matches('https://.*')));
       allow delete: if isSignedIn() && request.auth.uid == uid;
     }
+
+    // One document per relationship. Decline, cancel and unfriend are all a
+    // delete - there is no blocklist and no record of a refusal, which is
+    // proportionate for a venue with a few hundred customers.
+    match /friendships/{pairId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.uids;
+
+      allow create: if isSignedIn()
+        && request.resource.data.uids.size() == 2
+        && request.resource.data.uids[0] < request.resource.data.uids[1]
+        && pairId == friendPairId(request.resource.data.uids[0], request.resource.data.uids[1])
+        && request.auth.uid in request.resource.data.uids
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        // pairId joins the two uids with '_', so a uid containing '_' makes the
+        // join ambiguous: ("A","B_C") and ("A_B","C") both produce "A_B_C", and
+        // whichever pair creates it first grants the other pair access. Firebase
+        // Auth uids are 28-char alphanumeric so this is not reachable today, but
+        // the separator is load-bearing in a security boundary and the guard is
+        // one line. Verified reachable against a rules emulator with synthetic uids.
+        && !request.resource.data.uids[0].matches('.*_.*')
+        && !request.resource.data.uids[1].matches('.*_.*');
+
+      // Only the other party accepts, and only pending -> accepted. Pinning
+      // affectedKeys stops an accept from rewriting who the friendship is
+      // between or who asked.
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.uids
+        && resource.data.requestedBy != request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedAt']);
+
+      allow delete: if isSignedIn() && request.auth.uid in resource.data.uids;
+    }
   }
 }

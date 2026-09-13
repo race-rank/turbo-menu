@@ -134,3 +134,99 @@ describe('profiles', () => {
     }));
   });
 });
+
+describe('friendships', () => {
+  const request = (uids: string[], requestedBy: string) => ({
+    uids: [...uids].sort(), requestedBy, status: 'pending',
+  });
+
+  test('a user sends a friend request', async () => {
+    await assertSucceeds(setDoc(
+      doc(alice(), 'friendships', ALICE_BOB), request([ALICE, BOB], ALICE),
+    ));
+  });
+
+  test('a user cannot create a friendship they are not part of', async () => {
+    await assertFails(setDoc(
+      doc(carol(), 'friendships', ALICE_BOB), request([ALICE, BOB], ALICE),
+    ));
+  });
+
+  test('a user cannot send a request in someone else name', async () => {
+    await assertFails(setDoc(
+      doc(alice(), 'friendships', ALICE_BOB), request([ALICE, BOB], BOB),
+    ));
+  });
+
+  // Verified reachable on the emulator with synthetic uids: ("A","B_C") and
+  // ("A_B","C") both hash to pairId "A_B_C", letting an outsider inherit a
+  // friendship they were never part of.
+  test('a uid containing the pairId separator is rejected', async () => {
+    await assertFails(setDoc(doc(alice(), 'friendships', 'alice-uid_b_c'), {
+      uids: ['alice-uid', 'b_c'].sort(), requestedBy: ALICE, status: 'pending',
+    }));
+  });
+
+  test('the document id must match the sorted uids', async () => {
+    await assertFails(setDoc(
+      doc(alice(), 'friendships', 'not-the-pair-id'), request([ALICE, BOB], ALICE),
+    ));
+  });
+
+  test('a request cannot be created already accepted', async () => {
+    await assertFails(setDoc(doc(alice(), 'friendships', ALICE_BOB), {
+      uids: [ALICE, BOB].sort(), requestedBy: ALICE, status: 'accepted',
+    }));
+  });
+
+  test('the recipient accepts', async () => {
+    await seedFriendship(ALICE, BOB, 'pending', ALICE);
+    await assertSucceeds(setDoc(doc(bob(), 'friendships', ALICE_BOB), {
+      uids: [ALICE, BOB].sort(), requestedBy: ALICE, status: 'accepted',
+    }));
+  });
+
+  test('the requester cannot accept their own request', async () => {
+    await seedFriendship(ALICE, BOB, 'pending', ALICE);
+    await assertFails(setDoc(doc(alice(), 'friendships', ALICE_BOB), {
+      uids: [ALICE, BOB].sort(), requestedBy: ALICE, status: 'accepted',
+    }));
+  });
+
+  test('accepting cannot rewrite who the friendship is between', async () => {
+    await seedFriendship(ALICE, BOB, 'pending', ALICE);
+    await assertFails(setDoc(doc(bob(), 'friendships', ALICE_BOB), {
+      uids: [CAROL, BOB].sort(), requestedBy: ALICE, status: 'accepted',
+    }));
+  });
+
+  // Two people tapping at the same table is the likely case, not an edge case.
+  // The second write lands on an existing document, so it is evaluated as an
+  // update, and the update rule only permits the OTHER party accepting.
+  test('a simultaneous counter-request is denied rather than overwriting', async () => {
+    await seedFriendship(ALICE, BOB, 'pending', ALICE);
+    await assertFails(setDoc(
+      doc(bob(), 'friendships', ALICE_BOB), request([ALICE, BOB], BOB),
+    ));
+  });
+
+  test('either party deletes - decline, cancel and unfriend are all a delete', async () => {
+    await seedFriendship(ALICE, BOB, 'accepted');
+    await assertSucceeds(deleteDoc(doc(bob(), 'friendships', ALICE_BOB)));
+  });
+
+  test('a stranger cannot delete a friendship', async () => {
+    await seedFriendship(ALICE, BOB, 'accepted');
+    await assertFails(deleteDoc(doc(carol(), 'friendships', ALICE_BOB)));
+  });
+
+  test('a participant reads the friendship', async () => {
+    await seedFriendship(ALICE, BOB, 'pending');
+    await assertSucceeds(getDoc(doc(bob(), 'friendships', ALICE_BOB)));
+  });
+
+  test('a stranger cannot read a friendship', async () => {
+    await seedFriendship(ALICE, BOB, 'accepted');
+    await assertFails(getDoc(doc(carol(), 'friendships', ALICE_BOB)));
+  });
+});
