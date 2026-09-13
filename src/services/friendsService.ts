@@ -123,12 +123,24 @@ const generateCode = (): string => {
 };
 
 /**
+ * The inviteCodes rule refuses anonymous callers, because a friendship needs a
+ * profile and guests never get one. Failing here gives the caller something it
+ * can show a person, instead of a bare permission-denied from Firestore.
+ */
+const assertRealAccount = (user: User): void => {
+  if (user.isAnonymous) {
+    throw new Error('Create an account to get an invite link.');
+  }
+};
+
+/**
  * Rotation order matters: publish the new code, repoint the user, then delete
- * the old one. A crash midway leaves two working codes, which is harmless.
- * Deleting first would leave the customer showing a QR that resolves to
- * nothing.
+ * the old one. A crash between publishing and deleting leaves two working
+ * codes, which is harmless - both resolve to the same person. Deleting first
+ * would instead leave a customer showing a QR that resolves to nothing.
  */
 export const ensureInviteCode = async (user: User): Promise<string> => {
+  assertRealAccount(user);
   const userRef = doc(firestore, 'users', user.uid);
   const existing = await getDoc(userRef);
   const current = existing.data()?.inviteCode as string | undefined;
@@ -145,6 +157,7 @@ export const ensureInviteCode = async (user: User): Promise<string> => {
 };
 
 export const rotateInviteCode = async (user: User): Promise<string> => {
+  assertRealAccount(user);
   const userRef = doc(firestore, 'users', user.uid);
   const previous = (await getDoc(userRef)).data()?.inviteCode as string | undefined;
 
@@ -156,7 +169,13 @@ export const rotateInviteCode = async (user: User): Promise<string> => {
   });
   await setDoc(userRef, { inviteCode: code }, { merge: true });
   if (previous) {
-    await deleteDoc(doc(firestore, 'inviteCodes', previous)).catch(() => undefined);
+    // Deliberately non-fatal - the new code is already live and repointed, so
+    // throwing here would report a successful rotation as a failure. But NOT
+    // silent: if this delete fails the old code stays resolvable, which matters
+    // most when someone rotated precisely to revoke one they had over-shared.
+    await deleteDoc(doc(firestore, 'inviteCodes', previous)).catch((error) => {
+      console.error(`Old invite code ${previous} could not be revoked:`, error);
+    });
   }
   return code;
 };
@@ -186,7 +205,20 @@ export const sha256Hex = async (input: string): Promise<string> => {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 };
 
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
+/**
+ * For OUR OWN entry. The rule computes
+ * hashing.sha256(request.auth.token.email.lower()) - lowercase only, no trim -
+ * so this must match byte for byte. Trimming here would produce a hash the rule
+ * rejects whenever a provider returns an email with incidental whitespace,
+ * surfacing as a bare permission-denied with nothing to explain it.
+ */
+const normalizeOwnEmail = (email: string) => email.toLowerCase();
+
+/**
+ * For looking SOMEONE ELSE up. This value is typed by a person into a box, so
+ * stray whitespace is expected and trimming is the right thing to do.
+ */
+const normalizeSearchEmail = (email: string) => email.trim().toLowerCase();
 
 /**
  * Opt-in, default off.
@@ -198,7 +230,7 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
  */
 export const setDiscoverable = async (user: User, enabled: boolean): Promise<void> => {
   if (!user.email) throw new Error('This account has no email address.');
-  const hash = await sha256Hex(normalizeEmail(user.email));
+  const hash = await sha256Hex(normalizeOwnEmail(user.email));
   const lookupRef = doc(firestore, 'discoverable', hash);
   const userRef = doc(firestore, 'users', user.uid);
 
@@ -229,7 +261,7 @@ export const getDiscoverable = async (uid: string): Promise<boolean> => {
 export const findByEmail = async (
   email: string,
 ): Promise<{ uid: string; displayName: string | null } | null> => {
-  const hash = await sha256Hex(normalizeEmail(email));
+  const hash = await sha256Hex(normalizeSearchEmail(email));
   const snapshot = await getDoc(doc(firestore, 'discoverable', hash)).catch(() => null);
   if (!snapshot?.exists()) return null;
   const data = snapshot.data();
