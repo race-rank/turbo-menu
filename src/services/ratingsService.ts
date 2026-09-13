@@ -2,6 +2,7 @@ import {
   collection, doc, getDocs, serverTimestamp, writeBatch,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
+import { truncateLabel } from '@/services/comboId';
 
 export interface ComboRating {
   comboId: string;
@@ -42,7 +43,7 @@ export const rateOrder = async (
   });
   batch.set(doc(ratingsRef(uid), comboId), {
     comboId,
-    label,
+    label: truncateLabel(label),
     score,
     ratedAt: serverTimestamp(),
   });

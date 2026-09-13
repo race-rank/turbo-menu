@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { comboIdForCustom, comboIdForMix, fnv1a64 } from '../src/services/comboId';
+import {
+  comboIdForCustom, comboIdForMix, fnv1a64, truncateLabel,
+} from '../src/services/comboId';
 
 describe('fnv1a64', () => {
   test('is deterministic and 16 hex characters', () => {
@@ -84,4 +86,14 @@ describe('comboIdForCustom', () => {
     const b = comboIdForCustom('hookah1', 'virginia', [...FLAVORS]);
     expect(a).toBe(b);
   });
+});
+
+test('truncateLabel leaves a normal label alone', () => {
+  expect(truncateLabel('Khalil Mamoon - Mint, Lemon')).toBe('Khalil Mamoon - Mint, Lemon');
+});
+
+test('truncateLabel caps at the length the rules accept', () => {
+  const long = 'A'.repeat(500);
+  expect(truncateLabel(long).length).toBe(200);
+  expect(truncateLabel(long).endsWith('…')).toBe(true);
 });

@@ -2,6 +2,7 @@ import {
   collection, deleteDoc, doc, getDocs, setDoc, serverTimestamp,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
+import { truncateLabel } from '@/services/comboId';
 
 export interface FavoriteCombo {
   comboId: string;
@@ -43,6 +44,7 @@ export const addFavorite = async (uid: string, favorite: FavoriteCombo): Promise
   );
   await setDoc(doc(favoritesRef(uid), favorite.comboId), {
     ...payload,
+    label: truncateLabel(favorite.label),
     createdAt: serverTimestamp(),
   });
 };

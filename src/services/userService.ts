@@ -29,9 +29,14 @@ export const upsertUserProfile = async (user: User): Promise<void> => {
     { merge: true },
   );
 
-  // The friend-readable copy. Kept in step here so there is one place that
-  // knows an account changed.
-  await upsertPublicProfile(user);
+  // Deliberately non-fatal. By the time this runs the account and the user
+  // document already exist, and AuthForms treats any throw from
+  // upsertUserProfile as "sign-up failed" - so letting this propagate would
+  // tell someone their account was not created when it was. A missing public
+  // profile only means friends see no name until the next sign-in.
+  await upsertPublicProfile(user).catch((error) => {
+    console.error('Public profile sync failed:', error);
+  });
 };
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {

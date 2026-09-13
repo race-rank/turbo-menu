@@ -53,3 +53,15 @@ export const comboIdForCustom = (
   ].join('|');
   return `custom:${fnv1a64(canonical)}`;
 };
+
+/**
+ * Security rules cap a stored label at 200 characters, so anything longer is
+ * rejected outright with a bare permission-denied. Labels are built from
+ * admin-entered hookah and flavour names, which have no length limit of their
+ * own, so a legitimate three-flavour custom build can exceed it. Truncating
+ * here keeps a long name a cosmetic problem rather than a failed save.
+ */
+export const MAX_LABEL_LENGTH = 200;
+
+export const truncateLabel = (label: string): string =>
+  (label.length <= MAX_LABEL_LENGTH ? label : `${label.slice(0, MAX_LABEL_LENGTH - 1)}…`);
