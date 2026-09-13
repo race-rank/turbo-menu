@@ -392,13 +392,27 @@ describe('rating an order', () => {
 
   test('the owner rates their own order', async () => {
     await assertSucceeds(updateDoc(doc(alice(), 'orders', 'alice-order'), {
-      rating: 4, ratedAt: new Date(),
+      rating: 4, ratedAt: serverTimestamp(),
     }));
   });
 
   test('a rating outside 1 to 5 is rejected', async () => {
     await assertFails(updateDoc(doc(alice(), 'orders', 'alice-order'), { rating: 0 }));
     await assertFails(updateDoc(doc(alice(), 'orders', 'alice-order'), { rating: 6 }));
+  });
+
+  // A 500KB string was accepted before ratedAt was constrained.
+  test('ratedAt cannot be an arbitrary value', async () => {
+    await assertFails(updateDoc(doc(alice(), 'orders', 'alice-order'), {
+      rating: 4, ratedAt: 'whenever I like',
+    }));
+    await assertFails(updateDoc(doc(alice(), 'orders', 'alice-order'), {
+      rating: 4, ratedAt: 'x'.repeat(500_000),
+    }));
+  });
+
+  test('a rating without a ratedAt is still allowed', async () => {
+    await assertSucceeds(updateDoc(doc(alice(), 'orders', 'alice-order'), { rating: 4 }));
   });
 
   test('a user cannot rate someone else order', async () => {

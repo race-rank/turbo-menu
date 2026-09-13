@@ -17,6 +17,8 @@ service cloud.firestore {
     // orders written in the pre-uid shape rather than evaluating to false. The
     // denial was always correct; it just arrived as an error. The create rule
     // was made tolerant for this reason already - the read path was missed.
+    // Safe because Firebase Auth never issues a token with an empty sub, so the
+    // '' default can never accidentally match request.auth.uid.
     function ownsOrder() {
       return resource.data.get('customerInfo', {}).get('uid', '') == request.auth.uid;
     }
@@ -110,7 +112,12 @@ service cloud.firestore {
                  .hasOnly(['rating', 'ratedAt'])
             && request.resource.data.rating is int
             && request.resource.data.rating >= 1
-            && request.resource.data.rating <= 5);
+            && request.resource.data.rating <= 5
+            // Server time only, so a rating cannot carry an arbitrary payload.
+            // Optional in the same way acceptedAt is on friendships: an update
+            // that changes only `rating` must stay legal.
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratedAt'])
+                || request.resource.data.ratedAt == request.time));
     }
 
     match /menu/{document}             { allow read: if true; allow write: if isAdmin(); }
