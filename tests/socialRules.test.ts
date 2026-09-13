@@ -103,4 +103,34 @@ describe('profiles', () => {
   test('an unauthenticated client reads nothing', async () => {
     await assertFails(getDoc(doc(anon(), 'profiles', ALICE)));
   });
+
+  // All of these were accepted before the field constraints were added.
+  test('a profile rejects an oversized display name', async () => {
+    await assertFails(setDoc(doc(alice(), 'profiles', ALICE), {
+      displayName: 'A'.repeat(700_000), photoURL: null,
+    }));
+  });
+
+  test('a profile rejects a mistyped display name', async () => {
+    await assertFails(setDoc(doc(alice(), 'profiles', ALICE), { displayName: 12345 }));
+    await assertFails(setDoc(doc(alice(), 'profiles', ALICE), { displayName: ['a', 'b'] }));
+    await assertFails(setDoc(doc(alice(), 'profiles', ALICE), { displayName: { a: 'b' } }));
+  });
+
+  test('a profile rejects a non-https photo URL', async () => {
+    await assertFails(setDoc(doc(alice(), 'profiles', ALICE), {
+      photoURL: 'javascript:alert(document.cookie)',
+    }));
+    await assertFails(setDoc(doc(alice(), 'profiles', ALICE), {
+      photoURL: 'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==',
+    }));
+  });
+
+  // Firebase reports a missing display name as null, and profileService writes
+  // that through verbatim, so null must stay legal.
+  test('a profile still accepts a null display name and a real photo URL', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'profiles', ALICE), {
+      displayName: null, photoURL: 'https://lh3.googleusercontent.com/a/abc123',
+    }));
+  });
 });

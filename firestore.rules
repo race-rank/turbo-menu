@@ -111,7 +111,21 @@ service cloud.firestore {
     match /profiles/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || sharesFriendshipWith(uid));
       allow create, update: if isSignedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['displayName', 'photoURL', 'updatedAt']);
+        && request.resource.data.keys().hasOnly(['displayName', 'photoURL', 'updatedAt'])
+        // Bound what a friend has to download. Unvalidated, a 700KB displayName
+        // is accepted and then shipped to everyone who opens the profile.
+        // null is allowed because Firebase reports "no display name" as null.
+        && (!('displayName' in request.resource.data)
+            || request.resource.data.displayName == null
+            || (request.resource.data.displayName is string
+                && request.resource.data.displayName.size() <= 100))
+        // https only, so a javascript: or data:text/html URI can never reach an
+        // href or an img src once profile pictures are rendered.
+        && (!('photoURL' in request.resource.data)
+            || request.resource.data.photoURL == null
+            || (request.resource.data.photoURL is string
+                && request.resource.data.photoURL.size() <= 500
+                && request.resource.data.photoURL.matches('https://.*')));
       allow delete: if isSignedIn() && request.auth.uid == uid;
     }
   }
