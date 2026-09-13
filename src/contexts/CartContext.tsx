@@ -7,6 +7,13 @@ export interface CartItem {
   price: number;
   quantity: number;
   image: string;
+  // Stable identity for favouriting and rating. See src/services/comboId.ts.
+  comboId: string;
+  // Set on curated mixes only.
+  mixId?: string;
+  // Set on custom builds only. flavorIds are `{flavorDocId}:{variantType}`.
+  hookahId?: string;
+  flavorIds?: string[];
   table: string;
   tobaccoType?: 'virginia' | 'darkblend' | 'cigarleaf' | 'mix';
   tobaccoStrength?: number;

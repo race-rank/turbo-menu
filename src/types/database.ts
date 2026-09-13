@@ -24,6 +24,13 @@ export interface DatabaseOrderItem {
   // No `image` here on purpose. Menu images are base64 data URIs of roughly
   // 900KB, so carrying one per item put order documents at 91% of Firestore's
   // 1MiB limit. Staff need the name, hookah and flavors, never a photo.
+  // Identity of the combo ordered, so it can be rated from order history.
+  // Optional because orders written before this shipped have none - those are
+  // not rateable and the UI hides the control rather than erroring.
+  comboId?: string;
+  mixId?: string;
+  hookahId?: string;
+  flavorIds?: string[];
   hookah?: string;
   tobaccoType?: 'virginia' | 'darkblend' | 'cigarleaf' | 'mix';
   tobaccoStrength?: number;
