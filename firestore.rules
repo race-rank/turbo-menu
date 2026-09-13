@@ -149,7 +149,10 @@ service cloud.firestore {
         // the separator is load-bearing in a security boundary and the guard is
         // one line. Verified reachable against a rules emulator with synthetic uids.
         && !request.resource.data.uids[0].matches('.*_.*')
-        && !request.resource.data.uids[1].matches('.*_.*');
+        && !request.resource.data.uids[1].matches('.*_.*')
+        // Shape-pinned like profiles and notifications. createdAt is permitted
+        // but not required: friendsService writes it, the rules tests do not.
+        && request.resource.data.keys().hasOnly(['uids', 'requestedBy', 'status', 'createdAt']);
 
       // Only the other party accepts, and only pending -> accepted. Pinning
       // affectedKeys stops an accept from rewriting who the friendship is
@@ -159,7 +162,12 @@ service cloud.firestore {
         && resource.data.requestedBy != request.auth.uid
         && resource.data.status == 'pending'
         && request.resource.data.status == 'accepted'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedAt'])
+        // If acceptedAt is written it must be the server's time, not a value the
+        // accepting party picked. Optional rather than required, because the
+        // rules tests accept without it.
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['acceptedAt'])
+            || request.resource.data.acceptedAt == request.time);
 
       allow delete: if isSignedIn() && request.auth.uid in resource.data.uids;
     }

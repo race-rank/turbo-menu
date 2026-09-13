@@ -2,7 +2,9 @@ import { readFileSync } from 'fs';
 import {
   initializeTestEnvironment, assertSucceeds, assertFails, RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import {
+  deleteDoc, doc, getDoc, serverTimestamp, setDoc,
+} from 'firebase/firestore';
 import { beforeAll, afterAll, beforeEach, describe, test } from 'vitest';
 
 let testEnv: RulesTestEnvironment;
@@ -228,5 +230,34 @@ describe('friendships', () => {
   test('a stranger cannot read a friendship', async () => {
     await seedFriendship(ALICE, BOB, 'accepted');
     await assertFails(getDoc(doc(carol(), 'friendships', ALICE_BOB)));
+  });
+
+  // Verified accepted before the shape was pinned: a 10KB junk field rode along
+  // on an otherwise valid pending request.
+  test('a friend request cannot carry unexpected fields', async () => {
+    await assertFails(setDoc(doc(alice(), 'friendships', ALICE_BOB), {
+      uids: [ALICE, BOB].sort(), requestedBy: ALICE, status: 'pending',
+      junk: 'x'.repeat(10_000),
+    }));
+  });
+
+  // friendsService writes createdAt, so it has to stay legal.
+  test('a friend request may carry createdAt', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'friendships', ALICE_BOB), {
+      uids: [ALICE, BOB].sort(), requestedBy: ALICE, status: 'pending',
+      createdAt: serverTimestamp(),
+    }));
+  });
+
+  test('accepting cannot forge acceptedAt', async () => {
+    await seedFriendship(ALICE, BOB, 'pending', ALICE);
+    await assertFails(setDoc(doc(bob(), 'friendships', ALICE_BOB), {
+      uids: [ALICE, BOB].sort(), requestedBy: ALICE, status: 'accepted',
+      acceptedAt: new Date('2020-01-01'),
+    }));
+    await assertSucceeds(setDoc(doc(bob(), 'friendships', ALICE_BOB), {
+      uids: [ALICE, BOB].sort(), requestedBy: ALICE, status: 'accepted',
+      acceptedAt: serverTimestamp(),
+    }));
   });
 });
