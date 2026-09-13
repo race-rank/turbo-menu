@@ -3,7 +3,7 @@ import {
   initializeTestEnvironment, assertSucceeds, assertFails, RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc,
+  collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc,
 } from 'firebase/firestore';
 import { beforeAll, afterAll, beforeEach, describe, test } from 'vitest';
 
@@ -373,5 +373,64 @@ describe('favourites and ratings', () => {
       withIce: true, hasLED: true, hasColoredWater: false,
       hasAlcohol: false, hasFruits: false, createdAt: serverTimestamp(),
     }));
+  });
+});
+
+describe('rating an order', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'orders', 'alice-order'), {
+        total: 100, status: 'pending', customerInfo: { uid: ALICE },
+        items: [{ comboId: 'mix:sunset', name: 'Sunset Blend' }],
+      });
+      // Written by the pre-uid bundle: no customerInfo.uid at all.
+      await setDoc(doc(ctx.firestore(), 'orders', 'legacy-order'), {
+        total: 80, status: 'completed', customerInfo: { id: 'customer-abc' },
+      });
+    });
+  });
+
+  test('the owner rates their own order', async () => {
+    await assertSucceeds(updateDoc(doc(alice(), 'orders', 'alice-order'), {
+      rating: 4, ratedAt: new Date(),
+    }));
+  });
+
+  test('a rating outside 1 to 5 is rejected', async () => {
+    await assertFails(updateDoc(doc(alice(), 'orders', 'alice-order'), { rating: 0 }));
+    await assertFails(updateDoc(doc(alice(), 'orders', 'alice-order'), { rating: 6 }));
+  });
+
+  test('a user cannot rate someone else order', async () => {
+    await assertFails(updateDoc(doc(bob(), 'orders', 'alice-order'), { rating: 5 }));
+  });
+
+  // The point of pinning affectedKeys: without it this update path is a hole
+  // straight into revenue figures.
+  test('rating cannot be used to change the total or the status', async () => {
+    await assertFails(updateDoc(doc(alice(), 'orders', 'alice-order'), {
+      rating: 5, total: 1,
+    }));
+    await assertFails(updateDoc(doc(alice(), 'orders', 'alice-order'), {
+      rating: 5, status: 'completed',
+    }));
+  });
+
+  // ownsOrder() used to read customerInfo.uid directly, which RAISES on
+  // pre-uid documents instead of evaluating to false. The denial was right but
+  // arrived as an error and logged "Property uid is undefined" on every read.
+  test('a pre-uid order denies cleanly rather than raising', async () => {
+    await assertFails(getDoc(doc(bob(), 'orders', 'legacy-order')));
+    await assertFails(updateDoc(doc(bob(), 'orders', 'legacy-order'), { rating: 5 }));
+  });
+
+  // The invariant the whole design rests on. An order carries table, total and
+  // timestamp - who was at the bar, when, and what they spent. Friends see the
+  // projection under users/{uid}/ratings and never this. If this test ever goes
+  // green-to-red, stop: something has widened the order rules.
+  test('an accepted friend still cannot read or rate your orders', async () => {
+    await seedFriendship(ALICE, BOB, 'accepted');
+    await assertFails(getDoc(doc(bob(), 'orders', 'alice-order')));
+    await assertFails(updateDoc(doc(bob(), 'orders', 'alice-order'), { rating: 5 }));
   });
 });

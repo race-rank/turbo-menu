@@ -13,7 +13,13 @@ service cloud.firestore {
     // (!isAdmin(), isAdmin() == false, a ternary) would then deny instead of
     // allow, and every ordinary denial logs "Property admin is undefined".
     function isAdmin()    { return request.auth != null && request.auth.token.get('admin', false) == true; }
-    function ownsOrder()  { return resource.data.customerInfo.uid == request.auth.uid; }
+    // .get() with defaults rather than a bare property access, which RAISES on
+    // orders written in the pre-uid shape rather than evaluating to false. The
+    // denial was always correct; it just arrived as an error. The create rule
+    // was made tolerant for this reason already - the read path was missed.
+    function ownsOrder() {
+      return resource.data.get('customerInfo', {}).get('uid', '') == request.auth.uid;
+    }
 
     // pairId is the two uids sorted ascending and joined with '_', so a rule can
     // derive the friendship document key from the two participants rather than
@@ -95,7 +101,16 @@ service cloud.firestore {
         && request.resource.data.total is number
         && request.resource.data.total >= 0;
       allow read: if isAdmin() || (isSignedIn() && ownsOrder());
-      allow update, delete: if isAdmin();
+      allow delete: if isAdmin();
+
+      // hasOnly is what keeps this from becoming a route into status and total.
+      allow update: if isAdmin()
+        || (isSignedIn() && ownsOrder()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['rating', 'ratedAt'])
+            && request.resource.data.rating is int
+            && request.resource.data.rating >= 1
+            && request.resource.data.rating <= 5);
     }
 
     match /menu/{document}             { allow read: if true; allow write: if isAdmin(); }
