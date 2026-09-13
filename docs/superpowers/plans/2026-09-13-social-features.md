@@ -695,6 +695,15 @@ describe('friendships', () => {
     ));
   });
 
+  // Verified reachable on the emulator with synthetic uids: ("A","B_C") and
+  // ("A_B","C") both hash to pairId "A_B_C", letting an outsider inherit a
+  // friendship they were never part of.
+  test('a uid containing the pairId separator is rejected', async () => {
+    await assertFails(setDoc(doc(alice(), 'friendships', 'alice-uid_b_c'), {
+      uids: ['alice-uid', 'b_c'].sort(), requestedBy: ALICE, status: 'pending',
+    }));
+  });
+
   test('the document id must match the sorted uids', async () => {
     await assertFails(setDoc(
       doc(alice(), 'friendships', 'not-the-pair-id'), request([ALICE, BOB], ALICE),
@@ -785,7 +794,15 @@ In `firestore.rules`, after the `profiles` block:
         && pairId == friendPairId(request.resource.data.uids[0], request.resource.data.uids[1])
         && request.auth.uid in request.resource.data.uids
         && request.resource.data.requestedBy == request.auth.uid
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        // pairId joins the two uids with '_', so a uid containing '_' makes the
+        // join ambiguous: ("A","B_C") and ("A_B","C") both produce "A_B_C", and
+        // whichever pair creates it first grants the other pair access. Firebase
+        // Auth uids are 28-char alphanumeric so this is not reachable today, but
+        // the separator is load-bearing in a security boundary and the guard is
+        // one line. Verified reachable against a rules emulator with synthetic uids.
+        && !request.resource.data.uids[0].matches('.*_.*')
+        && !request.resource.data.uids[1].matches('.*_.*');
 
       // Only the other party accepts, and only pending -> accepted. Pinning
       // affectedKeys stops an accept from rewriting who the friendship is
@@ -807,7 +824,7 @@ In `firestore.rules`, after the `profiles` block:
 PATH="/opt/homebrew/opt/openjdk/bin:$PATH" npx firebase emulators:exec --only firestore --project demo-turbo-menu "npx vitest run tests/socialRules.test.ts"
 ```
 
-Expected: `Tests 20 passed (20)`.
+Expected: `tests/socialRules.test.ts` reports **21 passed** (7 + 14).
 
 - [ ] **Step 5: Commit**
 
@@ -937,7 +954,7 @@ In `firestore.rules`, immediately after the existing `match /users/{uid} { ... }
 PATH="/opt/homebrew/opt/openjdk/bin:$PATH" npx firebase emulators:exec --only firestore --project demo-turbo-menu "npx vitest run tests/socialRules.test.ts"
 ```
 
-Expected: `Tests 29 passed (29)`.
+Expected: `tests/socialRules.test.ts` reports **30 passed** (21 + 9).
 
 - [ ] **Step 5: Commit**
 
