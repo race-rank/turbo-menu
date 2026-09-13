@@ -1066,9 +1066,11 @@ In the `match /orders/{orderId}` block, replace `allow update, delete: if isAdmi
 PATH="/opt/homebrew/opt/openjdk/bin:$PATH" npm test
 ```
 
-Expected: `Tests 84 passed (84)`. That is 35 from before this plan, plus 11 from Task 1, 3 from Task 2, and 35 in `socialRules` so far (7 + 13 + 9 + 6).
+Expected: `tests/socialRules.test.ts` reports **35 passed** (7 + 13 + 9 + 6), and the run finishes with **0 failed** across all five test files.
 
-The existing `tests/rules.test.ts` must still pass **in full** — `ownsOrder()` changed and that file exercises it on both the read and the create path. If any of its 30 tests go red, the tolerant rewrite is wrong; fix it rather than adjusting that file.
+Do not check a global total — it drifts every time a task adds a test. Check two things instead: the per-file count for the file you changed, and that nothing previously green went red.
+
+`tests/rules.test.ts` in particular must still pass **in full** — `ownsOrder()` changed and that file exercises it on both the read and the create path. If any of its 30 tests go red, the tolerant rewrite is wrong; fix that rather than adjusting the test file.
 
 - [ ] **Step 6: Commit**
 
@@ -1222,7 +1224,7 @@ In `firestore.rules`, after the `friendships` block:
 PATH="/opt/homebrew/opt/openjdk/bin:$PATH" npm test
 ```
 
-Expected: `Tests 93 passed (93)` — the 84 above plus 9 in this task.
+Expected: `tests/socialRules.test.ts` reports **44 passed** (the 35 above plus 9 here), and **0 failed** overall.
 
 If the `discoverable` create tests fail on the hash comparison rather than compiling, print what the rule computes by temporarily relaxing the rule to `allow create: if true;`, write a document, and compare — the likely cause is hex case. Both sides are `.lower()`ed for exactly this reason.
 
@@ -2704,7 +2706,7 @@ npx tsc --noEmit -p tsconfig.app.json
 npm run build
 ```
 
-Expected: `Tests 93 passed (93)`; exactly 4 `tsc` errors, all in `src/services/firebaseService.ts`; build succeeds.
+Expected: **0 failed** across all test files, with `tests/socialRules.test.ts` at 44; exactly 4 `tsc` errors, all in `src/services/firebaseService.ts`; build succeeds.
 
 - [ ] **Step 2: End-to-end check with two accounts**
 
