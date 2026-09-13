@@ -448,3 +448,84 @@ describe('rating an order', () => {
     await assertFails(updateDoc(doc(bob(), 'orders', 'alice-order'), { rating: 5 }));
   });
 });
+
+// sha256('alice@example.com'), lowercase hex. Hard-coded and independently
+// verified with `echo -n "alice@example.com" | shasum -a 256`, so the test
+// proves the RULE computes the same value rather than agreeing with a helper
+// the test wrote itself.
+const ALICE_EMAIL_HASH = 'ff8d9819fc0e12bf0d24892e45987e249a28dce836a85cad60e28eaaa8c6d976';
+
+describe('invite codes', () => {
+  test('any signed-in user resolves a code by exact id', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'inviteCodes', 'CODE1234'), {
+        uid: ALICE, displayName: 'Alice',
+      });
+    });
+    await assertSucceeds(getDoc(doc(bob(), 'inviteCodes', 'CODE1234')));
+  });
+
+  test('a user publishes a code pointing at themselves', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'inviteCodes', 'NEWCODE1'), {
+      uid: ALICE, displayName: 'Alice',
+    }));
+  });
+
+  test('a user cannot publish a code pointing at someone else', async () => {
+    await assertFails(setDoc(doc(bob(), 'inviteCodes', 'NEWCODE2'), {
+      uid: ALICE, displayName: 'Alice',
+    }));
+  });
+
+  test('a user deletes only their own code', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'inviteCodes', 'CODE1234'), {
+        uid: ALICE, displayName: 'Alice',
+      });
+    });
+    await assertFails(deleteDoc(doc(bob(), 'inviteCodes', 'CODE1234')));
+    await assertSucceeds(deleteDoc(doc(alice(), 'inviteCodes', 'CODE1234')));
+  });
+});
+
+describe('email discovery', () => {
+  test('a user publishes a discoverable entry under the hash of their own email', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'discoverable', ALICE_EMAIL_HASH), {
+      uid: ALICE, displayName: 'Alice',
+    }));
+  });
+
+  // Without this check anyone could squat the hash of an email they do not own
+  // and intercept requests meant for that person.
+  test('a user cannot publish under someone else email hash', async () => {
+    await assertFails(setDoc(doc(bob(), 'discoverable', ALICE_EMAIL_HASH), {
+      uid: BOB, displayName: 'Bob',
+    }));
+  });
+
+  test('a signed-in user looks up an exact hash', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'discoverable', ALICE_EMAIL_HASH), {
+        uid: ALICE, displayName: 'Alice',
+      });
+    });
+    await assertSucceeds(getDoc(doc(bob(), 'discoverable', ALICE_EMAIL_HASH)));
+  });
+
+  test('a user removes their own entry', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'discoverable', ALICE_EMAIL_HASH), {
+        uid: ALICE, displayName: 'Alice',
+      });
+    });
+    await assertFails(deleteDoc(doc(bob(), 'discoverable', ALICE_EMAIL_HASH)));
+    await assertSucceeds(deleteDoc(doc(alice(), 'discoverable', ALICE_EMAIL_HASH)));
+  });
+
+  // The mitigation that actually stops harvesting: you can confirm an address
+  // you already hold, but you cannot walk the collection.
+  test('neither lookup collection can be enumerated', async () => {
+    await assertFails(getDocs(collection(bob(), 'discoverable')));
+    await assertFails(getDocs(collection(bob(), 'inviteCodes')));
+  });
+});

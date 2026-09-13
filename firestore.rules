@@ -224,5 +224,33 @@ service cloud.firestore {
 
       allow delete: if isSignedIn() && request.auth.uid in resource.data.uids;
     }
+
+    // Code -> uid, for invite links and QR. get is open to any signed-in user
+    // because a code is unguessable; list is denied so the collection cannot be
+    // walked to harvest them.
+    match /inviteCodes/{code} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'createdAt']);
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // sha256(lowercased email) -> uid, for email search. Opt-in and default-off
+    // in the client. get is allowed and list is denied, so someone can confirm
+    // an address they already hold but cannot harvest the customer base - which
+    // is the part that matters. The document id must be the hash of the
+    // CALLER'S OWN email, so nobody can squat an address they do not control.
+    match /discoverable/{emailHash} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn()
+        && request.auth.token.email != null
+        && emailHash == hashing.sha256(request.auth.token.email.lower()).toHexString().lower()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'displayName']);
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
   }
 }
