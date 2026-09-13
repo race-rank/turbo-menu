@@ -10,6 +10,18 @@ describe('fnv1a64', () => {
   test('separates inputs that differ by one character', () => {
     expect(fnv1a64('hello')).not.toBe(fnv1a64('hellp'));
   });
+
+  // Pins the published FNV-1a 64-bit reference vectors, not merely our own
+  // current output. Without this the whole suite passes even if the algorithm
+  // is swapped for a different deterministic hash - and since these ids become
+  // Firestore document ids for favourites and ratings, that would silently
+  // orphan real customer data rather than failing loudly.
+  test('matches the published FNV-1a 64-bit reference vectors', () => {
+    expect(fnv1a64('')).toBe('cbf29ce484222325');
+    expect(fnv1a64('a')).toBe('af63dc4c8601ec8c');
+    expect(fnv1a64('foobar')).toBe('85944171f73967e8');
+    expect(fnv1a64('hello')).toBe('a430d84680aabd0b');
+  });
 });
 
 describe('comboIdForMix', () => {
@@ -55,6 +67,13 @@ describe('comboIdForCustom', () => {
 
   test('is prefixed so the two kinds can never collide', () => {
     expect(comboIdForCustom('hookah1', 'virginia', FLAVORS)).toMatch(/^custom:[0-9a-f]{16}$/);
+  });
+
+  // Pins the canonical string layout too: field order, the '|' separators and
+  // the sort-then-comma-join. A change to any of those reshapes every id.
+  test('produces a known id for a known build', () => {
+    expect(comboIdForCustom('hookah1', 'virginia', ['mint:virginia', 'lemon:virginia']))
+      .toBe('custom:7d9fbd02572001ae');
   });
 
   // The whole point of excluding these: a favourite must survive the customer
