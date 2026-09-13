@@ -21,6 +21,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { getMenuData } from '@/services/menuService';
 import { comboIdForCustom, comboIdForMix } from '@/services/comboId';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
+import { FavoriteButton } from '@/components/FavoriteButton';
+import { addFavorite, listFavorites, removeFavorite } from '@/services/favoritesService';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ADDONS = [
   { key: 'hasLED' as const, label: 'LED Hookah', price: 30, image: '/img/led.webp' },
@@ -69,6 +72,8 @@ const Index = () => {
   const { addItem, getItemCount } = useCart();
   const location = useLocation();
   const { setTable } = useTable();
+  const { user } = useAuth();
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [selectedHookah, setSelectedHookah] = useState<string | null>(null);
   const [selectedTobaccoType, setSelectedTobaccoType] = useState<'virginia' | 'darkblend' | 'cigarleaf' | 'mix' | null>(null);
   const [tobaccoStrength, setTobaccoStrength] = useState<number>(1);
@@ -121,6 +126,14 @@ const Index = () => {
 
     loadMenuData();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    listFavorites(user.uid)
+      .then((favorites) => setFavoriteIds(new Set(favorites.map((f) => f.comboId))))
+      // A failed favourites read must not take the menu down with it.
+      .catch(() => setFavoriteIds(new Set()));
+  }, [user]);
 
   // Create expanded flavor list with separate entries for dual-compatible flavors
   const getExpandedFlavors = () => {
@@ -205,6 +218,30 @@ const Index = () => {
     }
 
     setMixDialogId(mixId);
+  };
+
+  const toggleMixFavorite = async (mix: DatabaseRecommendedMix) => {
+    if (!user) return;
+    const comboId = comboIdForMix(mix.id);
+    const next = new Set(favoriteIds);
+
+    try {
+      if (favoriteIds.has(comboId)) {
+        next.delete(comboId);
+        setFavoriteIds(next);
+        await removeFavorite(user.uid, comboId);
+      } else {
+        next.add(comboId);
+        setFavoriteIds(next);
+        await addFavorite(user.uid, {
+          comboId, label: mix.name, kind: 'mix', mixId: mix.id,
+        });
+      }
+    } catch (error) {
+      // Put the optimistic change back.
+      setFavoriteIds(new Set(favoriteIds));
+      toast({ title: 'Could not update favourites', variant: 'destructive' });
+    }
   };
 
   const confirmMixToCart = (category: 'virginia' | 'darkblend' | 'mix') => {
@@ -583,6 +620,14 @@ const Index = () => {
                     <Card className="bg-turbo-card border-border overflow-hidden h-full">
                       <CardContent className="p-0">
                         <div className={`${mix.bgColor} p-4 text-center relative`}>
+                          <div className="absolute right-2 top-2 z-10">
+                            <FavoriteButton
+                              label={mix.name}
+                              isFavorite={favoriteIds.has(comboIdForMix(mix.id))}
+                              onToggle={() => toggleMixFavorite(mix)}
+                              disabled={!user}
+                            />
+                          </div>
                           <img
                             src={mix.mainImage}
                             alt={mix.name}
