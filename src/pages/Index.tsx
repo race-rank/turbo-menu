@@ -19,6 +19,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getMenuData } from '@/services/menuService';
+import { comboIdForCustom, comboIdForMix } from '@/services/comboId';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 
 const ADDONS = [
@@ -220,6 +221,8 @@ const Index = () => {
       name: `${mix.name} (${categoryLabels[category]})`,
       price: mix.price,
       image: mix.mainImage,
+      comboId: comboIdForMix(mix.id),
+      mixId: mix.id,
       tobaccoType: category,
       table: tableId
     });
@@ -439,6 +442,15 @@ const Index = () => {
       selectedFlavorNames.push(`Ice (${icePercentage}%)`);
     }
 
+    // `{flavorDocId}:{variantType}` rather than the UI's variantId, which is a
+    // bare id for single-compatibility flavours and `{id}-{type}` for
+    // multi-compatibility ones. That shape flips when an admin edits a
+    // flavour's compatible types, which would orphan favourites keyed on it.
+    const flavorIds = selectedFlavors
+      .map(variantId => currentFlavors.find(f => f.variantId === variantId))
+      .filter((f): f is NonNullable<typeof f> => Boolean(f))
+      .map(f => `${f.id}:${f.variantType ?? finalTobaccoType}`);
+
     let totalPrice = selectedHookahData.price || 0;
     if (selectedAddons.hasLED) totalPrice += ADDON_PRICES.hasLED;
     if (selectedAddons.hasColoredWater) totalPrice += ADDON_PRICES.hasColoredWater;
@@ -451,6 +463,9 @@ const Index = () => {
       name: 'Custom Mix',
       price: totalPrice,
       image: selectedHookahData.image,
+      comboId: comboIdForCustom(selectedHookahData.id, finalTobaccoType, flavorIds),
+      hookahId: selectedHookahData.id,
+      flavorIds,
       hookah: selectedHookahData.name,
       tobaccoType: finalTobaccoType,
       tobaccoStrength: tobaccoStrength,
