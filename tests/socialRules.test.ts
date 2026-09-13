@@ -528,4 +528,39 @@ describe('email discovery', () => {
     await assertFails(getDocs(collection(bob(), 'discoverable')));
     await assertFails(getDocs(collection(bob(), 'inviteCodes')));
   });
+
+  // A 300KB displayName and a non-string displayName were both accepted before
+  // these bounds were added.
+  test('a lookup entry rejects an oversized or mistyped display name', async () => {
+    await assertFails(setDoc(doc(alice(), 'discoverable', ALICE_EMAIL_HASH), {
+      uid: ALICE, displayName: 'x'.repeat(300_000),
+    }));
+    await assertFails(setDoc(doc(alice(), 'discoverable', ALICE_EMAIL_HASH), {
+      uid: ALICE, displayName: { a: 'b' },
+    }));
+    await assertFails(setDoc(doc(alice(), 'inviteCodes', 'CODE9999'), {
+      uid: ALICE, displayName: 'x'.repeat(300_000),
+    }));
+  });
+
+  // Friends need a real account, so a guest-minted code would resolve to a
+  // profile that never exists.
+  test('an anonymous guest cannot mint an invite code', async () => {
+    const guest = testEnv.authenticatedContext('guest-uid', {
+      firebase: { sign_in_provider: 'anonymous', identities: {} },
+    }).firestore();
+    await assertFails(setDoc(doc(guest, 'inviteCodes', 'GUESTCODE'), {
+      uid: 'guest-uid', displayName: null,
+    }));
+  });
+
+  // No email claim at all - must deny by evaluating, not by raising.
+  test('an anonymous guest cannot publish a discoverable entry', async () => {
+    const guest = testEnv.authenticatedContext('guest-uid', {
+      firebase: { sign_in_provider: 'anonymous', identities: {} },
+    }).firestore();
+    await assertFails(setDoc(doc(guest, 'discoverable', ALICE_EMAIL_HASH), {
+      uid: 'guest-uid', displayName: null,
+    }));
+  });
 });

@@ -232,8 +232,18 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if false;
       allow create: if isSignedIn()
+        // Friends need a real account - a friendship requires a profile, and
+        // anonymous guests never get one. Without this an anonymous guest can
+        // mint a code that resolves to a dead end for whoever scans it.
+        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'anonymous'
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'createdAt']);
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'createdAt'])
+        // Bound what anyone resolving this code downloads. Same reasoning as
+        // the profiles, favorites, ratings and orders blocks above.
+        && (!('displayName' in request.resource.data)
+            || request.resource.data.displayName == null
+            || (request.resource.data.displayName is string
+                && request.resource.data.displayName.size() <= 100));
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
@@ -246,10 +256,18 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if false;
       allow create: if isSignedIn()
-        && request.auth.token.email != null
+        // .get() rather than a bare access: a bare one RAISES for an anonymous
+        // guest, who has no email claim at all. The denial was already correct,
+        // this just makes it evaluate instead of throwing, matching isAdmin()
+        // and ownsOrder() above.
+        && request.auth.token.get('email', '') != ''
         && emailHash == hashing.sha256(request.auth.token.email.lower()).toHexString().lower()
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.keys().hasOnly(['uid', 'displayName']);
+        && request.resource.data.keys().hasOnly(['uid', 'displayName'])
+        && (!('displayName' in request.resource.data)
+            || request.resource.data.displayName == null
+            || (request.resource.data.displayName is string
+                && request.resource.data.displayName.size() <= 100));
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
   }
