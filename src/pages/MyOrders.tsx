@@ -7,12 +7,19 @@ import { NavigationSidebar } from '@/components/NavigationSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { getOrdersForUser } from '@/services/orderService';
 import type { OrderDetails } from '@/services/orderService';
+import { StarRating } from '@/components/StarRating';
+import { rateOrder } from '@/services/ratingsService';
+import { toast } from '@/hooks/use-toast';
 
 const MyOrders: React.FC = () => {
   const { user, isAnonymous, loading } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderDetails[]>([]);
   const [busy, setBusy] = useState(true);
+  // Optimistic local scores, keyed by orderId. The list is fetched once, so
+  // without this a freshly given rating would not appear until a reload.
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -21,6 +28,35 @@ const MyOrders: React.FC = () => {
       .catch(() => setOrders([]))
       .finally(() => setBusy(false));
   }, [user, loading]);
+
+  const handleRate = async (order: OrderDetails, score: number) => {
+    if (!user) return;
+    const firstItem = order.items?.[0] as { comboId?: string; name?: string } | undefined;
+    if (!firstItem?.comboId) return;
+
+    setSaving(order.orderId);
+    const previous = scores[order.orderId];
+    setScores((current) => ({ ...current, [order.orderId]: score }));
+    try {
+      await rateOrder(
+        user.uid,
+        order.orderId,
+        firstItem.comboId,
+        firstItem.name ?? 'Your order',
+        score,
+      );
+      toast({ title: 'Thanks for rating' });
+    } catch (error) {
+      setScores((current) => ({ ...current, [order.orderId]: previous ?? 0 }));
+      toast({
+        title: 'Could not save your rating',
+        description: String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(null);
+    }
+  };
 
   return (
     // pb-24 clears the OrderStatusTracker, which App.tsx pins to the bottom of
@@ -73,6 +109,25 @@ const MyOrders: React.FC = () => {
                   {order.items.map((item) => item.name).join(', ')}
                 </p>
                 <p className="text-lg font-bold text-amber-400">{order.total} Lei</p>
+                {(order.items?.[0] as { comboId?: string } | undefined)?.comboId && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <p className="mb-2 text-xs uppercase text-turbo-muted">
+                      {scores[order.orderId] ?? (order as { rating?: number }).rating
+                        ? 'Your rating'
+                        : 'Rate this'}
+                    </p>
+                    <StarRating
+                      size="sm"
+                      value={
+                        scores[order.orderId]
+                        ?? (order as { rating?: number }).rating
+                        ?? 0
+                      }
+                      disabled={saving === order.orderId}
+                      onChange={(score) => handleRate(order, score)}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
