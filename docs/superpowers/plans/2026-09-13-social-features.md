@@ -321,7 +321,9 @@ const cartItem: CartItem = {
 npx vitest run tests/orderItem.test.ts
 ```
 
-Expected: FAIL — TypeScript rejects `comboId` as not existing on `CartItem`.
+Expected: FAIL — two tests fail with `expected undefined to be 'custom:0123456789abcdef'`.
+
+Note it does **not** fail as a type error. Vitest transforms through esbuild, which strips TypeScript types without checking them, so a missing field surfaces at runtime rather than at compile time. The type error appears only under `tsc` in Step 6.
 
 - [ ] **Step 3: Add the fields to `CartItem`**
 
