@@ -261,3 +261,73 @@ describe('friendships', () => {
     }));
   });
 });
+
+describe('favourites and ratings', () => {
+  const favPath = (uid: string) => `users/${uid}/favorites/mix:sunset`;
+  const ratingPath = (uid: string) => `users/${uid}/ratings/mix:sunset`;
+
+  test('a user reads and writes their own favourites', async () => {
+    await assertSucceeds(getDoc(doc(alice(), favPath(ALICE))));
+    await assertSucceeds(setDoc(doc(alice(), favPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', kind: 'mix',
+    }));
+  });
+
+  test('a stranger cannot read favourites', async () => {
+    await assertFails(getDoc(doc(carol(), favPath(ALICE))));
+  });
+
+  test('a stranger cannot read ratings', async () => {
+    await assertFails(getDoc(doc(carol(), ratingPath(ALICE))));
+  });
+
+  // The distinction that matters: a request you have not answered grants
+  // nothing beyond seeing who asked.
+  test('a pending friendship grants no access to favourites or ratings', async () => {
+    await seedFriendship(ALICE, BOB, 'pending');
+    await assertFails(getDoc(doc(bob(), favPath(ALICE))));
+    await assertFails(getDoc(doc(bob(), ratingPath(ALICE))));
+  });
+
+  test('an accepted friend reads favourites and ratings', async () => {
+    await seedFriendship(ALICE, BOB, 'accepted');
+    await assertSucceeds(getDoc(doc(bob(), favPath(ALICE))));
+    await assertSucceeds(getDoc(doc(bob(), ratingPath(ALICE))));
+  });
+
+  test('a friend cannot write to your favourites or ratings', async () => {
+    await seedFriendship(ALICE, BOB, 'accepted');
+    await assertFails(setDoc(doc(bob(), favPath(ALICE)), { comboId: 'mix:sunset' }));
+    await assertFails(setDoc(doc(bob(), ratingPath(ALICE)), { comboId: 'mix:sunset', score: 1 }));
+  });
+
+  // Rules evaluate the friendship document live, so revocation is immediate.
+  test('unfriending revokes access at once', async () => {
+    await seedFriendship(ALICE, BOB, 'accepted');
+    await assertSucceeds(getDoc(doc(bob(), favPath(ALICE))));
+    await deleteDoc(doc(bob(), 'friendships', ALICE_BOB));
+    await assertFails(getDoc(doc(bob(), favPath(ALICE))));
+  });
+
+  test('a rating score must be an integer from 1 to 5', async () => {
+    await assertFails(setDoc(doc(alice(), ratingPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', score: 0,
+    }));
+    await assertFails(setDoc(doc(alice(), ratingPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', score: 6,
+    }));
+    await assertFails(setDoc(doc(alice(), ratingPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', score: 'five',
+    }));
+    await assertSucceeds(setDoc(doc(alice(), ratingPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', score: 3,
+    }));
+  });
+
+  // users/{uid} is matched non-recursively, so subcollections are NOT covered
+  // by it. Proving that here because the natural assumption is the opposite.
+  test('friends still cannot read the private user document', async () => {
+    await seedFriendship(ALICE, BOB, 'accepted');
+    await assertFails(getDoc(doc(bob(), 'users', ALICE)));
+  });
+});

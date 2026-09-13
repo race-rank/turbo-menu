@@ -45,6 +45,23 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
+    // match /users/{uid} above is NOT recursive, so these subcollections need
+    // their own blocks. They are the friend-readable projection of a customer's
+    // taste; the user document itself stays owner-only.
+    match /users/{uid}/favorites/{comboId} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isFriendOf(uid));
+      allow write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid}/ratings/{comboId} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isFriendOf(uid));
+      allow create, update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.score is int
+        && request.resource.data.score >= 1
+        && request.resource.data.score <= 5;
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
     match /orders/{orderId} {
       // status and total are pinned at creation: update is admin-only, so without
       // this a customer could inject an order that already reads "completed", or
