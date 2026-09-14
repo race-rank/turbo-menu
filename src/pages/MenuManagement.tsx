@@ -32,9 +32,14 @@ import {
   deleteTobaccoType,
   deleteFlavor,
   deleteRecommendedMix,
-  publishMenuSnapshot
+  publishMenuSnapshot,
+  getFeaturedHookah,
+  setFeaturedHookah,
+  clearFeaturedHookah,
 } from '@/services/menuService';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
+import type { FeaturedHookah } from '@/types/database';
+import { MAX_PROMO_TEXT_LENGTH } from '@/services/hookahOfTheDay';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
@@ -50,6 +55,9 @@ const MenuManagement = () => {
   const [tobaccoTypes, setTobaccoTypes] = useState<DatabaseTobaccoType[]>([]);
   const [flavors, setFlavors] = useState<DatabaseFlavor[]>([]);
   const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
+  const [featured, setFeatured] = useState<FeaturedHookah | undefined>(undefined);
+  const [featuredPromo, setFeaturedPromo] = useState('');
+  const [featuredSaving, setFeaturedSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('hookahs');
   
@@ -119,17 +127,22 @@ const MenuManagement = () => {
   const loadMenuData = async () => {
     try {
       setIsLoading(true);
-      const [hookahsData, tobaccoData, flavorsData, mixesData] = await Promise.all([
+      const [hookahsData, tobaccoData, flavorsData, mixesData, featuredData] = await Promise.all([
         getHookahs(),
         getTobaccoTypes(),
         getFlavors(),
-        getRecommendedMixes()
+        getRecommendedMixes(),
+        getFeaturedHookah()
       ]);
-      
+
       setHookahs(hookahsData);
       setTobaccoTypes(tobaccoData);
       setFlavors(flavorsData);
       setRecommendedMixes(mixesData);
+      setFeatured(featuredData);
+      // Seeded from the stored value so editing the line and then picking a
+      // hookah does not silently wipe the promo text that is already live.
+      setFeaturedPromo(featuredData?.promoText ?? '');
     } catch (error) {
       console.error('Error loading menu data:', error);
       toast({
@@ -171,6 +184,43 @@ const MenuManagement = () => {
       hasFruits: hookah.hasFruits || false
     });
     setIsHookahModalOpen(true);
+  };
+
+  // Picking a new hookah IS the unset of the previous one - the pointer holds a
+  // single id - so there is nothing to clear first.
+  const handleSetFeatured = async (hookahId: string) => {
+    setFeaturedSaving(true);
+    try {
+      await setFeaturedHookah(hookahId, featuredPromo);
+      await publishAndReload();
+      toast({ title: 'Hookah of the day updated' });
+    } catch (error) {
+      console.error('Error setting hookah of the day:', error);
+      toast({
+        title: 'Could not update the hookah of the day',
+        variant: 'destructive',
+      });
+    } finally {
+      setFeaturedSaving(false);
+    }
+  };
+
+  const handleClearFeatured = async () => {
+    setFeaturedSaving(true);
+    try {
+      await clearFeaturedHookah();
+      setFeaturedPromo('');
+      await publishAndReload();
+      toast({ title: 'Hookah of the day cleared' });
+    } catch (error) {
+      console.error('Error clearing hookah of the day:', error);
+      toast({
+        title: 'Could not clear the hookah of the day',
+        variant: 'destructive',
+      });
+    } finally {
+      setFeaturedSaving(false);
+    }
   };
 
   const handleEditTobacco = (tobacco: DatabaseTobaccoType) => {
@@ -499,7 +549,70 @@ const MenuManagement = () => {
                 Add Hookah
               </Button>
             </div>
-            
+
+            <Card className="bg-turbo-card border-amber-400/40 mb-6">
+              <CardContent className="p-4 space-y-3">
+                <h3 className="font-semibold">Hookah of the day</h3>
+                <p className="text-xs text-turbo-muted">
+                  Shown as a banner above the menu and badged in the hookah list.
+                  One at a time — picking a new one replaces the current.
+                </p>
+
+                <Input
+                  placeholder="Optional promo line, e.g. Smooth and slow"
+                  value={featuredPromo}
+                  maxLength={MAX_PROMO_TEXT_LENGTH}
+                  onChange={(e) => setFeaturedPromo(e.target.value)}
+                  className="bg-turbo-bg border-border text-turbo-text"
+                />
+                <p className="text-right text-[10px] text-turbo-muted">
+                  {featuredPromo.length}/{MAX_PROMO_TEXT_LENGTH}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={featured?.hookahId ?? ''}
+                    onValueChange={handleSetFeatured}
+                    disabled={featuredSaving}
+                  >
+                    <SelectTrigger className="w-64 bg-turbo-bg border-border">
+                      <SelectValue placeholder="Choose a hookah" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {/* Active only, so the ordinary path cannot create a
+                          dangling pointer. The resolver still guards the case,
+                          because a hookah can be deactivated after it was
+                          featured. */}
+                      {hookahs.filter((h) => h.isActive).map((hookah) => (
+                        <SelectItem key={hookah.id} value={hookah.id}>
+                          {hookah.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {featured && (
+                    <Button
+                      variant="outline"
+                      onClick={handleClearFeatured}
+                      disabled={featuredSaving}
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+
+                {featured && !hookahs.some((h) => h.id === featured.hookahId && h.isActive) && (
+                  // The featured hookah was deleted or switched off after being
+                  // picked. Customers see nothing; say so here, where it can be
+                  // fixed.
+                  <p className="text-xs text-destructive">
+                    The featured hookah is no longer active, so customers are not seeing it.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="relative mb-6">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-turbo-muted h-4 w-4" />
               <Input
