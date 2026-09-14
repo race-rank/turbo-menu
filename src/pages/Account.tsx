@@ -5,10 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
+import { StarRating } from '@/components/StarRating';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthForms } from '@/components/auth/AuthForms';
 import { logout, updateDisplayName } from '@/services/authService';
 import { getAccountSummary, upsertUserProfile, type AccountSummary } from '@/services/userService';
+import { listFavorites, type FavoriteCombo } from '@/services/favoritesService';
+import { listRatings, type ComboRating } from '@/services/ratingsService';
 import { toast } from '@/hooks/use-toast';
 
 const Account: React.FC = () => {
@@ -19,6 +22,8 @@ const Account: React.FC = () => {
 
   const [summary, setSummary] = useState<AccountSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [favorites, setFavorites] = useState<FavoriteCombo[]>([]);
+  const [ratings, setRatings] = useState<ComboRating[]>([]);
   // Mirrored locally because updateProfile mutates the User in place without
   // firing an auth-state event, so the context value never changes identity.
   const [name, setName] = useState('');
@@ -33,6 +38,9 @@ const Account: React.FC = () => {
       .then(setSummary)
       .catch(() => setSummary(null))
       .finally(() => setLoadingSummary(false));
+    Promise.all([listFavorites(user.uid), listRatings(user.uid)])
+      .then(([f, r]) => { setFavorites(f); setRatings(r); })
+      .catch(() => { setFavorites([]); setRatings([]); });
   }, [signedIn, user]);
 
   const saveName = async () => {
@@ -138,8 +146,42 @@ const Account: React.FC = () => {
               </CardContent>
             </Card>
 
+            <Card className="bg-turbo-card border-border">
+              <CardContent className="p-4">
+                <h2 className="mb-3 text-sm font-bold uppercase text-turbo-muted">
+                  Favourites ({favorites.length})
+                </h2>
+                {favorites.length === 0 && (
+                  <p className="text-sm text-turbo-muted">Tap the heart on a mix to save it.</p>
+                )}
+                {favorites.map((favorite) => (
+                  <p key={favorite.comboId} className="py-1 text-sm">{favorite.label}</p>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-turbo-card border-border">
+              <CardContent className="p-4">
+                <h2 className="mb-3 text-sm font-bold uppercase text-turbo-muted">
+                  Your ratings ({ratings.length})
+                </h2>
+                {ratings.length === 0 && (
+                  <p className="text-sm text-turbo-muted">Rate an order from your history.</p>
+                )}
+                {ratings.map((rating) => (
+                  <div key={rating.comboId} className="flex items-center justify-between py-1">
+                    <span className="flex-1 truncate text-sm">{rating.label}</span>
+                    <StarRating value={rating.score} size="sm" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
             <Button className="w-full" onClick={() => navigate('/my-orders')}>
               My orders
+            </Button>
+            <Button variant="outline" className="w-full" onClick={() => navigate('/friends')}>
+              Friends
             </Button>
             <Button
               variant="outline"
