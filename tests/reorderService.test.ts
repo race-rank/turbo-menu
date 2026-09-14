@@ -289,4 +289,114 @@ describe('resolveReorder - custom builds', () => {
       expect(result.item.comboLabel).toBe('Khalil Mamoon · Mint');
     }
   });
+
+  // The single-flavour, no-ice, non-mix build above is the one shape where a
+  // bare flavour-name join happens to equal finalizeAddToCart's real output.
+  // These three cover the shapes where they diverge if reorderService ever
+  // goes back to building its own flavour strings instead of using
+  // comboDisplay.ts: two-or-more flavours, ice, and a mix-type build with the
+  // per-flavour variant tag.
+  test('two or more flavours carry percentages into comboLabel and flavors, matching finalizeAddToCart', () => {
+    // Mirrors this file's own regression scenario: Khalil Mamoon + Mint 60%
+    // + Lemon 40%, no ice, virginia (non-mix, so no variant tag).
+    const favorite: FavoriteCombo = {
+      comboId: comboIdForCustom('hookah-1', 'virginia', ['mint:virginia', 'lemon:virginia']),
+      label: 'Khalil Mamoon · Mint 60%, Lemon 40%',
+      kind: 'custom',
+      hookahId: 'hookah-1',
+      tobaccoType: 'virginia',
+      flavorIds: ['mint:virginia', 'lemon:virginia'],
+      flavorPercentages: { 'mint:virginia': 60, 'lemon:virginia': 40 },
+    };
+    const menu: MenuSnapshot = {
+      ...emptyMenu,
+      hookahs: [hookah()],
+      flavors: [
+        flavor({ id: 'mint', name: 'Mint', compatibleTobaccoTypes: ['virginia', 'darkblend'] }),
+        flavor({ id: 'lemon', name: 'Lemon', compatibleTobaccoTypes: ['virginia'] }),
+      ],
+    };
+
+    const result = resolveReorder(favorite, menu, 'table-3');
+
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      // finalizeAddToCart: selectedFlavors.length >= 2, so showPct is true
+      // for both flavours; virginia isn't 'mix', so no variant tag.
+      expect(result.item.flavors).toEqual(['Mint 60%', 'Lemon 40%']);
+      expect(result.item.comboLabel).toBe('Khalil Mamoon · Mint 60%, Lemon 40%');
+    }
+  });
+
+  test('a build with ice folds an Ice entry into flavors and comboLabel, matching finalizeAddToCart', () => {
+    // Two flavours whose stored percentages sum to 80 - the ice share
+    // finalizeAddToCart would have used is the 20 left over from 100.
+    const favorite: FavoriteCombo = {
+      comboId: comboIdForCustom('hookah-1', 'darkblend', ['mint:darkblend', 'lemon:darkblend']),
+      label: 'Khalil Mamoon · Mint 45%, Lemon 35%, Ice (20%)',
+      kind: 'custom',
+      hookahId: 'hookah-1',
+      tobaccoType: 'darkblend',
+      flavorIds: ['mint:darkblend', 'lemon:darkblend'],
+      flavorPercentages: { 'mint:darkblend': 45, 'lemon:darkblend': 35 },
+      withIce: true,
+    };
+    const menu: MenuSnapshot = {
+      ...emptyMenu,
+      hookahs: [hookah()],
+      flavors: [
+        flavor({ id: 'mint', name: 'Mint', compatibleTobaccoTypes: ['darkblend'] }),
+        flavor({ id: 'lemon', name: 'Lemon', compatibleTobaccoTypes: ['darkblend'] }),
+      ],
+    };
+
+    const result = resolveReorder(favorite, menu, 'table-3');
+
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.item.flavors).toEqual(['Mint 45%', 'Lemon 35%', 'Ice (20%)']);
+      expect(result.item.comboLabel).toBe('Khalil Mamoon · Mint 45%, Lemon 35%, Ice (20%)');
+    }
+  });
+
+  test('a Mix-type build with ice tags each flavour\'s category, matching finalizeAddToCart exactly', () => {
+    // The failure scenario from the review: Mint (Virginia) 40%, Lemon
+    // (Darkblend) 30%, Ice 30% - the admin dashboard renders nothing but
+    // this exact `flavors` join, so it must carry the category tags and the
+    // ice entry or staff cannot tell which flavour is which blend.
+    const favorite: FavoriteCombo = {
+      comboId: comboIdForCustom('hookah-1', 'mix', ['mint:virginia', 'lemon:darkblend']),
+      label: 'Khalil Mamoon · Mint (Virginia) 40%, Lemon (Darkblend) 30%, Ice (30%)',
+      kind: 'custom',
+      hookahId: 'hookah-1',
+      tobaccoType: 'mix',
+      flavorIds: ['mint:virginia', 'lemon:darkblend'],
+      flavorPercentages: { 'mint:virginia': 40, 'lemon:darkblend': 30 },
+      withIce: true,
+    };
+    const menu: MenuSnapshot = {
+      ...emptyMenu,
+      hookahs: [hookah()],
+      flavors: [
+        flavor({ id: 'mint', name: 'Mint', compatibleTobaccoTypes: ['virginia', 'darkblend'] }),
+        flavor({ id: 'lemon', name: 'Lemon', compatibleTobaccoTypes: ['virginia', 'darkblend'] }),
+      ],
+    };
+
+    const result = resolveReorder(favorite, menu, 'table-3');
+
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.item.flavors).toEqual([
+        'Mint (Virginia) 40%', 'Lemon (Darkblend) 30%', 'Ice (30%)',
+      ]);
+      expect(result.item.comboLabel).toBe(
+        'Khalil Mamoon · Mint (Virginia) 40%, Lemon (Darkblend) 30%, Ice (30%)',
+      );
+      // withIce carried through and the flavour percentages resolved and
+      // re-keyed canonically - the ice share itself is never stored as a
+      // flavour id, only derived for display.
+      expect(result.item.flavorPercentages).toEqual({ 'mint:virginia': 40, 'lemon:darkblend': 30 });
+    }
+  });
 });

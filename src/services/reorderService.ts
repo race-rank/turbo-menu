@@ -3,6 +3,8 @@ import type { DatabaseFlavor, DatabaseHookah, DatabaseRecommendedMix } from '@/t
 import type { FavoriteCombo } from '@/services/favoritesService';
 import { comboIdForCustom, comboIdForMix } from '@/services/comboId';
 import { ADDON_PRICES } from '@/services/addons';
+import { buildComboLabel, buildFlavorDisplayNames } from '@/services/comboDisplay';
+import type { FlavorDisplayEntry } from '@/services/comboDisplay';
 
 /**
  * Turns a saved favourite back into an orderable cart item, resolved against
@@ -37,10 +39,13 @@ const MIX_CATEGORY_LABELS = {
 
 type MixCategory = keyof typeof MIX_CATEGORY_LABELS;
 
-// toggleMixFavorite in Index.tsx never stores a category on a mix favourite
-// today - it is chosen later, at order time via confirmMixToCart's dialog -
-// so this falls back to 'mix' in the common case. A stored value is still
-// honoured when present, and anything unrecognised falls back too.
+// toggleMixFavorite in Index.tsx (the heart on a mix card) never stores a
+// category - it is tapped outside any category context, chosen only later at
+// order time via confirmMixToCart's dialog. confirmMixToCart writes the
+// chosen category back onto the favourite once it IS known (if the mix is
+// already favourited), so a favourite ordered at least once carries its
+// last-ordered category; one that has only ever been favourited, never
+// ordered, falls back to 'mix' here - same as anything unrecognised.
 const resolveMixCategory = (tobaccoType?: string): MixCategory => (
   tobaccoType === 'virginia' || tobaccoType === 'darkblend' || tobaccoType === 'mix'
     ? tobaccoType
@@ -177,7 +182,6 @@ const resolveCustom = (
   }
 
   const resolvedFlavors = lookups.filter(isResolvedLookup).map((lookup) => lookup.resolved);
-  const flavorNames = resolvedFlavors.map((entry) => entry.flavor.name);
 
   let price = hookah.price || 0;
   if (favorite.hasLED) price += ADDON_PRICES.hasLED;
@@ -185,15 +189,56 @@ const resolveCustom = (
   if (favorite.hasFruits) price += ADDON_PRICES.hasFruits;
   if (favorite.hasAlcohol) price += ADDON_PRICES.hasAlcohol;
 
+  // Looked up once, reused both for the canonical `flavorPercentages` map
+  // below and for the display list comboDisplay.ts builds - one lookup, one
+  // source of truth for "what split did this flavour have".
+  const perFlavorPercentage: (number | undefined)[] = resolvedFlavors.map(({ flavorDocId, variantType }) => (
+    favorite.flavorPercentages
+      ? lookupPercentage(favorite.flavorPercentages, flavorDocId, variantType)
+      : undefined
+  ));
+
+  // Canonical shape: `{flavorDocId}:{variantType}`, matching flavorIds.
+  // Index.tsx's finalizeAddToCart now keys its own cart item's
+  // flavorPercentages the same way (see the favouriteFlavorPercentages
+  // comment there) - both order paths agree on this key shape, never the
+  // UI's ephemeral variantId shape (bare id / `{id}-{type}`, which changes
+  // if an admin edits a flavour's compatible tobacco types).
   let flavorPercentages: Record<string, number> | undefined;
   if (favorite.flavorPercentages) {
     const remapped: Record<string, number> = {};
-    resolvedFlavors.forEach(({ flavorDocId, variantType }) => {
-      const value = lookupPercentage(favorite.flavorPercentages!, flavorDocId, variantType);
+    resolvedFlavors.forEach(({ flavorDocId, variantType }, index) => {
+      const value = perFlavorPercentage[index];
       if (value !== undefined) remapped[`${flavorDocId}:${variantType}`] = value;
     });
     if (Object.keys(remapped).length > 0) flavorPercentages = remapped;
   }
+
+  // Ice's own share isn't stored on the favourite (favoritesService.ts has
+  // no `icePercentage` field), but Index.tsx always sizes flavour splits to
+  // sum to exactly `100 - icePercentage` (its `flavorBudget`), so once every
+  // resolved flavour's percentage is known, the ice share is exactly what is
+  // left of 100. When it isn't fully known (e.g. a single-flavour favourite,
+  // whose split finalizeAddToCart never stores - see its `>= 2` gate on
+  // favoriteFlavorPercentages), buildFlavorDisplayNames shows "Ice" with no
+  // number instead of inventing one that might be wrong.
+  const allPercentagesKnown = resolvedFlavors.length > 0
+    && perFlavorPercentage.every((value): value is number => value !== undefined);
+  const derivedIcePercentage = allPercentagesKnown
+    ? Math.max(0, 100 - perFlavorPercentage.reduce<number>((sum, value) => sum + (value ?? 0), 0))
+    : undefined;
+
+  const flavorDisplayEntries: FlavorDisplayEntry[] = resolvedFlavors.map((entry, index) => ({
+    name: entry.flavor.name,
+    variantType: entry.variantType,
+    percentage: perFlavorPercentage[index],
+  }));
+  // Same builder finalizeAddToCart calls for a fresh build of the same
+  // hookah + flavours - see comboDisplay.ts - so the flavours a re-ordered
+  // item shows on the admin dashboard, and the label a rating files under,
+  // both match what the original build would have produced.
+  const withIce = !!favorite.withIce;
+  const flavorNames = buildFlavorDisplayNames(flavorDisplayEntries, favorite.tobaccoType, withIce, derivedIcePercentage);
 
   return {
     status: 'ok',
@@ -204,10 +249,7 @@ const resolveCustom = (
       price,
       image: hookah.image,
       comboId: comboIdForCustom(hookah.id, favorite.tobaccoType, flavorIds),
-      // Same expression finalizeAddToCart uses for a fresh build of the same
-      // hookah + flavours, so a re-ordered item's rating files under the
-      // same label as the original build would have.
-      comboLabel: `${hookah.name} · ${flavorNames.join(', ')}`,
+      comboLabel: buildComboLabel(hookah.name, flavorNames),
       hookahId: hookah.id,
       flavorIds,
       hookah: hookah.name,
