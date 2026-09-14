@@ -57,6 +57,28 @@ service cloud.firestore {
         && get(friendshipPath(owner)).data.status == 'accepted';
     }
 
+    function claimPath(anonUid) {
+      return /databases/$(database)/documents/accountClaims/$(anonUid);
+    }
+
+    // True once the caller has proved possession of a guest device's secret by
+    // taking its claim - see match /accountClaims below. This is the ONLY thing
+    // that lets one uid's data move to another.
+    //
+    // exists() before get() for the same reason sharesFriendshipWith() does it:
+    // get() on a missing document raises rather than returning null, and a raise
+    // inside a helper denies for a reason that has nothing to do with claiming.
+    // The empty-string guard is load-bearing too, not cosmetic: interpolating an
+    // empty segment into a path raises, and the callers below deliberately reach
+    // customerInfo.uid through .get() defaults because pre-uid orders have no
+    // uid at all (see ownsOrder()).
+    function hasClaimOn(anonUid) {
+      return request.auth != null
+        && anonUid != ''
+        && exists(claimPath(anonUid))
+        && get(claimPath(anonUid)).data.get('claimedBy', '') == request.auth.uid;
+    }
+
     match /users/{uid} {
       allow read, write: if isSignedIn() && request.auth.uid == uid;
       allow read: if isAdmin();
@@ -66,7 +88,13 @@ service cloud.firestore {
     // their own blocks. They are the friend-readable projection of a customer's
     // taste; the user document itself stays owner-only.
     match /users/{uid}/favorites/{comboId} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isFriendOf(uid));
+      // hasClaimOn: a customer who signed in to a pre-existing account cannot
+      // keep the guest uid, so the only way their guest favourites survive is
+      // for the new account to read them and copy them across. Read and delete
+      // only - the copy is written into the claimer's OWN subcollection, so
+      // create/update below stay strictly owner-only.
+      allow read: if isSignedIn()
+        && (request.auth.uid == uid || isFriendOf(uid) || hasClaimOn(uid));
       // Split from delete because request.resource is null on a delete, so a
       // field check in a combined `write` would raise and deny legitimate ones.
       allow create, update: if isSignedIn() && request.auth.uid == uid
@@ -114,11 +142,15 @@ service cloud.firestore {
         // tests here use) simply omits the field rather than sending a value.
         && (!('createdAt' in request.resource.data)
             || request.resource.data.createdAt == request.time);
-      allow delete: if isSignedIn() && request.auth.uid == uid;
+      // The claimer deletes the originals once it has copied them, so the dead
+      // guest uid is not left holding a second copy of the customer's taste.
+      allow delete: if isSignedIn() && (request.auth.uid == uid || hasClaimOn(uid));
     }
 
     match /users/{uid}/ratings/{comboId} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isFriendOf(uid));
+      // Same claim-based read as favorites above, for the same reason.
+      allow read: if isSignedIn()
+        && (request.auth.uid == uid || isFriendOf(uid) || hasClaimOn(uid));
       allow create, update: if isSignedIn() && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['comboId', 'label', 'score', 'ratedAt'])
         && request.resource.data.label is string
@@ -133,7 +165,7 @@ service cloud.firestore {
         // always sends it, but nothing here requires a caller to.
         && (!('ratedAt' in request.resource.data)
             || request.resource.data.ratedAt == request.time);
-      allow delete: if isSignedIn() && request.auth.uid == uid;
+      allow delete: if isSignedIn() && (request.auth.uid == uid || hasClaimOn(uid));
     }
 
     match /orders/{orderId} {
@@ -169,7 +201,36 @@ service cloud.firestore {
             // Optional in the same way acceptedAt is on friendships: an update
             // that changes only `rating` must stay legal.
             && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratedAt'])
-                || request.resource.data.ratedAt == request.time));
+                || request.resource.data.ratedAt == request.time))
+        // Claiming: the one path by which an order changes hands, for the
+        // customer who ordered as a guest and then signed in to an account
+        // that already existed. Firebase cannot merge two accounts, so the
+        // new session has a different uid and everything the guest created is
+        // stranded under the dead one.
+        //
+        // What makes this safe is hasClaimOn(): possession of a secret held
+        // only on the guest's own device, never readable from Firestore. Drop
+        // it and this rule reads "any signed-in user may rewrite any order's
+        // owner", which is order theft by guessing a document id.
+        //
+        // The two diffs are what keep it to ownership and nothing else: the
+        // outer one pins every other top-level field (status and total stay
+        // unreachable, exactly as on the rating branch above), the inner one
+        // pins name, id and table inside customerInfo - the bar's own record
+        // of who was at which table.
+        //
+        // .get() defaults throughout rather than bare accesses, because orders
+        // written by the pre-uid bundle have a customerInfo with no uid in it
+        // and a bare access raises there instead of evaluating - the same trap
+        // ownsOrder() documents. hasClaimOn() is last so its document read only
+        // happens once the free checks have passed.
+        || (isSignedIn()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerInfo'])
+            && request.resource.data.get('customerInfo', {})
+                 .diff(resource.data.get('customerInfo', {}))
+                 .affectedKeys().hasOnly(['uid'])
+            && request.resource.data.get('customerInfo', {}).get('uid', '') == request.auth.uid
+            && hasClaimOn(resource.data.get('customerInfo', {}).get('uid', '')));
     }
 
     match /menu/{document}             { allow read: if true; allow write: if isAdmin(); }
@@ -199,6 +260,69 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(
              ['type','title','message','isRead','orderId','createdAt']));
       allow read, update, delete: if isAdmin();
+    }
+
+    // A guest's proof of ownership over what it created before signing in.
+    //
+    // The device generates a random secret S and keeps it in localStorage;
+    // only sha256(S) is ever sent here. Presenting S back is what proves this
+    // is the same device, and that is the entire basis on which an order is
+    // allowed to change hands - see the claim branch on /orders above.
+    //
+    // NOTHING CAN READ THIS COLLECTION. get() inside a rule bypasses client
+    // read permission, so every check that needs the document still works,
+    // but a client that could read one would harvest the secret and the whole
+    // scheme degrades to "any signed-in user may take any order".
+    match /accountClaims/{anonUid} {
+      allow get, list: if false;
+
+      // Your own uid only. Planting a claim over a uid you do not hold is
+      // precisely how you would steal that person's orders.
+      allow create: if isSignedIn()
+        && anonUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['secretHash', 'createdAt'])
+        && request.resource.data.secretHash is string
+        // Exactly a lower-case sha256 digest. The update rule compares against
+        // hashing.sha256(...).toHexString().lower(), so an upper-case or
+        // malformed value stored here is a claim nobody can ever take - and,
+        // unbounded, this is the same 700KB-string hole label had on favorites.
+        && request.resource.data.secretHash.size() == 64
+        && request.resource.data.secretHash.matches('^[0-9a-f]+$')
+        // Required rather than optional-if-present as elsewhere in this file:
+        // this collection is new, so there is no older writer to tolerate.
+        // `in` rather than a bare access, which raises on a missing field.
+        && 'createdAt' in request.resource.data
+        && request.resource.data.createdAt == request.time;
+
+      // Taking the claim: the caller supplies S, the rule recomputes the
+      // digest, and only a match names them as the owner.
+      //
+      // Single use - claimedBy must be unset going in. Without that, a secret
+      // that ever leaked would be a permanent skeleton key: whoever holds it
+      // could displace each successive owner of those orders in turn.
+      //
+      // .get() defaults rather than bare accesses so a malformed attempt
+      // (claimedBy with no secret, a non-string secret) denies by evaluating
+      // instead of raising, matching isAdmin() and ownsOrder().
+      allow update: if isSignedIn()
+        && resource.data.get('claimedBy', '') == ''
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['claimedBy', 'secret'])
+        && request.resource.data.get('claimedBy', '') == request.auth.uid
+        && request.resource.data.get('secret', '') is string
+        && request.resource.data.get('secret', '').size() <= 200
+        && hashing.sha256(request.resource.data.get('secret', '')).toHexString().lower()
+             == resource.data.get('secretHash', '');
+
+      // Only the account that took it, so a finished migration can tidy up
+      // after itself and nobody can delete a claim out from under one that is
+      // still running. An untaken claim is deletable by no one, including the
+      // guest that created it - which is deliberate: create allows exactly one
+      // per uid, so a delete would be a way to rotate the secret, and a
+      // rotatable claim is one an attacker with momentary device access can
+      // repoint at themselves.
+      allow delete: if isSignedIn()
+        && resource.data.get('claimedBy', '') == request.auth.uid;
     }
 
     // Legacy bcrypt admin store. Sealed; removed once Task 11 lands.
