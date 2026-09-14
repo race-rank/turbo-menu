@@ -38,6 +38,9 @@ export interface MenuData {
   tobaccoTypes: DatabaseTobaccoType[];
   flavors: DatabaseFlavor[];
   recommendedMixes: DatabaseRecommendedMix[];
+  // Optional: a snapshot published before this shipped carries no such key, and
+  // that must read as "nothing featured" rather than as an error.
+  hookahOfTheDay?: FeaturedHookah;
 }
 
 // Hookah operations
@@ -202,13 +205,14 @@ export const getRecommendedMixes = async (): Promise<DatabaseRecommendedMix[]> =
 // Menu snapshot (single-document read path for guests)
 
 const fetchMenuCollections = async (): Promise<MenuData> => {
-  const [hookahs, tobaccoTypes, flavors, recommendedMixes] = await Promise.all([
+  const [hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay] = await Promise.all([
     getHookahs(),
     getTobaccoTypes(),
     getFlavors(),
-    getRecommendedMixes()
+    getRecommendedMixes(),
+    getFeaturedHookah()
   ]);
-  return { hookahs, tobaccoTypes, flavors, recommendedMixes };
+  return { hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay };
 };
 
 const reviveMenuItems = <T,>(items: unknown): T[] =>
@@ -247,7 +251,10 @@ export const getMenuData = async (): Promise<MenuData> => {
         hookahs: reviveMenuItems<DatabaseHookah>(data.hookahs),
         tobaccoTypes: reviveMenuItems<DatabaseTobaccoType>(data.tobaccoTypes),
         flavors: reviveMenuItems<DatabaseFlavor>(data.flavors),
-        recommendedMixes: reviveMenuItems<DatabaseRecommendedMix>(data.recommendedMixes)
+        recommendedMixes: reviveMenuItems<DatabaseRecommendedMix>(data.recommendedMixes),
+        // Not run through reviveMenuItems: it is a single object with no
+        // timestamps, not a list of menu items.
+        hookahOfTheDay: data.hookahOfTheDay ?? undefined
       };
     }
   } catch (error) {
