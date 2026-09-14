@@ -25,7 +25,7 @@ export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
 npm test
 ```
 
-Baseline before you start: **178 passed, 0 failed** across 6 files (socialRules 105, reorderService 17, rules 30, comboId 15, orderItem 9, orderService 2). `PERMISSION_DENIED` lines on stderr are expected — those tests assert that denials happen.
+Baseline before you start: **151 passed, 0 failed** across 6 files (socialRules 78, reorderService 17, rules 30, comboId 15, orderItem 9, orderService 2). `PERMISSION_DENIED` lines on stderr are expected — those tests assert that denials happen.
 
 **`npx tsc --noEmit -p tsconfig.app.json` reports exactly 4 pre-existing errors**, all in `src/services/firebaseService.ts`. That is the accepted baseline; add none.
 
@@ -227,7 +227,7 @@ npm test
 npx tsc --noEmit -p tsconfig.app.json
 ```
 
-Expected: 185 passed, 0 failed across 7 files (the 178 baseline plus this file's 7). `tsc`: the same 4 pre-existing `firebaseService.ts` errors, nothing new.
+Expected: 158 passed, 0 failed across 7 files (the 151 baseline plus this file's 7). `tsc`: the same 4 pre-existing `firebaseService.ts` errors, nothing new.
 
 - [ ] **Step 7: Commit**
 
@@ -673,7 +673,7 @@ npm run build
 npm test
 ```
 
-Expected: 4 pre-existing errors only; build succeeds; 185 passed, 0 failed.
+Expected: 4 pre-existing errors only; build succeeds; 158 passed, 0 failed.
 
 - [ ] **Step 8: Commit**
 
@@ -888,7 +888,7 @@ npm run build
 npm test
 ```
 
-Expected: 4 pre-existing errors only; build succeeds; 185 passed, 0 failed.
+Expected: 4 pre-existing errors only; build succeeds; 158 passed, 0 failed.
 
 - [ ] **Step 7: Commit**
 
@@ -912,7 +912,7 @@ npx tsc --noEmit -p tsconfig.app.json
 npm run build
 ```
 
-Expected: **185 passed, 0 failed** across 7 files (hookahOfTheDay 7, socialRules 105, reorderService 17, rules 30, comboId 15, orderItem 9, orderService 2); exactly 4 `tsc` errors, all in `src/services/firebaseService.ts`; build succeeds.
+Expected: **158 passed, 0 failed** across 7 files (hookahOfTheDay 7, socialRules 78, reorderService 17, rules 30, comboId 15, orderItem 9, orderService 2); exactly 4 `tsc` errors, all in `src/services/firebaseService.ts`; build succeeds.
 
 - [ ] **Step 2: Confirm the blast radius**
 
