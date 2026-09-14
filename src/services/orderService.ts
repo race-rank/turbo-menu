@@ -28,6 +28,12 @@ export interface OrderDetails {
   };
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'completed';
   createdAt?: Date;
+  // Written by ratingsService.rateOrder. Declared here so the compiler checks
+  // the field name instead of MyOrders casting its way to it.
+  rating?: number;
+  // Left as the raw Firestore Timestamp: unlike createdAt nothing converts it,
+  // because no screen renders it. Use safeConvertTimestamp before display.
+  ratedAt?: unknown;
 }
 
 export const submitOrder = async (orderData: Omit<OrderDetails, 'orderId' | 'status'>): Promise<OrderDetails> => {

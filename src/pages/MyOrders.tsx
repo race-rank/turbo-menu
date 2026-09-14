@@ -29,25 +29,34 @@ const MyOrders: React.FC = () => {
       .finally(() => setBusy(false));
   }, [user, loading]);
 
+  // The security rules allow exactly one `rating` per order document, so an
+  // order with two hookahs on it files its score under the first item's combo.
+  // The control names that combo rather than saying "rate this order", so a
+  // customer can see which hookah they are actually scoring.
+  const ratedItem = (order: OrderDetails) => order.items?.[0];
+  const ratedLabel = (order: OrderDetails) => {
+    const item = ratedItem(order);
+    return item?.comboLabel ?? item?.name ?? 'Your order';
+  };
+
   const handleRate = async (order: OrderDetails, score: number) => {
     if (!user) return;
-    const firstItem = order.items?.[0] as { comboId?: string; name?: string } | undefined;
-    if (!firstItem?.comboId) return;
+    const item = ratedItem(order);
+    if (!item?.comboId) return;
 
     setSaving(order.orderId);
-    const previous = scores[order.orderId];
     setScores((current) => ({ ...current, [order.orderId]: score }));
     try {
-      await rateOrder(
-        user.uid,
-        order.orderId,
-        firstItem.comboId,
-        firstItem.name ?? 'Your order',
-        score,
-      );
+      await rateOrder(user.uid, order.orderId, item.comboId, ratedLabel(order), score);
       toast({ title: 'Thanks for rating' });
     } catch (error) {
-      setScores((current) => ({ ...current, [order.orderId]: previous ?? 0 }));
+      // Drop the optimistic key rather than writing a 0. A 0 would win over
+      // order.rating in the ?? chain below and show an order that IS rated 4
+      // server-side as unrated until a reload.
+      setScores((current) => {
+        const { [order.orderId]: _discarded, ...rest } = current;
+        return rest;
+      });
       toast({
         title: 'Could not save your rating',
         description: String(error),
@@ -109,20 +118,15 @@ const MyOrders: React.FC = () => {
                   {order.items.map((item) => item.name).join(', ')}
                 </p>
                 <p className="text-lg font-bold text-amber-400">{order.total} Lei</p>
-                {(order.items?.[0] as { comboId?: string } | undefined)?.comboId && (
+                {ratedItem(order)?.comboId && (
                   <div className="mt-3 border-t border-border pt-3">
-                    <p className="mb-2 text-xs uppercase text-turbo-muted">
-                      {scores[order.orderId] ?? (order as { rating?: number }).rating
-                        ? 'Your rating'
-                        : 'Rate this'}
+                    <p className="mb-1 text-xs uppercase text-turbo-muted">
+                      {(scores[order.orderId] ?? order.rating) ? 'Your rating' : 'Rate this'}
                     </p>
+                    <p className="mb-2 text-sm">{ratedLabel(order)}</p>
                     <StarRating
                       size="sm"
-                      value={
-                        scores[order.orderId]
-                        ?? (order as { rating?: number }).rating
-                        ?? 0
-                      }
+                      value={scores[order.orderId] ?? order.rating ?? 0}
                       disabled={saving === order.orderId}
                       onChange={(score) => handleRate(order, score)}
                     />

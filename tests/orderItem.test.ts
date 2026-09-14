@@ -85,3 +85,38 @@ test('combo identity did not smuggle the image back in', () => {
   const dbItem = convertCartItemToDbItem({ ...cartItem, comboId: 'mix:abc123' });
   expect(Object.keys(dbItem)).not.toContain('image');
 });
+
+test('the persisted order item carries the canonical combo label', () => {
+  const dbItem = convertCartItemToDbItem({
+    ...cartItem,
+    // What the custom path actually puts in `name` - the same literal for
+    // every custom build, which is why the rating needs its own label.
+    name: 'Custom Mix',
+    comboLabel: 'Khalil Mamoon · Mint, Lemon',
+  });
+
+  expect(dbItem.comboLabel).toBe('Khalil Mamoon · Mint, Lemon');
+});
+
+test('a mix combo label excludes the tobacco category', () => {
+  const dbItem = convertCartItemToDbItem({
+    ...cartItem,
+    type: 'mix',
+    // The order item name carries the category ordered; the combo id and the
+    // favourite deliberately do not, so the label must not either.
+    name: 'Sunset Blend (Virginia)',
+    comboId: 'mix:abc123',
+    mixId: 'abc123',
+    comboLabel: 'Sunset Blend',
+  });
+
+  expect(dbItem.comboLabel).toBe('Sunset Blend');
+});
+
+test('an order item with no combo label carries no such key', () => {
+  // Firestore rejects undefined; cleanObject strips it, but the key must not
+  // be invented for legacy-shaped cart items either.
+  const dbItem = convertCartItemToDbItem(cartItem);
+
+  expect(dbItem.comboLabel).toBeUndefined();
+});

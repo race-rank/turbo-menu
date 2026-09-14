@@ -18,6 +18,7 @@ export const convertCartItemToDbItem = (item: CartItem): DatabaseOrderItem => ({
   price: item.price,
   quantity: item.quantity,
   comboId: item.comboId,
+  comboLabel: item.comboLabel,
   mixId: item.mixId,
   hookahId: item.hookahId,
   flavorIds: item.flavorIds,

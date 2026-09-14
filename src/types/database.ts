@@ -28,6 +28,10 @@ export interface DatabaseOrderItem {
   // Optional because orders written before this shipped have none - those are
   // not rateable and the UI hides the control rather than erroring.
   comboId?: string;
+  // Label the rating on this order is filed under, so it always matches the
+  // favourite for the same comboId. Optional for the same reason comboId is:
+  // orders written before this shipped have neither, and are not rateable.
+  comboLabel?: string;
   mixId?: string;
   hookahId?: string;
   flavorIds?: string[];

@@ -261,6 +261,10 @@ const Index = () => {
       price: mix.price,
       image: mix.mainImage,
       comboId: comboIdForMix(mix.id),
+      // Without the category, matching the favourite for this same comboId.
+      // `name` carries it; the combo id deliberately does not, so filing a
+      // rating under `name` would rewrite the label on every re-order.
+      comboLabel: mix.name,
       mixId: mix.id,
       tobaccoType: category,
       table: tableId
@@ -503,6 +507,10 @@ const Index = () => {
       price: totalPrice,
       image: selectedHookahData.image,
       comboId: comboIdForCustom(selectedHookahData.id, finalTobaccoType, flavorIds),
+      // `name` is the literal 'Custom Mix' for every build, so the rating needs
+      // its own label. Same expression as the favourite below, so the two
+      // always agree for one comboId.
+      comboLabel: `${selectedHookahData.name} · ${selectedFlavorNames.join(', ')}`,
       hookahId: selectedHookahData.id,
       flavorIds,
       hookah: selectedHookahData.name,
