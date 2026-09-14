@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
-import { StarRating } from '@/components/StarRating';
+import { FavoritesList, RatingsList } from '@/components/ComboLists';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthForms } from '@/components/auth/AuthForms';
 import { logout, updateDisplayName } from '@/services/authService';
@@ -38,10 +38,21 @@ const Account: React.FC = () => {
       .then(setSummary)
       .catch(() => setSummary(null))
       .finally(() => setLoadingSummary(false));
-    Promise.all([listFavorites(user.uid), listRatings(user.uid)])
-      .then(([f, r]) => { setFavorites(f); setRatings(r); })
-      .catch(() => { setFavorites([]); setRatings([]); });
+    listRatings(user.uid)
+      .then(setRatings)
+      .catch(() => setRatings([]));
   }, [signedIn, user]);
+
+  // Split from the effect above: favourites work for anonymous guests too
+  // (the rules permit writes to their own users/{uid}/favorites, and the uid
+  // survives a later linkWithCredential upgrade), so this list has to load
+  // whether or not the customer has a real account.
+  useEffect(() => {
+    if (!user) return;
+    listFavorites(user.uid)
+      .then(setFavorites)
+      .catch(() => setFavorites([]));
+  }, [user]);
 
   const saveName = async () => {
     const trimmed = name.trim();
@@ -146,36 +157,17 @@ const Account: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card className="bg-turbo-card border-border">
-              <CardContent className="p-4">
-                <h2 className="mb-3 text-sm font-bold uppercase text-turbo-muted">
-                  Favourites ({favorites.length})
-                </h2>
-                {favorites.length === 0 && (
-                  <p className="text-sm text-turbo-muted">Tap the heart on a mix to save it.</p>
-                )}
-                {favorites.map((favorite) => (
-                  <p key={favorite.comboId} className="py-1 text-sm">{favorite.label}</p>
-                ))}
-              </CardContent>
-            </Card>
+            <FavoritesList
+              favorites={favorites}
+              heading="Favourites"
+              emptyText="Tap the heart on a mix to save it."
+            />
 
-            <Card className="bg-turbo-card border-border">
-              <CardContent className="p-4">
-                <h2 className="mb-3 text-sm font-bold uppercase text-turbo-muted">
-                  Your ratings ({ratings.length})
-                </h2>
-                {ratings.length === 0 && (
-                  <p className="text-sm text-turbo-muted">Rate an order from your history.</p>
-                )}
-                {ratings.map((rating) => (
-                  <div key={rating.comboId} className="flex items-center justify-between py-1">
-                    <span className="flex-1 truncate text-sm">{rating.label}</span>
-                    <StarRating value={rating.score} size="sm" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+            <RatingsList
+              ratings={ratings}
+              heading="Your ratings"
+              emptyText="Rate an order from your history."
+            />
 
             <Button className="w-full" onClick={() => navigate('/my-orders')}>
               My orders
@@ -195,16 +187,34 @@ const Account: React.FC = () => {
             </Button>
           </div>
         ) : (
-          <Card className="w-full max-w-md mx-auto bg-turbo-card border-border">
-            <CardContent className="p-8">
-              <h2 className="text-2xl font-bold mb-2 text-center">Create your account</h2>
-              <p className="text-sm text-turbo-muted mb-6 text-center">
-                Keep your order history and get offers. Orders you already placed on this
-                device come with you.
-              </p>
-              <AuthForms onDone={() => navigate('/my-orders')} />
-            </CardContent>
-          </Card>
+          <div className="w-full max-w-md mx-auto space-y-4">
+            {/* Favourites genuinely work for an anonymous guest - the rules
+                let them write their own users/{uid}/favorites, and the uid
+                survives a later linkWithCredential sign-up - so this is a
+                real list, not a teaser for a feature they can't use yet. */}
+            {user && (
+              <FavoritesList
+                favorites={favorites}
+                heading="Favourites"
+                emptyText="Tap the heart on a mix to save it."
+                footer={
+                  <p className="mt-3 border-t border-border pt-3 text-xs text-turbo-muted">
+                    Sign up to keep these on any device.
+                  </p>
+                }
+              />
+            )}
+            <Card className="bg-turbo-card border-border">
+              <CardContent className="p-8">
+                <h2 className="text-2xl font-bold mb-2 text-center">Create your account</h2>
+                <p className="text-sm text-turbo-muted mb-6 text-center">
+                  Keep your order history and get offers. Orders you already placed on this
+                  device come with you.
+                </p>
+                <AuthForms onDone={() => navigate('/my-orders')} />
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </div>

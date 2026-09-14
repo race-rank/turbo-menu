@@ -39,15 +39,16 @@ export const StarRating: React.FC<StarRatingProps> = ({
   }
 
   return (
-    <div className="flex gap-1">
+    <div className="flex gap-1" role="radiogroup" aria-label="Rating">
       {scores.map((score) => (
         <button
           key={score}
           type="button"
+          role="radio"
           disabled={disabled}
           onClick={() => onChange(score)}
           aria-label={`Rate ${score} out of 5`}
-          aria-pressed={score === value}
+          aria-checked={score === value}
           className="disabled:opacity-50"
         >
           <Star

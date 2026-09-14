@@ -225,23 +225,34 @@ const Index = () => {
   const toggleMixFavorite = async (mix: DatabaseRecommendedMix) => {
     if (!user) return;
     const comboId = comboIdForMix(mix.id);
-    const next = new Set(favoriteIds);
+    const wasFavorite = favoriteIds.has(comboId);
+
+    // Functional updates throughout, including the rollback below: two
+    // hearts tapped inside the same render frame each start from their own
+    // stale `favoriteIds` closure, so composing onto `prev` (rather than
+    // this render's snapshot) is what lets both toggles survive together.
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (wasFavorite) next.delete(comboId); else next.add(comboId);
+      return next;
+    });
 
     try {
-      if (favoriteIds.has(comboId)) {
-        next.delete(comboId);
-        setFavoriteIds(next);
+      if (wasFavorite) {
         await removeFavorite(user.uid, comboId);
       } else {
-        next.add(comboId);
-        setFavoriteIds(next);
         await addFavorite(user.uid, {
           comboId, label: mix.name, kind: 'mix', mixId: mix.id,
         });
       }
     } catch (error) {
-      // Put the optimistic change back.
-      setFavoriteIds(new Set(favoriteIds));
+      // Put the optimistic change back, without clobbering any other
+      // concurrent toggle that has landed in the meantime.
+      setFavoriteIds((prev) => {
+        const next = new Set(prev);
+        if (wasFavorite) next.add(comboId); else next.delete(comboId);
+        return next;
+      });
       toast({ title: 'Could not update favourites', variant: 'destructive' });
     }
   };
@@ -1135,7 +1146,12 @@ const Index = () => {
         </DialogContent>
       </Dialog>
       {user && lastBuild && (
-        <div className="fixed bottom-24 left-0 right-0 z-40 px-4">
+        // OrderStatusTracker pins a card stack to bottom-0 at z-50 (a single
+        // collapsed order card runs ~106px plus its own 16px bottom padding,
+        // taller once expanded or with more than one live order); bottom-36
+        // clears that, and z-[60] - already OrderPlacedOverlay's convention
+        // for "above the tracker" - is the backstop for when it doesn't.
+        <div className="fixed bottom-36 left-0 right-0 z-[60] px-4">
           <Card className="bg-turbo-card border-primary">
             <CardContent className="flex items-center gap-3 p-4">
               <p className="flex-1 text-sm">Save this combo to your favourites?</p>

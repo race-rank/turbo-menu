@@ -18,8 +18,10 @@ export const FavoriteButton: React.FC<FavoriteButtonProps> = ({
     aria-pressed={isFavorite}
     aria-label={isFavorite ? `Remove ${label} from favourites` : `Add ${label} to favourites`}
     onClick={(event) => {
-      // Mix cards are themselves tappable - without this, favouriting also
-      // opens the order dialog.
+      // The mix Card has no onClick today, so this has nothing to guard
+      // against right now - but it sits on top of one inside a Carousel
+      // slide, and stopPropagation is cheap insurance against whatever the
+      // card or slide picks up next.
       event.stopPropagation();
       onToggle();
     }}
