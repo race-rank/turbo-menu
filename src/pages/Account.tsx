@@ -7,16 +7,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
 import { FavoritesList, RatingsList } from '@/components/ComboLists';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
 import { AuthForms } from '@/components/auth/AuthForms';
 import { logout, updateDisplayName } from '@/services/authService';
 import { getAccountSummary, upsertUserProfile, type AccountSummary } from '@/services/userService';
 import { listFavorites, type FavoriteCombo } from '@/services/favoritesService';
 import { listRatings, type ComboRating } from '@/services/ratingsService';
+import { getMenuData } from '@/services/menuService';
+import { resolveReorder, type MenuSnapshot } from '@/services/reorderService';
+import { isValidTableId, TURBO_TABLE_STORAGE_KEY } from '@/services/tableValidation';
 import { toast } from '@/hooks/use-toast';
 
 const Account: React.FC = () => {
   const { user, isAnonymous, loading } = useAuth();
   const navigate = useNavigate();
+  const { addItem } = useCart();
 
   const signedIn = !!user && !isAnonymous;
 
@@ -24,6 +29,11 @@ const Account: React.FC = () => {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [favorites, setFavorites] = useState<FavoriteCombo[]>([]);
   const [ratings, setRatings] = useState<ComboRating[]>([]);
+  // Loaded once, unconditionally: re-ordering a favourite needs the live
+  // menu to resolve and re-price against (see reorderService.ts), and
+  // favourites render for a signed-out guest too, so this can't wait on
+  // `signedIn`.
+  const [menu, setMenu] = useState<MenuSnapshot | null>(null);
   // Mirrored locally because updateProfile mutates the User in place without
   // firing an auth-state event, so the context value never changes identity.
   const [name, setName] = useState('');
@@ -53,6 +63,52 @@ const Account: React.FC = () => {
       .then(setFavorites)
       .catch(() => setFavorites([]));
   }, [user]);
+
+  // Same call Index.tsx makes to build its own builder - a menu snapshot,
+  // not a Firestore listener, since re-order only needs a menu to resolve
+  // against, not to stay live-updated while this page is open.
+  useEffect(() => {
+    getMenuData()
+      .then(setMenu)
+      .catch(() => setMenu(null));
+  }, []);
+
+  const handleReorder = (favorite: FavoriteCombo) => {
+    const tableId = localStorage.getItem(TURBO_TABLE_STORAGE_KEY);
+    if (!isValidTableId(tableId)) {
+      toast({
+        title: 'No table selected',
+        description: "Please scan your table's QR code to place an order.",
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!menu) {
+      toast({
+        title: 'Menu still loading',
+        description: 'Please try again in a moment.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const resolution = resolveReorder(favorite, menu, tableId);
+    if (resolution.status === 'unavailable') {
+      // Names what is gone rather than silently dropping it from the build -
+      // see reorderService.ts.
+      toast({
+        title: 'No longer available',
+        description: `${resolution.missing.join(', ')} ${resolution.missing.length > 1 ? 'are' : 'is'} no longer on the menu.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    addItem(resolution.item);
+    toast({ title: 'Added to cart', description: `${favorite.label} is back in your cart.` });
+    navigate('/cart');
+  };
 
   const saveName = async () => {
     const trimmed = name.trim();
@@ -161,6 +217,7 @@ const Account: React.FC = () => {
               favorites={favorites}
               heading="Favourites"
               emptyText="Tap the heart on a mix to save it."
+              onReorder={handleReorder}
             />
 
             <RatingsList
@@ -197,6 +254,7 @@ const Account: React.FC = () => {
                 favorites={favorites}
                 heading="Favourites"
                 emptyText="Tap the heart on a mix to save it."
+                onReorder={handleReorder}
                 footer={
                   <p className="mt-3 border-t border-border pt-3 text-xs text-turbo-muted">
                     Sign up to keep these on any device.

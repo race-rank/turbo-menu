@@ -25,15 +25,8 @@ import { FavoriteButton } from '@/components/FavoriteButton';
 import { addFavorite, listFavorites, removeFavorite } from '@/services/favoritesService';
 import type { FavoriteCombo } from '@/services/favoritesService';
 import { useAuth } from '@/contexts/AuthContext';
-
-const ADDONS = [
-  { key: 'hasLED' as const, label: 'LED Hookah', price: 30, image: '/img/led.webp' },
-  { key: 'hasColoredWater' as const, label: 'Colored Water', price: 10, image: '/img/colorant.webp' },
-  { key: 'hasAlcohol' as const, label: 'Alcohol in Vase', price: 40, image: '/img/alcool.webp' },
-  { key: 'hasFruits' as const, label: 'Fruits in Vase', price: 20, image: '/img/fruits.webp' },
-] as const;
-
-const ADDON_PRICES = Object.fromEntries(ADDONS.map(a => [a.key, a.price])) as Record<typeof ADDONS[number]['key'], number>;
+import { ADDONS, ADDON_PRICES } from '@/services/addons';
+import { isValidTableId } from '@/services/tableValidation';
 
 const MixSkeletons = () => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -202,9 +195,6 @@ const Index = () => {
       });
     }
   };
-
-  const isValidTableId = (tableId: string | null): boolean =>
-    !!tableId && (tableId.includes('table-') || tableId.includes('bar'));
 
   const addMixToCart = (mixId: string) => {
     const tableId = localStorage.getItem('turbo-table');
@@ -500,10 +490,32 @@ const Index = () => {
     // bare id for single-compatibility flavours and `{id}-{type}` for
     // multi-compatibility ones. That shape flips when an admin edits a
     // flavour's compatible types, which would orphan favourites keyed on it.
+    // Built alongside flavorIds so flavorPercentages can be re-keyed the same
+    // way below - see the favourite's flavorPercentages comment.
+    const flavorIdByVariantId: Record<string, string> = {};
     const flavorIds = selectedFlavors
       .map(variantId => currentFlavors.find(f => f.variantId === variantId))
       .filter((f): f is NonNullable<typeof f> => Boolean(f))
-      .map(f => `${f.id}:${f.variantType ?? finalTobaccoType}`);
+      .map(f => {
+        const flavorId = `${f.id}:${f.variantType ?? finalTobaccoType}`;
+        flavorIdByVariantId[f.variantId] = flavorId;
+        return flavorId;
+      });
+
+    // The favourite's flavorPercentages must be keyed the same way as its
+    // flavorIds ({flavorDocId}:{variantType}), not the UI's variantId - that
+    // shape flips whenever an admin edits a flavour's compatible tobacco
+    // types (comboId.ts:32-38), which would silently orphan a saved
+    // percentage split on re-order. The cart item below keeps the UI-keyed
+    // flavorPercentages; only the favourite needs the stable key.
+    const favoriteFlavorPercentages = selectedFlavors.length >= 2
+      ? Object.fromEntries(
+          Object.entries(flavorPercentages).map(([variantId, pct]) => [
+            flavorIdByVariantId[variantId] ?? variantId,
+            pct,
+          ]),
+        )
+      : undefined;
 
     let totalPrice = selectedHookahData.price || 0;
     if (selectedAddons.hasLED) totalPrice += ADDON_PRICES.hasLED;
@@ -546,7 +558,7 @@ const Index = () => {
       tobaccoType: finalTobaccoType,
       flavorIds,
       tobaccoStrength,
-      flavorPercentages: selectedFlavors.length >= 2 ? flavorPercentages : undefined,
+      flavorPercentages: favoriteFlavorPercentages,
       withIce,
       hasLED: selectedAddons.hasLED,
       hasColoredWater: selectedAddons.hasColoredWater,
