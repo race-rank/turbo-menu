@@ -23,6 +23,7 @@ const Statistics = lazy(() => import("./pages/Statistics"));
 const Account = lazy(() => import("./pages/Account"));
 const MyOrders = lazy(() => import("./pages/MyOrders"));
 const Friends = lazy(() => import("./pages/Friends"));
+const FriendProfile = lazy(() => import("./pages/FriendProfile"));
 
 const queryClient = new QueryClient();
 
@@ -75,6 +76,7 @@ const App = () => {
                       <Route path="/account" element={<Account />} />
                       <Route path="/my-orders" element={<MyOrders />} />
                       <Route path="/friends" element={<Friends />} />
+                      <Route path="/friends/:uid" element={<FriendProfile />} />
                       <Route path="*" element={<Index />} />
                     </Routes>
                   </Suspense>
