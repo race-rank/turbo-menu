@@ -14,7 +14,8 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
-import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
+import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix, FeaturedHookah } from '@/types/database';
+import { MAX_PROMO_TEXT_LENGTH } from './hookahOfTheDay';
 import { safeConvertTimestamp, cleanObject } from './firebaseService';
 
 const MENU_COLLECTIONS = {
@@ -28,6 +29,9 @@ const MENU_COLLECTIONS = {
 // document instead of running four queries on a cold Firestore connection.
 const MENU_SNAPSHOT_COLLECTION = 'menu';
 const MENU_SNAPSHOT_ID = 'current';
+// Sibling of the snapshot under the same collection, so it inherits
+// `match /menu/{document}` - public read, admin write - with no rules change.
+const FEATURED_HOOKAH_ID = 'featured';
 
 export interface MenuData {
   hookahs: DatabaseHookah[];
@@ -422,4 +426,48 @@ export const subscribeToMenuData = (
     unsubscribeFlavors();
     unsubscribeMixes();
   };
+};
+
+// ------------------------------------------------- hookah of the day
+
+/**
+ * Read the promotion pointer. Returns undefined when nothing is featured,
+ * which is the normal resting state, not an error.
+ *
+ * Field-by-field rather than a spread: this document is admin-written and
+ * therefore trusted, but a stray field would otherwise ride into the public
+ * snapshot that every customer downloads.
+ */
+export const getFeaturedHookah = async (): Promise<FeaturedHookah | undefined> => {
+  const snapshot = await getDoc(doc(firestore, MENU_SNAPSHOT_COLLECTION, FEATURED_HOOKAH_ID));
+  if (!snapshot.exists()) return undefined;
+
+  const data = snapshot.data();
+  if (typeof data.hookahId !== 'string' || !data.hookahId) return undefined;
+
+  return {
+    hookahId: data.hookahId,
+    promoText: typeof data.promoText === 'string' ? data.promoText : undefined,
+  };
+};
+
+/**
+ * Point the promotion at a hookah. setDoc rather than updateDoc so clearing the
+ * promo line actually removes it instead of leaving the previous one behind.
+ *
+ * Callers must republish the menu snapshot afterwards, or guests keep seeing
+ * the previous promotion - the same contract every other mutation in this file
+ * has.
+ */
+export const setFeaturedHookah = async (hookahId: string, promoText?: string): Promise<void> => {
+  const trimmed = promoText?.trim();
+  await setDoc(doc(firestore, MENU_SNAPSHOT_COLLECTION, FEATURED_HOOKAH_ID), stripUndefined({
+    hookahId,
+    promoText: trimmed ? trimmed.slice(0, MAX_PROMO_TEXT_LENGTH) : undefined,
+  }));
+};
+
+/** Ends the promotion. Deleting is the whole of it - there is no "off" state. */
+export const clearFeaturedHookah = async (): Promise<void> => {
+  await deleteDoc(doc(firestore, MENU_SNAPSHOT_COLLECTION, FEATURED_HOOKAH_ID));
 };
