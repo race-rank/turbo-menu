@@ -227,6 +227,26 @@ const normalizeSearchEmail = (email: string) => email.trim().toLowerCase();
  * so an interrupted opt-out never leaves someone findable while their settings
  * claim otherwise. The document's existence is what actually determines
  * findability; the boolean is a UI mirror.
+ *
+ * The delete is deliberately NOT swallowed: if the lookup document cannot be
+ * removed, this throws and discoverableByEmail is left exactly as it was.
+ * Flipping the flag to false anyway would tell the customer they are hidden
+ * while a live lookup row still resolves their email to their uid - worse
+ * than surfacing the error and letting them retry. Friends.tsx already
+ * catches this and shows a toast.
+ *
+ * The opt-in write is a plain setDoc, not merge, and the rule for
+ * `discoverable` allows both create and update of your own hash - so a
+ * repeat opt-in (a retry, a double-tap, or turning it on again right after
+ * turning it off) lands on an existing document and stays legal instead of
+ * a bare permission-denied.
+ *
+ * One case this cannot fix: if the email on the account changed since the
+ * lookup document was written, this hashes the NEW address and the delete
+ * targets a document that was never created - there is nothing here to
+ * remove for the OLD one, and its id cannot be recomputed from the current
+ * token. That stale row is a known limitation of hashing the current
+ * address, not something this function can close.
  */
 export const setDiscoverable = async (user: User, enabled: boolean): Promise<void> => {
   if (!user.email) throw new Error('This account has no email address.');
@@ -240,7 +260,7 @@ export const setDiscoverable = async (user: User, enabled: boolean): Promise<voi
     return;
   }
 
-  await deleteDoc(lookupRef).catch(() => undefined);
+  await deleteDoc(lookupRef);
   await setDoc(userRef, { discoverableByEmail: false }, { merge: true });
 };
 

@@ -135,6 +135,17 @@ describe('profiles', () => {
       displayName: null, photoURL: 'https://lh3.googleusercontent.com/a/abc123',
     }));
   });
+
+  // updatedAt sat unconstrained next to displayName and photoURL, which ARE
+  // bounded.
+  test('a profile cannot forge updatedAt', async () => {
+    await assertFails(setDoc(doc(alice(), 'profiles', ALICE), {
+      displayName: 'Alice', photoURL: null, updatedAt: new Date('2020-01-01'),
+    }));
+    await assertSucceeds(setDoc(doc(alice(), 'profiles', ALICE), {
+      displayName: 'Alice', photoURL: null, updatedAt: serverTimestamp(),
+    }));
+  });
 });
 
 describe('friendships', () => {
@@ -260,6 +271,43 @@ describe('friendships', () => {
       acceptedAt: serverTimestamp(),
     }));
   });
+
+  // createdAt sat unconstrained next to acceptedAt, which IS pinned - a 500KB
+  // string was accepted here before this test.
+  test('a friend request cannot forge createdAt', async () => {
+    await assertFails(setDoc(doc(alice(), 'friendships', ALICE_BOB), {
+      uids: [ALICE, BOB].sort(), requestedBy: ALICE, status: 'pending',
+      createdAt: new Date('2020-01-01'),
+    }));
+    await assertFails(setDoc(doc(alice(), 'friendships', ALICE_BOB), {
+      uids: [ALICE, BOB].sort(), requestedBy: ALICE, status: 'pending',
+      createdAt: 'x'.repeat(500_000),
+    }));
+  });
+
+  // Friends need a real account: a friendship requires a profile, and
+  // anonymous guests never get one. Same reasoning as inviteCodes.
+  test('an anonymous guest cannot create a friendship', async () => {
+    const guest = testEnv.authenticatedContext('guest-uid', {
+      firebase: { sign_in_provider: 'anonymous', identities: {} },
+    }).firestore();
+    await assertFails(setDoc(doc(guest, 'friendships', pair('guest-uid', ALICE)), {
+      uids: ['guest-uid', ALICE].sort(), requestedBy: 'guest-uid', status: 'pending',
+    }));
+  });
+
+  // Otherwise a real account could target a guest uid with a request, and the
+  // guest could accept it into an unattributable friendship from the other
+  // side of the same hole.
+  test('an anonymous guest cannot accept a friendship', async () => {
+    const guest = testEnv.authenticatedContext('guest-uid', {
+      firebase: { sign_in_provider: 'anonymous', identities: {} },
+    }).firestore();
+    await seedFriendship(ALICE, 'guest-uid', 'pending', ALICE);
+    await assertFails(setDoc(doc(guest, 'friendships', pair(ALICE, 'guest-uid')), {
+      uids: [ALICE, 'guest-uid'].sort(), requestedBy: ALICE, status: 'accepted',
+    }));
+  });
 });
 
 describe('favourites and ratings', () => {
@@ -374,6 +422,60 @@ describe('favourites and ratings', () => {
       hasAlcohol: false, hasFruits: false, createdAt: serverTimestamp(),
     }));
   });
+
+  // comboId sat unconstrained next to label, which IS bounded - a friend
+  // downloading their friend's favourites/ratings list would pull down
+  // whatever size a customer's devtools cared to send.
+  test('an oversized or mistyped comboId is rejected on both collections', async () => {
+    await assertFails(setDoc(doc(alice(), `users/${ALICE}/favorites/x`), {
+      comboId: 'x'.repeat(700_000), label: 'Sunset Blend', kind: 'mix',
+    }));
+    await assertFails(setDoc(doc(alice(), `users/${ALICE}/favorites/x`), {
+      comboId: 12345, label: 'Sunset Blend', kind: 'mix',
+    }));
+    await assertFails(setDoc(doc(alice(), ratingPath(ALICE)), {
+      comboId: 'x'.repeat(700_000), label: 'Sunset Blend', score: 3,
+    }));
+    await assertFails(setDoc(doc(alice(), ratingPath(ALICE)), {
+      comboId: 12345, label: 'Sunset Blend', score: 3,
+    }));
+  });
+
+  // Same gap as comboId/label: unbounded, and re-downloaded by every friend
+  // who opens the profile.
+  test('oversized flavorIds or flavorPercentages are rejected', async () => {
+    await assertFails(setDoc(doc(alice(), `users/${ALICE}/favorites/custom:big`), {
+      comboId: 'custom:big', label: 'Big build', kind: 'custom',
+      flavorIds: Array.from({ length: 5000 }, (_, i) => `flavor-${i}`),
+    }));
+    await assertFails(setDoc(doc(alice(), `users/${ALICE}/favorites/custom:big`), {
+      comboId: 'custom:big', label: 'Big build', kind: 'custom',
+      flavorPercentages: Object.fromEntries(
+        Array.from({ length: 5000 }, (_, i) => [`flavor-${i}`, 1]),
+      ),
+    }));
+  });
+
+  // ratedAt/createdAt sat unconstrained next to the friendship's acceptedAt,
+  // which IS pinned to request.time.
+  test('a favourite cannot forge createdAt and a rating cannot forge ratedAt', async () => {
+    await assertFails(setDoc(doc(alice(), favPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', kind: 'mix',
+      createdAt: new Date('2020-01-01'),
+    }));
+    await assertSucceeds(setDoc(doc(alice(), favPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', kind: 'mix',
+      createdAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(alice(), ratingPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', score: 3,
+      ratedAt: new Date('2020-01-01'),
+    }));
+    await assertSucceeds(setDoc(doc(alice(), ratingPath(ALICE)), {
+      comboId: 'mix:sunset', label: 'Sunset Blend', score: 3,
+      ratedAt: serverTimestamp(),
+    }));
+  });
 });
 
 describe('rating an order', () => {
@@ -486,6 +588,17 @@ describe('invite codes', () => {
     await assertFails(deleteDoc(doc(bob(), 'inviteCodes', 'CODE1234')));
     await assertSucceeds(deleteDoc(doc(alice(), 'inviteCodes', 'CODE1234')));
   });
+
+  // createdAt sat unconstrained, unlike every other timestamp field this
+  // branch added.
+  test('an invite code cannot forge createdAt', async () => {
+    await assertFails(setDoc(doc(alice(), 'inviteCodes', 'NEWCODE3'), {
+      uid: ALICE, displayName: 'Alice', createdAt: new Date('2020-01-01'),
+    }));
+    await assertSucceeds(setDoc(doc(alice(), 'inviteCodes', 'NEWCODE3'), {
+      uid: ALICE, displayName: 'Alice', createdAt: serverTimestamp(),
+    }));
+  });
 });
 
 describe('email discovery', () => {
@@ -561,6 +674,46 @@ describe('email discovery', () => {
     }).firestore();
     await assertFails(setDoc(doc(guest, 'discoverable', ALICE_EMAIL_HASH), {
       uid: 'guest-uid', displayName: null,
+    }));
+  });
+
+  // The document id is deterministic (the email hash), so a repeat setDoc
+  // over a surviving document - a retry, a double-tap, or opting in again
+  // after opting out - is evaluated as an update, not a create. Without
+  // allow update this is a permission-denied with no way out.
+  test('opting in twice in a row succeeds (idempotent re-opt-in)', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'discoverable', ALICE_EMAIL_HASH), {
+      uid: ALICE, displayName: 'Alice',
+    }));
+    await assertSucceeds(setDoc(doc(alice(), 'discoverable', ALICE_EMAIL_HASH), {
+      uid: ALICE, displayName: 'Alice A',
+    }));
+  });
+
+  // The full toggle cycle a customer actually drives from the Switch: on,
+  // off, on again. Must never get stuck on the second "on".
+  test('a customer can toggle discovery off and on repeatedly', async () => {
+    await assertSucceeds(setDoc(doc(alice(), 'discoverable', ALICE_EMAIL_HASH), {
+      uid: ALICE, displayName: 'Alice',
+    }));
+    await assertSucceeds(deleteDoc(doc(alice(), 'discoverable', ALICE_EMAIL_HASH)));
+    await assertSucceeds(setDoc(doc(alice(), 'discoverable', ALICE_EMAIL_HASH), {
+      uid: ALICE, displayName: 'Alice',
+    }));
+    await assertSucceeds(deleteDoc(doc(alice(), 'discoverable', ALICE_EMAIL_HASH)));
+  });
+
+  // The update path is restricted the same way create is: the document id
+  // must be the hash of the CALLER'S OWN email, so re-writing an existing
+  // entry under someone else's hash is still refused.
+  test('a user cannot update someone else discoverable entry', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'discoverable', ALICE_EMAIL_HASH), {
+        uid: ALICE, displayName: 'Alice',
+      });
+    });
+    await assertFails(setDoc(doc(bob(), 'discoverable', ALICE_EMAIL_HASH), {
+      uid: BOB, displayName: 'Bob',
     }));
   });
 });

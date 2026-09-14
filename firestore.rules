@@ -23,6 +23,15 @@ service cloud.firestore {
       return resource.data.get('customerInfo', {}).get('uid', '') == request.auth.uid;
     }
 
+    // Anonymous guests never get a profiles document, so any write that is
+    // effectively "I have a profile" - an invite code, a friendship - must
+    // refuse them. .get() with a default rather than a bare token access,
+    // which RAISES for a provider that omits the claim entirely (this
+    // project has already been bitten by that shape of bug - see isAdmin()).
+    function isRealAccount() {
+      return request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'anonymous';
+    }
+
     // pairId is the two uids sorted ascending and joined with '_', so a rule can
     // derive the friendship document key from the two participants rather than
     // needing it passed in and then trusting it.
@@ -68,7 +77,43 @@ service cloud.firestore {
         // Bound what a friend downloads: this list is re-read on every visit to
         // their profile. Same reasoning as the profiles block above.
         && request.resource.data.label is string
-        && request.resource.data.label.size() <= 200;
+        && request.resource.data.label.size() <= 200
+        // comboId is `mix:{docId}` or `custom:{16 hex}` - see comboId.ts -
+        // never anywhere near this bound. Left unconstrained, this is the
+        // same 700KB-string hole label had, just on the field next to it.
+        && request.resource.data.comboId is string
+        && request.resource.data.comboId.size() <= 100
+        && request.resource.data.kind in ['mix', 'custom']
+        && (!('mixId' in request.resource.data)
+            || (request.resource.data.mixId is string
+                && request.resource.data.mixId.size() <= 100))
+        && (!('hookahId' in request.resource.data)
+            || (request.resource.data.hookahId is string
+                && request.resource.data.hookahId.size() <= 100))
+        && (!('tobaccoType' in request.resource.data)
+            || (request.resource.data.tobaccoType is string
+                && request.resource.data.tobaccoType.size() <= 100))
+        // A friend downloads these too, so size is bounded like every other
+        // list/map a friend can pull down, not just its element type.
+        && (!('flavorIds' in request.resource.data)
+            || (request.resource.data.flavorIds is list
+                && request.resource.data.flavorIds.size() <= 10))
+        && (!('flavorPercentages' in request.resource.data)
+            || (request.resource.data.flavorPercentages is map
+                && request.resource.data.flavorPercentages.size() <= 10))
+        && (!('tobaccoStrength' in request.resource.data)
+            || request.resource.data.tobaccoStrength is number)
+        && (!('withIce' in request.resource.data) || request.resource.data.withIce is bool)
+        && (!('hasLED' in request.resource.data) || request.resource.data.hasLED is bool)
+        && (!('hasColoredWater' in request.resource.data)
+            || request.resource.data.hasColoredWater is bool)
+        && (!('hasAlcohol' in request.resource.data) || request.resource.data.hasAlcohol is bool)
+        && (!('hasFruits' in request.resource.data) || request.resource.data.hasFruits is bool)
+        // Server time only, matching the acceptedAt idiom on friendships.
+        // Optional because a full-document setDoc without merge (what the
+        // tests here use) simply omits the field rather than sending a value.
+        && (!('createdAt' in request.resource.data)
+            || request.resource.data.createdAt == request.time);
       allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
@@ -78,9 +123,16 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['comboId', 'label', 'score', 'ratedAt'])
         && request.resource.data.label is string
         && request.resource.data.label.size() <= 200
+        // Same shape and bound as the favorites block above.
+        && request.resource.data.comboId is string
+        && request.resource.data.comboId.size() <= 100
         && request.resource.data.score is int
         && request.resource.data.score >= 1
-        && request.resource.data.score <= 5;
+        && request.resource.data.score <= 5
+        // Server time only, matching acceptedAt. Optional: ratingsService
+        // always sends it, but nothing here requires a caller to.
+        && (!('ratedAt' in request.resource.data)
+            || request.resource.data.ratedAt == request.time);
       allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
@@ -178,7 +230,11 @@ service cloud.firestore {
             || request.resource.data.photoURL == null
             || (request.resource.data.photoURL is string
                 && request.resource.data.photoURL.size() <= 500
-                && request.resource.data.photoURL.matches('https://.*')));
+                && request.resource.data.photoURL.matches('https://.*')))
+        // Server time only, matching acceptedAt. Optional: a plain setDoc
+        // without merge (as the tests here use) simply omits the field.
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt == request.time);
       allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
@@ -189,6 +245,12 @@ service cloud.firestore {
       allow read: if isSignedIn() && request.auth.uid in resource.data.uids;
 
       allow create: if isSignedIn()
+        // A friendship requires a profile, and anonymous guests never get
+        // one - same reasoning as inviteCodes below, reusing its helper.
+        // Without this an anonymous guest can create a friendship request
+        // directly (after resolving a uid via the open inviteCodes get),
+        // and the recipient sees a request from an unattributable "Someone".
+        && isRealAccount()
         && request.resource.data.uids.size() == 2
         && request.resource.data.uids[0] < request.resource.data.uids[1]
         && pairId == friendPairId(request.resource.data.uids[0], request.resource.data.uids[1])
@@ -205,12 +267,19 @@ service cloud.firestore {
         && !request.resource.data.uids[1].matches('.*_.*')
         // Shape-pinned like profiles and notifications. createdAt is permitted
         // but not required: friendsService writes it, the rules tests do not.
-        && request.resource.data.keys().hasOnly(['uids', 'requestedBy', 'status', 'createdAt']);
+        && request.resource.data.keys().hasOnly(['uids', 'requestedBy', 'status', 'createdAt'])
+        // Server time only, matching acceptedAt right below.
+        && (!('createdAt' in request.resource.data)
+            || request.resource.data.createdAt == request.time);
 
       // Only the other party accepts, and only pending -> accepted. Pinning
       // affectedKeys stops an accept from rewriting who the friendship is
       // between or who asked.
       allow update: if isSignedIn()
+        // Same guard as create: accepting is how a guest could gain friend
+        // access from the OTHER side of the hole, if a real account ever
+        // targeted a guest uid with a request.
+        && isRealAccount()
         && request.auth.uid in resource.data.uids
         && resource.data.requestedBy != request.auth.uid
         && resource.data.status == 'pending'
@@ -232,10 +301,9 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow list: if false;
       allow create: if isSignedIn()
-        // Friends need a real account - a friendship requires a profile, and
-        // anonymous guests never get one. Without this an anonymous guest can
-        // mint a code that resolves to a dead end for whoever scans it.
-        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'anonymous'
+        // Without this an anonymous guest can mint a code that resolves to a
+        // dead end for whoever scans it.
+        && isRealAccount()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['uid', 'displayName', 'createdAt'])
         // Bound what anyone resolving this code downloads. Same reasoning as
@@ -243,7 +311,10 @@ service cloud.firestore {
         && (!('displayName' in request.resource.data)
             || request.resource.data.displayName == null
             || (request.resource.data.displayName is string
-                && request.resource.data.displayName.size() <= 100));
+                && request.resource.data.displayName.size() <= 100))
+        // Server time only, matching acceptedAt on friendships.
+        && (!('createdAt' in request.resource.data)
+            || request.resource.data.createdAt == request.time);
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
@@ -255,7 +326,17 @@ service cloud.firestore {
     match /discoverable/{emailHash} {
       allow get: if isSignedIn();
       allow list: if false;
-      allow create: if isSignedIn()
+      // create AND update share one rule, not just create: the document id is
+      // deterministic (the hash of your own email), so a repeat setDoc over a
+      // surviving document - a retry, a double-tap, or opting in again right
+      // after opting out - is evaluated as an update, not a second create.
+      // Without allow update that second write was a bare permission-denied
+      // with no way to recover.
+      // Still theft-proof: emailHash must equal the hash of the CALLER'S OWN
+      // email token on every write, so nobody can ever land here to update a
+      // document keyed to an email they do not hold - the same guarantee
+      // create alone used to provide.
+      allow create, update: if isSignedIn()
         // .get() rather than a bare access: a bare one RAISES for an anonymous
         // guest, who has no email claim at all. The denial was already correct,
         // this just makes it evaluate instead of throwing, matching isAdmin()
