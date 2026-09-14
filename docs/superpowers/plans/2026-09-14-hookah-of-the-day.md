@@ -917,8 +917,13 @@ Expected: **158 passed, 0 failed** across 7 files (hookahOfTheDay 7, socialRules
 - [ ] **Step 2: Confirm the blast radius**
 
 ```bash
-git diff main...HEAD --stat
+git fetch origin
+git diff origin/main...HEAD --stat
 ```
+
+Use `origin/main`, not `main`. The local `main` ref in this clone is stale — it sits at
+the PR #10 era, several merges behind — so `git diff main...HEAD` drags in the whole
+social-features release and reports 42 files instead of this branch's 9.
 
 Expected: nine files — two docs (`docs/superpowers/specs/2026-09-14-hookah-of-the-day-design.md`, `docs/superpowers/plans/2026-09-14-hookah-of-the-day.md`), six source files (`src/types/database.ts`, `src/services/hookahOfTheDay.ts`, `src/services/menuService.ts`, `src/components/HookahOfTheDayCard.tsx`, `src/pages/Index.tsx`, `src/pages/MenuManagement.tsx`), and one test file (`tests/hookahOfTheDay.test.ts`).
 
