@@ -599,6 +599,72 @@ describe('invite codes', () => {
       uid: ALICE, displayName: 'Alice', createdAt: serverTimestamp(),
     }));
   });
+
+  // ensureInviteCode only writes displayName once, at first mint - a customer
+  // who generates their link before setting a name would otherwise carry a
+  // frozen `null` (or stale name) on that code forever, with Reset link (which
+  // invalidates whatever was already shared) as the only remedy.
+  test('the owner refreshes their invite code display name', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'inviteCodes', 'CODE1234'), {
+        uid: ALICE, displayName: null,
+      });
+    });
+    await assertSucceeds(updateDoc(doc(alice(), 'inviteCodes', 'CODE1234'), {
+      displayName: 'Alice A',
+    }));
+  });
+
+  test('a non-owner cannot refresh someone else invite code name', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'inviteCodes', 'CODE1234'), {
+        uid: ALICE, displayName: 'Alice',
+      });
+    });
+    await assertFails(updateDoc(doc(bob(), 'inviteCodes', 'CODE1234'), {
+      displayName: 'Not Alice',
+    }));
+  });
+
+  // The property the whole rule exists to protect: a code that could be
+  // repointed at another uid would let its holder hijack an existing,
+  // possibly already-shared, invite link.
+  test('an invite code update cannot reassign uid', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'inviteCodes', 'CODE1234'), {
+        uid: ALICE, displayName: 'Alice',
+      });
+    });
+    await assertFails(updateDoc(doc(alice(), 'inviteCodes', 'CODE1234'), {
+      uid: BOB,
+    }));
+  });
+
+  // affectedKeys().hasOnly(['displayName']) is what makes the uid check above
+  // hold - it also means createdAt cannot be rewritten after the fact.
+  test('an invite code update cannot touch createdAt', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'inviteCodes', 'CODE1234'), {
+        uid: ALICE, displayName: 'Alice', createdAt: serverTimestamp(),
+      });
+    });
+    await assertFails(updateDoc(doc(alice(), 'inviteCodes', 'CODE1234'), {
+      displayName: 'Alice A', createdAt: serverTimestamp(),
+    }));
+  });
+
+  // The update path respects the same bound as create - nothing here should
+  // let a stray, oversized displayName back in through the side door.
+  test('an invite code update rejects an oversized display name', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'inviteCodes', 'CODE1234'), {
+        uid: ALICE, displayName: 'Alice',
+      });
+    });
+    await assertFails(updateDoc(doc(alice(), 'inviteCodes', 'CODE1234'), {
+      displayName: 'x'.repeat(300_000),
+    }));
+  });
 });
 
 describe('email discovery', () => {

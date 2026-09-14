@@ -1,6 +1,11 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { StarRating } from '@/components/StarRating';
 import type { FavoriteCombo } from '@/services/favoritesService';
 import type { ComboRating } from '@/services/ratingsService';
@@ -22,10 +27,14 @@ interface FavoritesListProps {
   // is not part of this feature, and the row simply renders without a
   // control rather than a page having to disable one.
   onReorder?: (favorite: FavoriteCombo) => void;
+  // Same as onReorder: FriendProfile does not pass this, so the remove
+  // control is structurally impossible to reach for someone else's list
+  // rather than merely hidden by a page-level check.
+  onRemove?: (favorite: FavoriteCombo) => void;
 }
 
 export const FavoritesList: React.FC<FavoritesListProps> = ({
-  favorites, heading, emptyText, footer, onReorder,
+  favorites, heading, emptyText, footer, onReorder, onRemove,
 }) => (
   <Card className="bg-turbo-card border-border">
     <CardContent className="p-4">
@@ -45,6 +54,38 @@ export const FavoritesList: React.FC<FavoritesListProps> = ({
             >
               Order again
             </Button>
+          )}
+          {onRemove && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 text-xs text-turbo-muted"
+                  aria-label={`Remove ${favorite.label} from favourites`}
+                >
+                  Remove
+                </Button>
+              </AlertDialogTrigger>
+              {/* Destructive and easy to mis-tap on a phone next to "Order
+                  again" - confirm before it is gone, same precedent as the
+                  invite-code reset on Friends.tsx. */}
+              <AlertDialogContent className="bg-turbo-card border-border">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove this favourite?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    &ldquo;{favorite.label}&rdquo; will no longer appear on your favourites
+                    list.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep it</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onRemove(favorite)}>
+                    Remove
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       ))}

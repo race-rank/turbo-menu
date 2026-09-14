@@ -156,6 +156,30 @@ export const ensureInviteCode = async (user: User): Promise<string> => {
   return code;
 };
 
+/**
+ * Keeps an existing invite code's stored displayName in step with the
+ * account's current name, without rotating the code (and so without
+ * invalidating a link or QR someone may have already shared or printed).
+ *
+ * ensureInviteCode only writes displayName once, at first mint, so a
+ * customer who generates their link before setting a name would otherwise
+ * carry `null` on that code forever. The `allow update` on inviteCodes
+ * permits changing only this one field - see firestore.rules.
+ *
+ * No-op, not an error, when the account has no code yet: there is nothing
+ * stale to refresh, and the next ensureInviteCode call will mint one with
+ * the current name already on it.
+ */
+export const refreshInviteCodeName = async (user: User): Promise<void> => {
+  assertRealAccount(user);
+  const userRef = doc(firestore, 'users', user.uid);
+  const code = (await getDoc(userRef)).data()?.inviteCode as string | undefined;
+  if (!code) return;
+  await updateDoc(doc(firestore, 'inviteCodes', code), {
+    displayName: shortName(user.displayName),
+  });
+};
+
 export const rotateInviteCode = async (user: User): Promise<string> => {
   assertRealAccount(user);
   const userRef = doc(firestore, 'users', user.uid);

@@ -11,7 +11,8 @@ import { useCart } from '@/contexts/CartContext';
 import { AuthForms } from '@/components/auth/AuthForms';
 import { logout, updateDisplayName } from '@/services/authService';
 import { getAccountSummary, upsertUserProfile, type AccountSummary } from '@/services/userService';
-import { listFavorites, type FavoriteCombo } from '@/services/favoritesService';
+import { refreshInviteCodeName } from '@/services/friendsService';
+import { listFavorites, removeFavorite, type FavoriteCombo } from '@/services/favoritesService';
 import { listRatings, type ComboRating } from '@/services/ratingsService';
 import { getMenuData } from '@/services/menuService';
 import { resolveReorder, type MenuSnapshot } from '@/services/reorderService';
@@ -110,6 +111,21 @@ const Account: React.FC = () => {
     navigate('/cart');
   };
 
+  // The only caller that ever passes onRemove to FavoritesList - this is the
+  // owner's own list, guest or signed in. FriendProfile renders the same
+  // component for someone else's favourites and deliberately does not pass
+  // this prop, so the control cannot reach that page even by mistake.
+  const handleRemoveFavorite = async (favorite: FavoriteCombo) => {
+    if (!user) return;
+    try {
+      await removeFavorite(user.uid, favorite.comboId);
+      setFavorites((prev) => prev.filter((f) => f.comboId !== favorite.comboId));
+      toast({ title: 'Removed from favourites' });
+    } catch (error) {
+      toast({ title: 'Could not remove that favourite', description: String(error), variant: 'destructive' });
+    }
+  };
+
   const saveName = async () => {
     const trimmed = name.trim();
     if (!trimmed) {
@@ -120,6 +136,13 @@ const Account: React.FC = () => {
     try {
       const updated = await updateDisplayName(trimmed);
       await upsertUserProfile(updated);
+      // Non-fatal: a rename already succeeded by this point, and a code that
+      // stays stale until the next rename is a strictly smaller problem than
+      // reporting a successful rename as a failure. No-ops if there is no
+      // invite code yet.
+      await refreshInviteCodeName(updated).catch((error) => {
+        console.error('Invite code name refresh failed:', error);
+      });
       setEditing(false);
       toast({ title: 'Name updated' });
     } catch (error) {
@@ -218,6 +241,7 @@ const Account: React.FC = () => {
               heading="Favourites"
               emptyText="Tap the heart on a mix to save it."
               onReorder={handleReorder}
+              onRemove={handleRemoveFavorite}
             />
 
             <RatingsList
@@ -255,6 +279,7 @@ const Account: React.FC = () => {
                 heading="Favourites"
                 emptyText="Tap the heart on a mix to save it."
                 onReorder={handleReorder}
+                onRemove={handleRemoveFavorite}
                 footer={
                   <p className="mt-3 border-t border-border pt-3 text-xs text-turbo-muted">
                     Sign up to keep these on any device.

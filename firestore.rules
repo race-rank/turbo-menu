@@ -315,6 +315,20 @@ service cloud.firestore {
         // Server time only, matching acceptedAt on friendships.
         && (!('createdAt' in request.resource.data)
             || request.resource.data.createdAt == request.time);
+      // Lets the owner refresh a stale displayName without rotating the code.
+      // ensureInviteCode only ever creates once, so a name set AFTER the
+      // first mint was previously frozen forever - the only fix was Reset
+      // link, which invalidates a QR that may already be shared or printed.
+      // affectedKeys().hasOnly(['displayName']) is what keeps this narrow:
+      // uid is not in the allowed set, so it can never be reassigned to
+      // repoint the code at another account (that would be a hijack), and
+      // createdAt cannot be forged after the fact either.
+      allow update: if isSignedIn() && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])
+        && (!('displayName' in request.resource.data)
+            || request.resource.data.displayName == null
+            || (request.resource.data.displayName is string
+                && request.resource.data.displayName.size() <= 100));
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
