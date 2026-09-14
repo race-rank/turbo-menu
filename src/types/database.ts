@@ -101,6 +101,24 @@ export interface DatabaseHookah {
   updatedAt: Date;
 }
 
+/**
+ * The admin's current promotion: a pointer to one hookah, not a flag on it.
+ *
+ * A boolean on each hookah could not enforce "exactly one" - setting a new one
+ * would mean clearing the old one, two writes that can half-fail and leave two
+ * hookahs featured, or none. With a pointer, picking a new hookah IS the unset
+ * of the previous one.
+ */
+export interface FeaturedHookah {
+  hookahId: string;
+  /**
+   * Optional promo line, capped at MAX_PROMO_TEXT_LENGTH. It rides inside the
+   * public menu snapshot that every customer downloads on every visit, so it is
+   * bounded for the same reason order items stopped carrying base64 images.
+   */
+  promoText?: string;
+}
+
 export interface DatabaseTobaccoType {
   id: string;
   name: string;
