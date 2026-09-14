@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { onIdTokenChanged, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { ensureSignedIn } from '@/services/authService';
+import { upsertPublicProfile } from '@/services/profileService';
 
 interface AuthContextType {
   user: User | null;
@@ -30,6 +31,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // uids that have already had a profiles/{uid} backfill attempted this
+  // session. onIdTokenChanged also fires on the hourly token refresh, and a
+  // customer base of mostly-persistent anonymous/real sessions means an
+  // unconditional write here would bill a setDoc on every single app load
+  // for every real customer, forever. One attempt per uid per session is
+  // enough - the explicit upsert on sign-in/sign-up/rename covers the rest.
+  const profileBackfillAttempted = useRef(new Set<string>());
+
   useEffect(() => {
     // onIdTokenChanged, NOT onAuthStateChanged: the SDK's notifyAuthListeners
     // only pushes to auth-state listeners when the uid changes, and linking a
@@ -52,6 +61,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsAnonymous(next.isAnonymous);
       setUser(next);
       setLoading(false);
+
+      // Backfill for every real account that predates profiles/{uid}, or
+      // that hit the AccountExistsError/upsert-failure edge cases: without
+      // this, a customer who signed up once and never signs in again stays
+      // nameless to friends forever, since the explicit upsert only runs on
+      // an explicit sign-in, sign-up or rename. Never for guests - that
+      // would hand every anonymous visitor a profile document that friends
+      // (a real-account-only feature) should never see. Fire-and-forget and
+      // non-fatal: this must never delay or fail an auth-state settle, the
+      // same reasoning upsertUserProfile documents for its own internal
+      // call to this function.
+      if (!next.isAnonymous && !profileBackfillAttempted.current.has(next.uid)) {
+        profileBackfillAttempted.current.add(next.uid);
+        upsertPublicProfile(next).catch((error) => {
+          console.error('Public profile backfill failed:', error);
+        });
+      }
     });
 
     return () => unsubscribe();

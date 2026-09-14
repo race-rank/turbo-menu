@@ -10,6 +10,7 @@ const cartItem: CartItem = {
   quantity: 2,
   // Stand-in for the real thing: menu images are base64 data URIs of ~900KB.
   image: 'data:image/webp;base64,AAAAAAAAAAAAAAAA',
+  comboId: 'custom:0000000000000000',
   table: '7',
   hookah: 'Khalil Mamoon',
   tobaccoType: 'virginia',
@@ -51,4 +52,71 @@ test('a persisted order item stays far below the 1MiB document limit', () => {
   // The bug this guards: at ~940KB per item, a two-item order exceeded the
   // limit outright and Firestore rejected the write at checkout.
   expect(JSON.stringify(dbItem).length).toBeLessThan(2048);
+});
+
+test('the persisted order item carries combo identity', () => {
+  const dbItem = convertCartItemToDbItem({
+    ...cartItem,
+    comboId: 'custom:0123456789abcdef',
+    hookahId: 'hookah-1',
+    flavorIds: ['mint:virginia', 'lemon:virginia'],
+  });
+
+  expect(dbItem.comboId).toBe('custom:0123456789abcdef');
+  expect(dbItem.hookahId).toBe('hookah-1');
+  expect(dbItem.flavorIds).toEqual(['mint:virginia', 'lemon:virginia']);
+});
+
+test('a curated mix item carries its mix id', () => {
+  const dbItem = convertCartItemToDbItem({
+    ...cartItem,
+    type: 'mix',
+    comboId: 'mix:abc123',
+    mixId: 'abc123',
+  });
+
+  expect(dbItem.comboId).toBe('mix:abc123');
+  expect(dbItem.mixId).toBe('abc123');
+});
+
+// Regression guard from the previous perf work: images are ~900KB base64 and
+// must never reach Firestore again.
+test('combo identity did not smuggle the image back in', () => {
+  const dbItem = convertCartItemToDbItem({ ...cartItem, comboId: 'mix:abc123' });
+  expect(Object.keys(dbItem)).not.toContain('image');
+});
+
+test('the persisted order item carries the canonical combo label', () => {
+  const dbItem = convertCartItemToDbItem({
+    ...cartItem,
+    // What the custom path actually puts in `name` - the same literal for
+    // every custom build, which is why the rating needs its own label.
+    name: 'Custom Mix',
+    comboLabel: 'Khalil Mamoon · Mint, Lemon',
+  });
+
+  expect(dbItem.comboLabel).toBe('Khalil Mamoon · Mint, Lemon');
+});
+
+test('a mix combo label excludes the tobacco category', () => {
+  const dbItem = convertCartItemToDbItem({
+    ...cartItem,
+    type: 'mix',
+    // The order item name carries the category ordered; the combo id and the
+    // favourite deliberately do not, so the label must not either.
+    name: 'Sunset Blend (Virginia)',
+    comboId: 'mix:abc123',
+    mixId: 'abc123',
+    comboLabel: 'Sunset Blend',
+  });
+
+  expect(dbItem.comboLabel).toBe('Sunset Blend');
+});
+
+test('an order item with no combo label carries no such key', () => {
+  // Firestore rejects undefined; cleanObject strips it, but the key must not
+  // be invented for legacy-shaped cart items either.
+  const dbItem = convertCartItemToDbItem(cartItem);
+
+  expect(dbItem.comboLabel).toBeUndefined();
 });

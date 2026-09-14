@@ -7,12 +7,19 @@ import { NavigationSidebar } from '@/components/NavigationSidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { getOrdersForUser } from '@/services/orderService';
 import type { OrderDetails } from '@/services/orderService';
+import { StarRating } from '@/components/StarRating';
+import { rateOrder } from '@/services/ratingsService';
+import { toast } from '@/hooks/use-toast';
 
 const MyOrders: React.FC = () => {
   const { user, isAnonymous, loading } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderDetails[]>([]);
   const [busy, setBusy] = useState(true);
+  // Optimistic local scores, keyed by orderId. The list is fetched once, so
+  // without this a freshly given rating would not appear until a reload.
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading || !user) return;
@@ -21,6 +28,44 @@ const MyOrders: React.FC = () => {
       .catch(() => setOrders([]))
       .finally(() => setBusy(false));
   }, [user, loading]);
+
+  // The security rules allow exactly one `rating` per order document, so an
+  // order with two hookahs on it files its score under the first item's combo.
+  // The control names that combo rather than saying "rate this order", so a
+  // customer can see which hookah they are actually scoring.
+  const ratedItem = (order: OrderDetails) => order.items?.[0];
+  const ratedLabel = (order: OrderDetails) => {
+    const item = ratedItem(order);
+    return item?.comboLabel ?? item?.name ?? 'Your order';
+  };
+
+  const handleRate = async (order: OrderDetails, score: number) => {
+    if (!user) return;
+    const item = ratedItem(order);
+    if (!item?.comboId) return;
+
+    setSaving(order.orderId);
+    setScores((current) => ({ ...current, [order.orderId]: score }));
+    try {
+      await rateOrder(user.uid, order.orderId, item.comboId, ratedLabel(order), score);
+      toast({ title: 'Thanks for rating' });
+    } catch (error) {
+      // Drop the optimistic key rather than writing a 0. A 0 would win over
+      // order.rating in the ?? chain below and show an order that IS rated 4
+      // server-side as unrated until a reload.
+      setScores((current) => {
+        const { [order.orderId]: _discarded, ...rest } = current;
+        return rest;
+      });
+      toast({
+        title: 'Could not save your rating',
+        description: String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(null);
+    }
+  };
 
   return (
     // pb-24 clears the OrderStatusTracker, which App.tsx pins to the bottom of
@@ -73,6 +118,20 @@ const MyOrders: React.FC = () => {
                   {order.items.map((item) => item.name).join(', ')}
                 </p>
                 <p className="text-lg font-bold text-amber-400">{order.total} Lei</p>
+                {ratedItem(order)?.comboId && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <p className="mb-1 text-xs uppercase text-turbo-muted">
+                      {(scores[order.orderId] ?? order.rating) ? 'Your rating' : 'Rate this'}
+                    </p>
+                    <p className="mb-2 text-sm">{ratedLabel(order)}</p>
+                    <StarRating
+                      size="sm"
+                      value={scores[order.orderId] ?? order.rating ?? 0}
+                      disabled={saving === order.orderId}
+                      onChange={(score) => handleRate(order, score)}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

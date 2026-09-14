@@ -2,6 +2,7 @@ import { doc, getDoc, setDoc, serverTimestamp, increment } from 'firebase/firest
 import type { User } from 'firebase/auth';
 import { firestore } from '@/lib/firebase';
 import { getOrdersForUser } from '@/services/orderService';
+import { upsertPublicProfile } from '@/services/profileService';
 
 export interface UserProfile {
   displayName: string | null;
@@ -27,6 +28,15 @@ export const upsertUserProfile = async (user: User): Promise<void> => {
     },
     { merge: true },
   );
+
+  // Deliberately non-fatal. By the time this runs the account and the user
+  // document already exist, and AuthForms treats any throw from
+  // upsertUserProfile as "sign-up failed" - so letting this propagate would
+  // tell someone their account was not created when it was. A missing public
+  // profile only means friends see no name until the next sign-in.
+  await upsertPublicProfile(user).catch((error) => {
+    console.error('Public profile sync failed:', error);
+  });
 };
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {

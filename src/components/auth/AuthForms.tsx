@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { User } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,8 +18,21 @@ export const AuthForms: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const handleExisting = (error: unknown): boolean => {
+  // The already-exists fallback signs into the OTHER, pre-existing account
+  // (see signUpWithGoogle/signUpWithEmail), and that account never runs
+  // through the upsert above it - so without this call a customer hitting
+  // this path stayed nameless to friends until their next explicit sign-in.
+  // Non-fatal like every other upsertUserProfile call site: this is already
+  // the success path (the account IS signed in), so a profile-sync failure
+  // must not turn "signed in to your existing account" into an error toast.
+  const handleExisting = async (error: unknown): Promise<boolean> => {
     if (!(error instanceof AccountExistsError)) return false;
+    const existing = (error as AccountExistsError & { user?: User }).user;
+    if (existing) {
+      await upsertUserProfile(existing).catch((syncError) => {
+        console.error('Profile sync failed for existing account:', syncError);
+      });
+    }
     toast({
       title: 'Signed in to your existing account',
       description: 'Orders placed as a guest on this device could not be moved over.',
@@ -35,7 +49,7 @@ export const AuthForms: React.FC<{ onDone: () => void }> = ({ onDone }) => {
       toast({ title: 'Welcome!', description: 'Your order history is saved to this account.' });
       onDone();
     } catch (error) {
-      if (!handleExisting(error)) {
+      if (!(await handleExisting(error))) {
         toast({ title: 'Google sign-in failed', description: String(error), variant: 'destructive' });
       }
     } finally {
@@ -54,7 +68,7 @@ export const AuthForms: React.FC<{ onDone: () => void }> = ({ onDone }) => {
       toast({ title: mode === 'signup' ? 'Account created' : 'Welcome back' });
       onDone();
     } catch (error) {
-      if (!handleExisting(error)) {
+      if (!(await handleExisting(error))) {
         toast({ title: 'Could not continue', description: String(error), variant: 'destructive' });
       }
     } finally {

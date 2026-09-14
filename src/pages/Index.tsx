@@ -19,16 +19,15 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getMenuData } from '@/services/menuService';
+import { comboIdForCustom, comboIdForMix } from '@/services/comboId';
+import { buildComboLabel, buildFlavorDisplayNames } from '@/services/comboDisplay';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
-
-const ADDONS = [
-  { key: 'hasLED' as const, label: 'LED Hookah', price: 30, image: '/img/led.webp' },
-  { key: 'hasColoredWater' as const, label: 'Colored Water', price: 10, image: '/img/colorant.webp' },
-  { key: 'hasAlcohol' as const, label: 'Alcohol in Vase', price: 40, image: '/img/alcool.webp' },
-  { key: 'hasFruits' as const, label: 'Fruits in Vase', price: 20, image: '/img/fruits.webp' },
-] as const;
-
-const ADDON_PRICES = Object.fromEntries(ADDONS.map(a => [a.key, a.price])) as Record<typeof ADDONS[number]['key'], number>;
+import { FavoriteButton } from '@/components/FavoriteButton';
+import { addFavorite, listFavorites, removeFavorite } from '@/services/favoritesService';
+import type { FavoriteCombo } from '@/services/favoritesService';
+import { useAuth } from '@/contexts/AuthContext';
+import { ADDONS, ADDON_PRICES } from '@/services/addons';
+import { isValidTableId } from '@/services/tableValidation';
 
 const MixSkeletons = () => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -68,6 +67,9 @@ const Index = () => {
   const { addItem, getItemCount } = useCart();
   const location = useLocation();
   const { setTable } = useTable();
+  const { user } = useAuth();
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [lastBuild, setLastBuild] = useState<FavoriteCombo | null>(null);
   const [selectedHookah, setSelectedHookah] = useState<string | null>(null);
   const [selectedTobaccoType, setSelectedTobaccoType] = useState<'virginia' | 'darkblend' | 'cigarleaf' | 'mix' | null>(null);
   const [tobaccoStrength, setTobaccoStrength] = useState<number>(1);
@@ -120,6 +122,14 @@ const Index = () => {
 
     loadMenuData();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    listFavorites(user.uid)
+      .then((favorites) => setFavoriteIds(new Set(favorites.map((f) => f.comboId))))
+      // A failed favourites read must not take the menu down with it.
+      .catch(() => setFavoriteIds(new Set()));
+  }, [user]);
 
   // Create expanded flavor list with separate entries for dual-compatible flavors
   const getExpandedFlavors = () => {
@@ -187,9 +197,6 @@ const Index = () => {
     }
   };
 
-  const isValidTableId = (tableId: string | null): boolean =>
-    !!tableId && (tableId.includes('table-') || tableId.includes('bar'));
-
   const addMixToCart = (mixId: string) => {
     const tableId = localStorage.getItem('turbo-table');
 
@@ -206,6 +213,41 @@ const Index = () => {
     setMixDialogId(mixId);
   };
 
+  const toggleMixFavorite = async (mix: DatabaseRecommendedMix) => {
+    if (!user) return;
+    const comboId = comboIdForMix(mix.id);
+    const wasFavorite = favoriteIds.has(comboId);
+
+    // Functional updates throughout, including the rollback below: two
+    // hearts tapped inside the same render frame each start from their own
+    // stale `favoriteIds` closure, so composing onto `prev` (rather than
+    // this render's snapshot) is what lets both toggles survive together.
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (wasFavorite) next.delete(comboId); else next.add(comboId);
+      return next;
+    });
+
+    try {
+      if (wasFavorite) {
+        await removeFavorite(user.uid, comboId);
+      } else {
+        await addFavorite(user.uid, {
+          comboId, label: mix.name, kind: 'mix', mixId: mix.id,
+        });
+      }
+    } catch (error) {
+      // Put the optimistic change back, without clobbering any other
+      // concurrent toggle that has landed in the meantime.
+      setFavoriteIds((prev) => {
+        const next = new Set(prev);
+        if (wasFavorite) next.add(comboId); else next.delete(comboId);
+        return next;
+      });
+      toast({ title: 'Could not update favourites', variant: 'destructive' });
+    }
+  };
+
   const confirmMixToCart = (category: 'virginia' | 'darkblend' | 'mix') => {
     const mix = recommendedMixes.find(m => m.id === mixDialogId);
     const tableId = localStorage.getItem('turbo-table');
@@ -213,6 +255,7 @@ const Index = () => {
     if (!mix || !tableId) return;
 
     const categoryLabels = { virginia: 'Virginia', darkblend: 'Darkblend', mix: 'Mix' };
+    const comboId = comboIdForMix(mix.id);
 
     addItem({
       id: `mix-${mix.id}-${category}`,
@@ -220,6 +263,12 @@ const Index = () => {
       name: `${mix.name} (${categoryLabels[category]})`,
       price: mix.price,
       image: mix.mainImage,
+      comboId,
+      // Without the category, matching the favourite for this same comboId.
+      // `name` carries it; the combo id deliberately does not, so filing a
+      // rating under `name` would rewrite the label on every re-order.
+      comboLabel: mix.name,
+      mixId: mix.id,
       tobaccoType: category,
       table: tableId
     });
@@ -230,6 +279,20 @@ const Index = () => {
       title: "Added to cart",
       description: `${mix.name} (${categoryLabels[category]}) has been added to your cart!`,
     });
+
+    // toggleMixFavorite (the heart on a mix card) is tapped outside any
+    // category context, so a mix favourited straight from the grid has no
+    // tobaccoType to store - resolveMixCategory falls back to 'mix' for it
+    // (reorderService.ts). Ordering it here is the first moment a category
+    // IS known, so if it's already favourited, record the category actually
+    // ordered: "order again" then restores this exact blend instead of
+    // silently substituting the fallback. Fire-and-forget - the order above
+    // has already succeeded and must not be undone by this failing.
+    if (user && favoriteIds.has(comboId)) {
+      addFavorite(user.uid, {
+        comboId, label: mix.name, kind: 'mix', mixId: mix.id, tobaccoType: category,
+      }).catch(() => {});
+    }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -423,21 +486,53 @@ const Index = () => {
 
     const finalTobaccoType = resolveFinalTobaccoType() ?? selectedTobaccoType;
 
-    const showPct = selectedFlavors.length >= 2 || withIce;
-    const selectedFlavorNames = selectedFlavors.map(variantId => {
-      const flavor = currentFlavors.find(f => f.variantId === variantId);
-      if (!flavor) return null;
-      const showVariant = finalTobaccoType === 'mix' && flavor.variantType;
-      const base = showVariant
-        ? `${flavor.name} (${flavor.variantType!.charAt(0).toUpperCase() + flavor.variantType!.slice(1)})`
-        : flavor.name;
-      const pct = flavorPercentages[variantId];
-      return showPct && pct != null ? `${base} ${pct}%` : base;
-    }).filter(Boolean) as string[];
+    // Shared with reorderService.ts's resolveCustom via comboDisplay.ts, so a
+    // re-ordered favourite's flavours and comboLabel can never drift from
+    // what a fresh build of the same combo produces here.
+    const flavorDisplayEntries = selectedFlavors
+      .map(variantId => {
+        const flavor = currentFlavors.find(f => f.variantId === variantId);
+        if (!flavor) return null;
+        return { name: flavor.name, variantType: flavor.variantType, percentage: flavorPercentages[variantId] };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+    const selectedFlavorNames = buildFlavorDisplayNames(
+      flavorDisplayEntries, finalTobaccoType, withIce, icePercentage,
+    );
 
-    if (withIce) {
-      selectedFlavorNames.push(`Ice (${icePercentage}%)`);
-    }
+    // `{flavorDocId}:{variantType}` rather than the UI's variantId, which is a
+    // bare id for single-compatibility flavours and `{id}-{type}` for
+    // multi-compatibility ones. That shape flips when an admin edits a
+    // flavour's compatible types, which would orphan favourites keyed on it.
+    // Built alongside flavorIds so flavorPercentages can be re-keyed the same
+    // way below - see the favourite's flavorPercentages comment.
+    const flavorIdByVariantId: Record<string, string> = {};
+    const flavorIds = selectedFlavors
+      .map(variantId => currentFlavors.find(f => f.variantId === variantId))
+      .filter((f): f is NonNullable<typeof f> => Boolean(f))
+      .map(f => {
+        const flavorId = `${f.id}:${f.variantType ?? finalTobaccoType}`;
+        flavorIdByVariantId[f.variantId] = flavorId;
+        return flavorId;
+      });
+
+    // Canonical shape: `{flavorDocId}:{variantType}`, matching flavorIds -
+    // not the UI's variantId, which is a bare id for single-compatibility
+    // flavours and `{id}-{type}` for multi-compatibility ones and flips
+    // shape whenever an admin edits a flavour's compatible tobacco types
+    // (comboId.ts:32-38). That would silently orphan a saved percentage
+    // split on re-order, so both the favourite AND the cart item below use
+    // this stable key - reorderService.ts's resolveCustom re-keys the same
+    // way, so a re-ordered item's flavorPercentages is shaped identically to
+    // a freshly-built one, not just its comboLabel.
+    const favoriteFlavorPercentages = selectedFlavors.length >= 2
+      ? Object.fromEntries(
+          Object.entries(flavorPercentages).map(([variantId, pct]) => [
+            flavorIdByVariantId[variantId] ?? variantId,
+            pct,
+          ]),
+        )
+      : undefined;
 
     let totalPrice = selectedHookahData.price || 0;
     if (selectedAddons.hasLED) totalPrice += ADDON_PRICES.hasLED;
@@ -451,16 +546,42 @@ const Index = () => {
       name: 'Custom Mix',
       price: totalPrice,
       image: selectedHookahData.image,
+      comboId: comboIdForCustom(selectedHookahData.id, finalTobaccoType, flavorIds),
+      // `name` is the literal 'Custom Mix' for every build, so the rating needs
+      // its own label. Same builder (comboDisplay.ts) as the favourite below
+      // and as reorderService.ts's resolveCustom, so all three always agree
+      // for one comboId.
+      comboLabel: buildComboLabel(selectedHookahData.name, selectedFlavorNames),
+      hookahId: selectedHookahData.id,
+      flavorIds,
       hookah: selectedHookahData.name,
       tobaccoType: finalTobaccoType,
       tobaccoStrength: tobaccoStrength,
       flavors: selectedFlavorNames,
-      flavorPercentages: selectedFlavors.length >= 2 ? flavorPercentages : undefined,
+      flavorPercentages: favoriteFlavorPercentages,
       table: tableId,
       hasLED: selectedAddons.hasLED,
       hasColoredWater: selectedAddons.hasColoredWater,
       hasAlcohol: selectedAddons.hasAlcohol,
       hasFruits: selectedAddons.hasFruits
+    });
+
+    // Offered rather than automatic: not every build is worth keeping, and a
+    // favourites list that fills itself is noise.
+    setLastBuild({
+      comboId: comboIdForCustom(selectedHookahData.id, finalTobaccoType, flavorIds),
+      label: buildComboLabel(selectedHookahData.name, selectedFlavorNames),
+      kind: 'custom',
+      hookahId: selectedHookahData.id,
+      tobaccoType: finalTobaccoType,
+      flavorIds,
+      tobaccoStrength,
+      flavorPercentages: favoriteFlavorPercentages,
+      withIce,
+      hasLED: selectedAddons.hasLED,
+      hasColoredWater: selectedAddons.hasColoredWater,
+      hasAlcohol: selectedAddons.hasAlcohol,
+      hasFruits: selectedAddons.hasFruits,
     });
 
     successHaptic();
@@ -568,6 +689,14 @@ const Index = () => {
                     <Card className="bg-turbo-card border-border overflow-hidden h-full">
                       <CardContent className="p-0">
                         <div className={`${mix.bgColor} p-4 text-center relative`}>
+                          <div className="absolute right-2 top-2 z-10">
+                            <FavoriteButton
+                              label={mix.name}
+                              isFavorite={favoriteIds.has(comboIdForMix(mix.id))}
+                              onToggle={() => toggleMixFavorite(mix)}
+                              disabled={!user}
+                            />
+                          </div>
                           <img
                             src={mix.mainImage}
                             alt={mix.name}
@@ -1046,6 +1175,39 @@ const Index = () => {
           </div>
         </DialogContent>
       </Dialog>
+      {user && lastBuild && (
+        // OrderStatusTracker pins a card stack to bottom-0 at z-50 (a single
+        // collapsed order card runs ~106px plus its own 16px bottom padding,
+        // taller once expanded or with more than one live order); bottom-36
+        // clears that, and z-[60] - already OrderPlacedOverlay's convention
+        // for "above the tracker" - is the backstop for when it doesn't.
+        <div className="fixed bottom-36 left-0 right-0 z-[60] px-4">
+          <Card className="bg-turbo-card border-primary">
+            <CardContent className="flex items-center gap-3 p-4">
+              <p className="flex-1 text-sm">Save this combo to your favourites?</p>
+              <Button variant="ghost" size="sm" onClick={() => setLastBuild(null)}>
+                No thanks
+              </Button>
+              <Button
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await addFavorite(user.uid, lastBuild);
+                    setFavoriteIds((current) => new Set(current).add(lastBuild.comboId));
+                    toast({ title: 'Saved to favourites' });
+                  } catch {
+                    toast({ title: 'Could not save', variant: 'destructive' });
+                  } finally {
+                    setLastBuild(null);
+                  }
+                }}
+              >
+                Save
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

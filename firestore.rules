@@ -13,11 +13,127 @@ service cloud.firestore {
     // (!isAdmin(), isAdmin() == false, a ternary) would then deny instead of
     // allow, and every ordinary denial logs "Property admin is undefined".
     function isAdmin()    { return request.auth != null && request.auth.token.get('admin', false) == true; }
-    function ownsOrder()  { return resource.data.customerInfo.uid == request.auth.uid; }
+    // .get() with defaults rather than a bare property access, which RAISES on
+    // orders written in the pre-uid shape rather than evaluating to false. The
+    // denial was always correct; it just arrived as an error. The create rule
+    // was made tolerant for this reason already - the read path was missed.
+    // Safe because Firebase Auth never issues a token with an empty sub, so the
+    // '' default can never accidentally match request.auth.uid.
+    function ownsOrder() {
+      return resource.data.get('customerInfo', {}).get('uid', '') == request.auth.uid;
+    }
+
+    // Anonymous guests never get a profiles document, so any write that is
+    // effectively "I have a profile" - an invite code, a friendship - must
+    // refuse them. .get() with a default rather than a bare token access,
+    // which RAISES for a provider that omits the claim entirely (this
+    // project has already been bitten by that shape of bug - see isAdmin()).
+    function isRealAccount() {
+      return request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'anonymous';
+    }
+
+    // pairId is the two uids sorted ascending and joined with '_', so a rule can
+    // derive the friendship document key from the two participants rather than
+    // needing it passed in and then trusting it.
+    function friendPairId(a, b) {
+      return a < b ? a + '_' + b : b + '_' + a;
+    }
+
+    function friendshipPath(owner) {
+      return /databases/$(database)/documents/friendships/$(friendPairId(request.auth.uid, owner));
+    }
+
+    // exists() before get(): get() on a missing document raises rather than
+    // returning null, and a raise inside a helper denies the read for a reason
+    // that has nothing to do with friendship.
+    function sharesFriendshipWith(owner) {
+      return request.auth != null
+        && request.auth.uid != owner
+        && exists(friendshipPath(owner));
+    }
+
+    function isFriendOf(owner) {
+      return sharesFriendshipWith(owner)
+        && get(friendshipPath(owner)).data.status == 'accepted';
+    }
 
     match /users/{uid} {
       allow read, write: if isSignedIn() && request.auth.uid == uid;
       allow read: if isAdmin();
+    }
+
+    // match /users/{uid} above is NOT recursive, so these subcollections need
+    // their own blocks. They are the friend-readable projection of a customer's
+    // taste; the user document itself stays owner-only.
+    match /users/{uid}/favorites/{comboId} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isFriendOf(uid));
+      // Split from delete because request.resource is null on a delete, so a
+      // field check in a combined `write` would raise and deny legitimate ones.
+      allow create, update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+             'comboId', 'label', 'kind', 'mixId', 'hookahId', 'tobaccoType',
+             'flavorIds', 'tobaccoStrength', 'flavorPercentages', 'withIce',
+             'hasLED', 'hasColoredWater', 'hasAlcohol', 'hasFruits', 'createdAt'])
+        // Bound what a friend downloads: this list is re-read on every visit to
+        // their profile. Same reasoning as the profiles block above.
+        && request.resource.data.label is string
+        && request.resource.data.label.size() <= 200
+        // comboId is `mix:{docId}` or `custom:{16 hex}` - see comboId.ts -
+        // never anywhere near this bound. Left unconstrained, this is the
+        // same 700KB-string hole label had, just on the field next to it.
+        && request.resource.data.comboId is string
+        && request.resource.data.comboId.size() <= 100
+        && request.resource.data.kind in ['mix', 'custom']
+        && (!('mixId' in request.resource.data)
+            || (request.resource.data.mixId is string
+                && request.resource.data.mixId.size() <= 100))
+        && (!('hookahId' in request.resource.data)
+            || (request.resource.data.hookahId is string
+                && request.resource.data.hookahId.size() <= 100))
+        && (!('tobaccoType' in request.resource.data)
+            || (request.resource.data.tobaccoType is string
+                && request.resource.data.tobaccoType.size() <= 100))
+        // A friend downloads these too, so size is bounded like every other
+        // list/map a friend can pull down, not just its element type.
+        && (!('flavorIds' in request.resource.data)
+            || (request.resource.data.flavorIds is list
+                && request.resource.data.flavorIds.size() <= 10))
+        && (!('flavorPercentages' in request.resource.data)
+            || (request.resource.data.flavorPercentages is map
+                && request.resource.data.flavorPercentages.size() <= 10))
+        && (!('tobaccoStrength' in request.resource.data)
+            || request.resource.data.tobaccoStrength is number)
+        && (!('withIce' in request.resource.data) || request.resource.data.withIce is bool)
+        && (!('hasLED' in request.resource.data) || request.resource.data.hasLED is bool)
+        && (!('hasColoredWater' in request.resource.data)
+            || request.resource.data.hasColoredWater is bool)
+        && (!('hasAlcohol' in request.resource.data) || request.resource.data.hasAlcohol is bool)
+        && (!('hasFruits' in request.resource.data) || request.resource.data.hasFruits is bool)
+        // Server time only, matching the acceptedAt idiom on friendships.
+        // Optional because a full-document setDoc without merge (what the
+        // tests here use) simply omits the field rather than sending a value.
+        && (!('createdAt' in request.resource.data)
+            || request.resource.data.createdAt == request.time);
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid}/ratings/{comboId} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isFriendOf(uid));
+      allow create, update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['comboId', 'label', 'score', 'ratedAt'])
+        && request.resource.data.label is string
+        && request.resource.data.label.size() <= 200
+        // Same shape and bound as the favorites block above.
+        && request.resource.data.comboId is string
+        && request.resource.data.comboId.size() <= 100
+        && request.resource.data.score is int
+        && request.resource.data.score >= 1
+        && request.resource.data.score <= 5
+        // Server time only, matching acceptedAt. Optional: ratingsService
+        // always sends it, but nothing here requires a caller to.
+        && (!('ratedAt' in request.resource.data)
+            || request.resource.data.ratedAt == request.time);
+      allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
     match /orders/{orderId} {
@@ -39,7 +155,21 @@ service cloud.firestore {
         && request.resource.data.total is number
         && request.resource.data.total >= 0;
       allow read: if isAdmin() || (isSignedIn() && ownsOrder());
-      allow update, delete: if isAdmin();
+      allow delete: if isAdmin();
+
+      // hasOnly is what keeps this from becoming a route into status and total.
+      allow update: if isAdmin()
+        || (isSignedIn() && ownsOrder()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['rating', 'ratedAt'])
+            && request.resource.data.rating is int
+            && request.resource.data.rating >= 1
+            && request.resource.data.rating <= 5
+            // Server time only, so a rating cannot carry an arbitrary payload.
+            // Optional in the same way acceptedAt is on friendships: an update
+            // that changes only `rating` must stay legal.
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['ratedAt'])
+                || request.resource.data.ratedAt == request.time));
     }
 
     match /menu/{document}             { allow read: if true; allow write: if isAdmin(); }
@@ -77,5 +207,163 @@ service cloud.firestore {
     // Deliberately absent, so default-deny applies: products, sessions and
     // tables. Verified dead - products and sessions are referenced nowhere in
     // src/, and tables only by updateTableStatus, which has no callers.
+
+    // Split from users/{uid} because Firestore has no field-level read
+    // security: a friend-read on the user document would hand over the email
+    // address, order count and total spend along with the display name.
+    // Readable on ANY friendship including pending, so the recipient of a
+    // request can see who is asking.
+    match /profiles/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || sharesFriendshipWith(uid));
+      allow create, update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['displayName', 'photoURL', 'updatedAt'])
+        // Bound what a friend has to download. Unvalidated, a 700KB displayName
+        // is accepted and then shipped to everyone who opens the profile.
+        // null is allowed because Firebase reports "no display name" as null.
+        && (!('displayName' in request.resource.data)
+            || request.resource.data.displayName == null
+            || (request.resource.data.displayName is string
+                && request.resource.data.displayName.size() <= 100))
+        // https only, so a javascript: or data:text/html URI can never reach an
+        // href or an img src once profile pictures are rendered.
+        && (!('photoURL' in request.resource.data)
+            || request.resource.data.photoURL == null
+            || (request.resource.data.photoURL is string
+                && request.resource.data.photoURL.size() <= 500
+                && request.resource.data.photoURL.matches('https://.*')))
+        // Server time only, matching acceptedAt. Optional: a plain setDoc
+        // without merge (as the tests here use) simply omits the field.
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt == request.time);
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // One document per relationship. Decline, cancel and unfriend are all a
+    // delete - there is no blocklist and no record of a refusal, which is
+    // proportionate for a venue with a few hundred customers.
+    match /friendships/{pairId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.uids;
+
+      allow create: if isSignedIn()
+        // A friendship requires a profile, and anonymous guests never get
+        // one - same reasoning as inviteCodes below, reusing its helper.
+        // Without this an anonymous guest can create a friendship request
+        // directly (after resolving a uid via the open inviteCodes get),
+        // and the recipient sees a request from an unattributable "Someone".
+        && isRealAccount()
+        && request.resource.data.uids.size() == 2
+        && request.resource.data.uids[0] < request.resource.data.uids[1]
+        && pairId == friendPairId(request.resource.data.uids[0], request.resource.data.uids[1])
+        && request.auth.uid in request.resource.data.uids
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.resource.data.status == 'pending'
+        // pairId joins the two uids with '_', so a uid containing '_' makes the
+        // join ambiguous: ("A","B_C") and ("A_B","C") both produce "A_B_C", and
+        // whichever pair creates it first grants the other pair access. Firebase
+        // Auth uids are 28-char alphanumeric so this is not reachable today, but
+        // the separator is load-bearing in a security boundary and the guard is
+        // one line. Verified reachable against a rules emulator with synthetic uids.
+        && !request.resource.data.uids[0].matches('.*_.*')
+        && !request.resource.data.uids[1].matches('.*_.*')
+        // Shape-pinned like profiles and notifications. createdAt is permitted
+        // but not required: friendsService writes it, the rules tests do not.
+        && request.resource.data.keys().hasOnly(['uids', 'requestedBy', 'status', 'createdAt'])
+        // Server time only, matching acceptedAt right below.
+        && (!('createdAt' in request.resource.data)
+            || request.resource.data.createdAt == request.time);
+
+      // Only the other party accepts, and only pending -> accepted. Pinning
+      // affectedKeys stops an accept from rewriting who the friendship is
+      // between or who asked.
+      allow update: if isSignedIn()
+        // Same guard as create: accepting is how a guest could gain friend
+        // access from the OTHER side of the hole, if a real account ever
+        // targeted a guest uid with a request.
+        && isRealAccount()
+        && request.auth.uid in resource.data.uids
+        && resource.data.requestedBy != request.auth.uid
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedAt'])
+        // If acceptedAt is written it must be the server's time, not a value the
+        // accepting party picked. Optional rather than required, because the
+        // rules tests accept without it.
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['acceptedAt'])
+            || request.resource.data.acceptedAt == request.time);
+
+      allow delete: if isSignedIn() && request.auth.uid in resource.data.uids;
+    }
+
+    // Code -> uid, for invite links and QR. get is open to any signed-in user
+    // because a code is unguessable; list is denied so the collection cannot be
+    // walked to harvest them.
+    match /inviteCodes/{code} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn()
+        // Without this an anonymous guest can mint a code that resolves to a
+        // dead end for whoever scans it.
+        && isRealAccount()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'displayName', 'createdAt'])
+        // Bound what anyone resolving this code downloads. Same reasoning as
+        // the profiles, favorites, ratings and orders blocks above.
+        && (!('displayName' in request.resource.data)
+            || request.resource.data.displayName == null
+            || (request.resource.data.displayName is string
+                && request.resource.data.displayName.size() <= 100))
+        // Server time only, matching acceptedAt on friendships.
+        && (!('createdAt' in request.resource.data)
+            || request.resource.data.createdAt == request.time);
+      // Lets the owner refresh a stale displayName without rotating the code.
+      // ensureInviteCode only ever creates once, so a name set AFTER the
+      // first mint was previously frozen forever - the only fix was Reset
+      // link, which invalidates a QR that may already be shared or printed.
+      // affectedKeys().hasOnly(['displayName']) is what keeps this narrow:
+      // uid is not in the allowed set, so it can never be reassigned to
+      // repoint the code at another account (that would be a hijack), and
+      // createdAt cannot be forged after the fact either.
+      allow update: if isSignedIn() && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])
+        && (!('displayName' in request.resource.data)
+            || request.resource.data.displayName == null
+            || (request.resource.data.displayName is string
+                && request.resource.data.displayName.size() <= 100));
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // sha256(lowercased email) -> uid, for email search. Opt-in and default-off
+    // in the client. get is allowed and list is denied, so someone can confirm
+    // an address they already hold but cannot harvest the customer base - which
+    // is the part that matters. The document id must be the hash of the
+    // CALLER'S OWN email, so nobody can squat an address they do not control.
+    match /discoverable/{emailHash} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      // create AND update share one rule, not just create: the document id is
+      // deterministic (the hash of your own email), so a repeat setDoc over a
+      // surviving document - a retry, a double-tap, or opting in again right
+      // after opting out - is evaluated as an update, not a second create.
+      // Without allow update that second write was a bare permission-denied
+      // with no way to recover.
+      // Still theft-proof: emailHash must equal the hash of the CALLER'S OWN
+      // email token on every write, so nobody can ever land here to update a
+      // document keyed to an email they do not hold - the same guarantee
+      // create alone used to provide.
+      allow create, update: if isSignedIn()
+        // .get() rather than a bare access: a bare one RAISES for an anonymous
+        // guest, who has no email claim at all. The denial was already correct,
+        // this just makes it evaluate instead of throwing, matching isAdmin()
+        // and ownsOrder() above.
+        && request.auth.token.get('email', '') != ''
+        && emailHash == hashing.sha256(request.auth.token.email.lower()).toHexString().lower()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'displayName'])
+        && (!('displayName' in request.resource.data)
+            || request.resource.data.displayName == null
+            || (request.resource.data.displayName is string
+                && request.resource.data.displayName.size() <= 100));
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
   }
 }

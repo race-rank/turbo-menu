@@ -7,6 +7,18 @@ export interface CartItem {
   price: number;
   quantity: number;
   image: string;
+  // Stable identity for favouriting and rating. See src/services/comboId.ts.
+  comboId: string;
+  // Canonical, human-readable name of the combo, set from the same expression
+  // the favourite for this comboId uses. `name` cannot serve: it is the
+  // literal 'Custom Mix' for every custom build, and carries the tobacco
+  // category for a mix, which the combo id deliberately excludes.
+  comboLabel?: string;
+  // Set on curated mixes only.
+  mixId?: string;
+  // Set on custom builds only. flavorIds are `{flavorDocId}:{variantType}`.
+  hookahId?: string;
+  flavorIds?: string[];
   table: string;
   tobaccoType?: 'virginia' | 'darkblend' | 'cigarleaf' | 'mix';
   tobaccoStrength?: number;
