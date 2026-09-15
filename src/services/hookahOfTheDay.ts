@@ -8,6 +8,23 @@ import type { DatabaseHookah, FeaturedHookah } from '@/types/database';
  */
 export const MAX_PROMO_TEXT_LENGTH = 140;
 
+/**
+ * Normalise a promo line for storage: trimmed, capped, and absent rather than
+ * empty.
+ *
+ * Lives here rather than inline in menuService.setFeaturedHookah so the cap -
+ * the one hard backstop stopping unbounded text reaching the public menu
+ * snapshot - sits in the tested seam. The Input's maxLength is a courtesy to
+ * the admin; this is the guarantee.
+ */
+export const clampPromoText = (promoText?: string): string | undefined => {
+  const trimmed = promoText?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.length <= MAX_PROMO_TEXT_LENGTH
+    ? trimmed
+    : trimmed.slice(0, MAX_PROMO_TEXT_LENGTH);
+};
+
 export interface ResolvedHookahOfTheDay {
   hookah: DatabaseHookah;
   promoText?: string;

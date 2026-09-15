@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix, FeaturedHookah } from '@/types/database';
-import { MAX_PROMO_TEXT_LENGTH } from './hookahOfTheDay';
+import { clampPromoText } from './hookahOfTheDay';
 import { safeConvertTimestamp, cleanObject } from './firebaseService';
 
 const MENU_COLLECTIONS = {
@@ -467,10 +467,9 @@ export const getFeaturedHookah = async (): Promise<FeaturedHookah | undefined> =
  * has.
  */
 export const setFeaturedHookah = async (hookahId: string, promoText?: string): Promise<void> => {
-  const trimmed = promoText?.trim();
   await setDoc(doc(firestore, MENU_SNAPSHOT_COLLECTION, FEATURED_HOOKAH_ID), stripUndefined({
     hookahId,
-    promoText: trimmed ? trimmed.slice(0, MAX_PROMO_TEXT_LENGTH) : undefined,
+    promoText: clampPromoText(promoText),
   }));
 };
 

@@ -563,6 +563,11 @@ const MenuManagement = () => {
                   value={featuredPromo}
                   maxLength={MAX_PROMO_TEXT_LENGTH}
                   onChange={(e) => setFeaturedPromo(e.target.value)}
+                  // Disabled mid-save like the Select and buttons: loadMenuData
+                  // re-seeds this field from the server when the write returns,
+                  // so keystrokes typed during the round trip would be silently
+                  // discarded.
+                  disabled={featuredSaving}
                   className="bg-turbo-bg border-border text-turbo-text"
                 />
                 <p className="text-right text-[10px] text-turbo-muted">

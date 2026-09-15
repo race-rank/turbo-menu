@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { resolveHookahOfTheDay } from '../src/services/hookahOfTheDay';
+import { MAX_PROMO_TEXT_LENGTH, clampPromoText, resolveHookahOfTheDay } from '../src/services/hookahOfTheDay';
 import type { DatabaseHookah, FeaturedHookah } from '../src/types/database';
 
 const NOW = new Date('2026-01-01T00:00:00.000Z');
@@ -60,5 +60,43 @@ describe('resolveHookahOfTheDay', () => {
 
   test('an empty hookah list resolves to null rather than throwing', () => {
     expect(resolveHookahOfTheDay([], { hookahId: 'hookah-1' })).toBeNull();
+  });
+});
+
+describe('clampPromoText', () => {
+  test('a normal line survives unchanged', () => {
+    expect(clampPromoText('Smooth and slow')).toBe('Smooth and slow');
+  });
+
+  test('surrounding whitespace is trimmed', () => {
+    expect(clampPromoText('  Smooth and slow  ')).toBe('Smooth and slow');
+  });
+
+  test('an absent, empty or whitespace-only line becomes undefined', () => {
+    // undefined rather than '' so stripUndefined drops the key entirely instead
+    // of writing an empty string into the public snapshot.
+    expect(clampPromoText(undefined)).toBeUndefined();
+    expect(clampPromoText('')).toBeUndefined();
+    expect(clampPromoText('   ')).toBeUndefined();
+  });
+
+  test('a line at the cap is kept whole', () => {
+    const exact = 'x'.repeat(MAX_PROMO_TEXT_LENGTH);
+
+    expect(clampPromoText(exact)).toBe(exact);
+  });
+
+  test('an oversized line is cut to the cap', () => {
+    // The Input's maxLength is a courtesy to the admin; this is the guarantee
+    // that unbounded text never reaches the snapshot every customer downloads.
+    const result = clampPromoText('x'.repeat(5000));
+
+    expect(result).toHaveLength(MAX_PROMO_TEXT_LENGTH);
+  });
+
+  test('a line that is only oversized after trimming is still cut', () => {
+    const result = clampPromoText(`   ${'x'.repeat(5000)}   `);
+
+    expect(result).toHaveLength(MAX_PROMO_TEXT_LENGTH);
   });
 });
