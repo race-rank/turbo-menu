@@ -783,3 +783,319 @@ describe('email discovery', () => {
     }));
   });
 });
+
+// --------------------------------------------------------- guest data claims
+//
+// The whole point of accountClaims is that possession of a device-held secret
+// is the ONLY proof of ownership that lets an order change hands. These tests
+// exist to prove the two halves of that: the secret cannot be read back out of
+// Firestore, and without it no signed-in user can move an order they did not
+// place - even knowing its document id.
+
+const GUEST = 'guest-uid';
+
+// sha256 of GUEST_SECRET, lowercase hex. Hard-coded and independently verified
+// with `printf '%s' "<secret>" | shasum -a 256`, exactly like ALICE_EMAIL_HASH
+// above, so the test proves the RULE computes this value rather than agreeing
+// with a helper the test wrote itself.
+const GUEST_SECRET = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
+const GUEST_SECRET_HASH = '2a8abfa8cb9906290437854193ca6bca41d4d4e26d1d454bd66a35158095e737';
+
+const guest = (uid = GUEST) => testEnv.authenticatedContext(uid, {
+  firebase: { sign_in_provider: 'anonymous', identities: {} },
+}).firestore();
+
+/** Puts a claim document in place, bypassing the rules. */
+const seedClaim = async (anonUid: string, claimedBy?: string) => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'accountClaims', anonUid), {
+      secretHash: GUEST_SECRET_HASH,
+      ...(claimedBy ? { claimedBy, secret: GUEST_SECRET } : {}),
+    });
+  });
+};
+
+describe('account claims', () => {
+  test('a guest creates a claim for its own uid', async () => {
+    await assertSucceeds(setDoc(doc(guest(), 'accountClaims', GUEST), {
+      secretHash: GUEST_SECRET_HASH, createdAt: serverTimestamp(),
+    }));
+  });
+
+  // The create rule is what stops someone planting a claim over a uid they do
+  // not hold and then "claiming" that person's orders.
+  test('a guest cannot create a claim for another uid', async () => {
+    await assertFails(setDoc(doc(guest(), 'accountClaims', ALICE), {
+      secretHash: GUEST_SECRET_HASH, createdAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(alice(), 'accountClaims', GUEST), {
+      secretHash: GUEST_SECRET_HASH, createdAt: serverTimestamp(),
+    }));
+  });
+
+  // The load-bearing denial. get() inside a rule bypasses client read
+  // permission, so the rules can still verify a claim - but if a client could
+  // read one, the secret would be harvestable and the whole scheme collapses
+  // into "any signed-in user may reassign any order".
+  test('no client can read a claim, by get or by list', async () => {
+    await seedClaim(GUEST);
+    await assertFails(getDoc(doc(guest(), 'accountClaims', GUEST)));
+    await assertFails(getDoc(doc(alice(), 'accountClaims', GUEST)));
+    await assertFails(getDoc(doc(anon(), 'accountClaims', GUEST)));
+    await assertFails(getDocs(collection(guest(), 'accountClaims')));
+    await assertFails(getDocs(collection(alice(), 'accountClaims')));
+  });
+
+  test('a claim rejects a malformed secret hash', async () => {
+    await assertFails(setDoc(doc(guest(), 'accountClaims', GUEST), {
+      secretHash: 'not-hex-at-all-not-hex-at-all-not-hex-at-all-not-hex-at-all-xxxx',
+      createdAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(guest(), 'accountClaims', GUEST), {
+      secretHash: 'abcd', createdAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(guest(), 'accountClaims', GUEST), {
+      secretHash: 'a'.repeat(700_000), createdAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(guest(), 'accountClaims', GUEST), {
+      secretHash: 12345, createdAt: serverTimestamp(),
+    }));
+    // Upper-case hex: the rule lowercases what it computes, so a stored
+    // upper-case digest would never match and the claim would be dead.
+    await assertFails(setDoc(doc(guest(), 'accountClaims', GUEST), {
+      secretHash: GUEST_SECRET_HASH.toUpperCase(), createdAt: serverTimestamp(),
+    }));
+  });
+
+  test('a claim cannot forge createdAt or omit it', async () => {
+    await assertFails(setDoc(doc(guest(), 'accountClaims', GUEST), {
+      secretHash: GUEST_SECRET_HASH, createdAt: new Date('2020-01-01'),
+    }));
+    await assertFails(setDoc(doc(guest(), 'accountClaims', GUEST), {
+      secretHash: GUEST_SECRET_HASH,
+    }));
+  });
+
+  // claimedBy at create time would be self-appointment without ever proving
+  // possession of the secret.
+  test('a claim cannot be created already claimed, or carry extra fields', async () => {
+    await assertFails(setDoc(doc(guest(), 'accountClaims', GUEST), {
+      secretHash: GUEST_SECRET_HASH, createdAt: serverTimestamp(), claimedBy: GUEST,
+    }));
+    await assertFails(setDoc(doc(guest(), 'accountClaims', GUEST), {
+      secretHash: GUEST_SECRET_HASH, createdAt: serverTimestamp(), admin: true,
+    }));
+  });
+
+  test('taking a claim with the wrong secret is denied', async () => {
+    await seedClaim(GUEST);
+    await assertFails(updateDoc(doc(alice(), 'accountClaims', GUEST), {
+      claimedBy: ALICE, secret: 'wrong-secret',
+    }));
+    // No secret at all - must deny by evaluating, not by raising.
+    await assertFails(updateDoc(doc(alice(), 'accountClaims', GUEST), {
+      claimedBy: ALICE,
+    }));
+  });
+
+  test('taking a claim with the right secret succeeds', async () => {
+    await seedClaim(GUEST);
+    await assertSucceeds(updateDoc(doc(alice(), 'accountClaims', GUEST), {
+      claimedBy: ALICE, secret: GUEST_SECRET,
+    }));
+  });
+
+  test('taking a claim cannot name someone else', async () => {
+    await seedClaim(GUEST);
+    await assertFails(updateDoc(doc(alice(), 'accountClaims', GUEST), {
+      claimedBy: BOB, secret: GUEST_SECRET,
+    }));
+  });
+
+  test('taking a claim cannot rewrite the hash or smuggle fields', async () => {
+    await seedClaim(GUEST);
+    await assertFails(updateDoc(doc(alice(), 'accountClaims', GUEST), {
+      claimedBy: ALICE, secret: GUEST_SECRET, secretHash: 'f'.repeat(64),
+    }));
+    await assertFails(updateDoc(doc(alice(), 'accountClaims', GUEST), {
+      claimedBy: ALICE, secret: GUEST_SECRET, admin: true,
+    }));
+  });
+
+  // Single use. Without this, a leaked secret stays a permanent skeleton key:
+  // every future owner of those orders could be displaced again.
+  test('a claim cannot be taken twice', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertFails(updateDoc(doc(bob(), 'accountClaims', GUEST), {
+      claimedBy: BOB, secret: GUEST_SECRET,
+    }));
+    await assertFails(updateDoc(doc(alice(), 'accountClaims', GUEST), {
+      claimedBy: ALICE, secret: GUEST_SECRET,
+    }));
+  });
+
+  test('only the account named in claimedBy deletes the claim', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertFails(deleteDoc(doc(bob(), 'accountClaims', GUEST)));
+    await assertFails(deleteDoc(doc(guest(), 'accountClaims', GUEST)));
+    await assertSucceeds(deleteDoc(doc(alice(), 'accountClaims', GUEST)));
+  });
+
+  test('an unclaimed claim cannot be deleted by anyone', async () => {
+    await seedClaim(GUEST);
+    await assertFails(deleteDoc(doc(alice(), 'accountClaims', GUEST)));
+    await assertFails(deleteDoc(doc(guest(), 'accountClaims', GUEST)));
+  });
+});
+
+describe('claiming a guest order', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'orders', 'guest-order'), {
+        total: 120, status: 'pending',
+        customerInfo: { uid: GUEST, id: 'customer-xyz', name: 'Guest', table: '7' },
+        items: [{ comboId: 'mix:sunset', name: 'Sunset Blend' }],
+      });
+      await setDoc(doc(db, `users/${GUEST}/favorites/mix:sunset`), {
+        comboId: 'mix:sunset', label: 'Sunset Blend', kind: 'mix',
+      });
+      await setDoc(doc(db, `users/${GUEST}/ratings/mix:sunset`), {
+        comboId: 'mix:sunset', label: 'Sunset Blend', score: 4,
+      });
+    });
+  });
+
+  test('the account named in claimedBy reassigns the order', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertSucceeds(updateDoc(doc(alice(), 'orders', 'guest-order'), {
+      'customerInfo.uid': ALICE,
+    }));
+  });
+
+  // The attack the whole design exists to stop. Order ids are short and a
+  // customer sees their own; knowing one must buy nothing.
+  test('a signed-in stranger who knows the order id cannot reassign it', async () => {
+    await assertFails(updateDoc(doc(bob(), 'orders', 'guest-order'), {
+      'customerInfo.uid': BOB,
+    }));
+    await seedClaim(GUEST, ALICE);
+    await assertFails(updateDoc(doc(bob(), 'orders', 'guest-order'), {
+      'customerInfo.uid': BOB,
+    }));
+  });
+
+  test('a guest order with no claim at all cannot be reassigned', async () => {
+    await assertFails(updateDoc(doc(alice(), 'orders', 'guest-order'), {
+      'customerInfo.uid': ALICE,
+    }));
+  });
+
+  // Holding the claim does not let the holder hand the order to a third party.
+  test('a reassignment must point at the caller', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertFails(updateDoc(doc(alice(), 'orders', 'guest-order'), {
+      'customerInfo.uid': BOB,
+    }));
+  });
+
+  // Ownership moves; nothing else does. Without the nested diff this is a
+  // route straight into revenue figures and the kitchen queue.
+  test('a reassignment that also alters status, total or the name is denied', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertFails(updateDoc(doc(alice(), 'orders', 'guest-order'), {
+      'customerInfo.uid': ALICE, status: 'completed',
+    }));
+    await assertFails(updateDoc(doc(alice(), 'orders', 'guest-order'), {
+      'customerInfo.uid': ALICE, total: 1,
+    }));
+    await assertFails(updateDoc(doc(alice(), 'orders', 'guest-order'), {
+      'customerInfo.uid': ALICE, 'customerInfo.name': 'Mallory',
+    }));
+    await assertFails(updateDoc(doc(alice(), 'orders', 'guest-order'), {
+      'customerInfo.uid': ALICE, rating: 5,
+    }));
+  });
+
+  // Replacing the whole map rather than the one field drops name, id and
+  // table, which is a silent loss of the bar's own record.
+  test('a reassignment cannot replace the whole customerInfo map', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertFails(updateDoc(doc(alice(), 'orders', 'guest-order'), {
+      customerInfo: { uid: ALICE },
+    }));
+  });
+
+  // Pre-uid orders have customerInfo but no uid inside it; the claim lookup
+  // must evaluate to a denial rather than raise on the missing field.
+  test('a pre-uid order denies cleanly rather than raising', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'orders', 'legacy-order'), {
+        total: 80, status: 'completed', customerInfo: { id: 'customer-abc' },
+      });
+    });
+    await assertFails(updateDoc(doc(alice(), 'orders', 'legacy-order'), {
+      'customerInfo.uid': ALICE,
+    }));
+  });
+
+  // The invariant from 'rating an order', restated against the new branch: a
+  // friendship must buy nothing on the orders collection, reassignment least
+  // of all.
+  test('an accepted friend still cannot read or reassign your orders', async () => {
+    await seedFriendship(ALICE, BOB, 'accepted');
+    await seedClaim(GUEST, ALICE);
+    await assertFails(getDoc(doc(bob(), 'orders', 'guest-order')));
+    await assertFails(updateDoc(doc(bob(), 'orders', 'guest-order'), {
+      'customerInfo.uid': BOB,
+    }));
+  });
+
+  test('the claimer reads and lists the guest favourites and ratings', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertSucceeds(getDoc(doc(alice(), `users/${GUEST}/favorites/mix:sunset`)));
+    await assertSucceeds(getDoc(doc(alice(), `users/${GUEST}/ratings/mix:sunset`)));
+    await assertSucceeds(getDocs(collection(alice(), `users/${GUEST}/favorites`)));
+    await assertSucceeds(getDocs(collection(alice(), `users/${GUEST}/ratings`)));
+  });
+
+  test('the claimer deletes the guest originals once copied', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertSucceeds(deleteDoc(doc(alice(), `users/${GUEST}/favorites/mix:sunset`)));
+    await assertSucceeds(deleteDoc(doc(alice(), `users/${GUEST}/ratings/mix:sunset`)));
+  });
+
+  // Read and delete only. The claimer copies these into their own account;
+  // nothing needs them to be able to write into the guest's.
+  test('the claimer cannot write into the guest favourites or ratings', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertFails(setDoc(doc(alice(), `users/${GUEST}/favorites/mix:dawn`), {
+      comboId: 'mix:dawn', label: 'Dawn', kind: 'mix',
+    }));
+    await assertFails(setDoc(doc(alice(), `users/${GUEST}/ratings/mix:dawn`), {
+      comboId: 'mix:dawn', label: 'Dawn', score: 3,
+    }));
+  });
+
+  test('claim-based access does not reach the guest user document', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertFails(getDoc(doc(alice(), 'users', GUEST)));
+  });
+
+  test('everyone else is still shut out of the guest favourites and ratings', async () => {
+    await seedClaim(GUEST, ALICE);
+    await assertFails(getDoc(doc(bob(), `users/${GUEST}/favorites/mix:sunset`)));
+    await assertFails(getDoc(doc(bob(), `users/${GUEST}/ratings/mix:sunset`)));
+    await assertFails(getDocs(collection(bob(), `users/${GUEST}/favorites`)));
+    await assertFails(deleteDoc(doc(bob(), `users/${GUEST}/favorites/mix:sunset`)));
+    await assertFails(getDoc(doc(carol(), `users/${GUEST}/favorites/mix:sunset`)));
+  });
+
+  // An unclaimed claim grants nothing: the exists()/claimedBy check has to
+  // fail closed, not merely on a mismatch.
+  test('an unclaimed claim grants no access to favourites or ratings', async () => {
+    await seedClaim(GUEST);
+    await assertFails(getDoc(doc(alice(), `users/${GUEST}/favorites/mix:sunset`)));
+    await assertFails(getDoc(doc(alice(), `users/${GUEST}/ratings/mix:sunset`)));
+  });
+});

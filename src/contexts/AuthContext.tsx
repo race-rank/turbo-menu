@@ -3,6 +3,7 @@ import { onIdTokenChanged, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { ensureSignedIn } from '@/services/authService';
 import { upsertPublicProfile } from '@/services/profileService';
+import { claimGuestData } from '@/services/accountClaimService';
 
 interface AuthContextType {
   user: User | null;
@@ -38,6 +39,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // for every real customer, forever. One attempt per uid per session is
   // enough - the explicit upsert on sign-in/sign-up/rename covers the rest.
   const profileBackfillAttempted = useRef(new Set<string>());
+
+  // Same one-attempt-per-uid-per-session guard, for resuming an interrupted
+  // guest-data migration. AuthForms drives the first attempt; this is what
+  // finishes the job for a customer whose connection dropped halfway through
+  // and who simply comes back later already signed in.
+  const claimAttempted = useRef(new Set<string>());
 
   useEffect(() => {
     // onIdTokenChanged, NOT onAuthStateChanged: the SDK's notifyAuthListeners
@@ -76,6 +83,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         profileBackfillAttempted.current.add(next.uid);
         upsertPublicProfile(next).catch((error) => {
           console.error('Public profile backfill failed:', error);
+        });
+      }
+
+      // Finish, or burn, whatever guest claim this device is still holding.
+      // Costs nothing when localStorage holds no claim record, which is the
+      // overwhelmingly common case - it returns before touching the network.
+      // Fire-and-forget and non-fatal for the same reason as the backfill
+      // above: this must never delay or fail an auth-state settle.
+      if (!next.isAnonymous && !claimAttempted.current.has(next.uid)) {
+        claimAttempted.current.add(next.uid);
+        claimGuestData(next).catch((error) => {
+          console.error('Resuming the guest data claim failed:', error);
         });
       }
     });
