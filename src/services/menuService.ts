@@ -14,7 +14,8 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
-import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
+import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix, FeaturedHookah } from '@/types/database';
+import { clampPromoText } from './hookahOfTheDay';
 import { safeConvertTimestamp, cleanObject } from './firebaseService';
 
 const MENU_COLLECTIONS = {
@@ -28,12 +29,18 @@ const MENU_COLLECTIONS = {
 // document instead of running four queries on a cold Firestore connection.
 const MENU_SNAPSHOT_COLLECTION = 'menu';
 const MENU_SNAPSHOT_ID = 'current';
+// Sibling of the snapshot under the same collection, so it inherits
+// `match /menu/{document}` - public read, admin write - with no rules change.
+const FEATURED_HOOKAH_ID = 'featured';
 
 export interface MenuData {
   hookahs: DatabaseHookah[];
   tobaccoTypes: DatabaseTobaccoType[];
   flavors: DatabaseFlavor[];
   recommendedMixes: DatabaseRecommendedMix[];
+  // Optional: a snapshot published before this shipped carries no such key, and
+  // that must read as "nothing featured" rather than as an error.
+  hookahOfTheDay?: FeaturedHookah;
 }
 
 // Hookah operations
@@ -198,13 +205,14 @@ export const getRecommendedMixes = async (): Promise<DatabaseRecommendedMix[]> =
 // Menu snapshot (single-document read path for guests)
 
 const fetchMenuCollections = async (): Promise<MenuData> => {
-  const [hookahs, tobaccoTypes, flavors, recommendedMixes] = await Promise.all([
+  const [hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay] = await Promise.all([
     getHookahs(),
     getTobaccoTypes(),
     getFlavors(),
-    getRecommendedMixes()
+    getRecommendedMixes(),
+    getFeaturedHookah()
   ]);
-  return { hookahs, tobaccoTypes, flavors, recommendedMixes };
+  return { hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay };
 };
 
 const reviveMenuItems = <T,>(items: unknown): T[] =>
@@ -243,7 +251,10 @@ export const getMenuData = async (): Promise<MenuData> => {
         hookahs: reviveMenuItems<DatabaseHookah>(data.hookahs),
         tobaccoTypes: reviveMenuItems<DatabaseTobaccoType>(data.tobaccoTypes),
         flavors: reviveMenuItems<DatabaseFlavor>(data.flavors),
-        recommendedMixes: reviveMenuItems<DatabaseRecommendedMix>(data.recommendedMixes)
+        recommendedMixes: reviveMenuItems<DatabaseRecommendedMix>(data.recommendedMixes),
+        // Not run through reviveMenuItems: it is a single object with no
+        // timestamps, not a list of menu items.
+        hookahOfTheDay: data.hookahOfTheDay ?? undefined
       };
     }
   } catch (error) {
@@ -422,4 +433,47 @@ export const subscribeToMenuData = (
     unsubscribeFlavors();
     unsubscribeMixes();
   };
+};
+
+// ------------------------------------------------- hookah of the day
+
+/**
+ * Read the promotion pointer. Returns undefined when nothing is featured,
+ * which is the normal resting state, not an error.
+ *
+ * Field-by-field rather than a spread: this document is admin-written and
+ * therefore trusted, but a stray field would otherwise ride into the public
+ * snapshot that every customer downloads.
+ */
+export const getFeaturedHookah = async (): Promise<FeaturedHookah | undefined> => {
+  const snapshot = await getDoc(doc(firestore, MENU_SNAPSHOT_COLLECTION, FEATURED_HOOKAH_ID));
+  if (!snapshot.exists()) return undefined;
+
+  const data = snapshot.data();
+  if (typeof data.hookahId !== 'string' || !data.hookahId) return undefined;
+
+  return {
+    hookahId: data.hookahId,
+    promoText: typeof data.promoText === 'string' ? data.promoText : undefined,
+  };
+};
+
+/**
+ * Point the promotion at a hookah. setDoc rather than updateDoc so clearing the
+ * promo line actually removes it instead of leaving the previous one behind.
+ *
+ * Callers must republish the menu snapshot afterwards, or guests keep seeing
+ * the previous promotion - the same contract every other mutation in this file
+ * has.
+ */
+export const setFeaturedHookah = async (hookahId: string, promoText?: string): Promise<void> => {
+  await setDoc(doc(firestore, MENU_SNAPSHOT_COLLECTION, FEATURED_HOOKAH_ID), stripUndefined({
+    hookahId,
+    promoText: clampPromoText(promoText),
+  }));
+};
+
+/** Ends the promotion. Deleting is the whole of it - there is no "off" state. */
+export const clearFeaturedHookah = async (): Promise<void> => {
+  await deleteDoc(doc(firestore, MENU_SNAPSHOT_COLLECTION, FEATURED_HOOKAH_ID));
 };

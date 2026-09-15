@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Autoplay from 'embla-carousel-autoplay';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Search, ShoppingCart, Trash2, Shuffle } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Shuffle, Star } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '@/contexts/CartContext';
 import { useTable } from '@/contexts/TableContext';
@@ -28,6 +28,9 @@ import type { FavoriteCombo } from '@/services/favoritesService';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADDONS, ADDON_PRICES } from '@/services/addons';
 import { isValidTableId } from '@/services/tableValidation';
+import { HookahOfTheDayCard } from '@/components/HookahOfTheDayCard';
+import { resolveHookahOfTheDay } from '@/services/hookahOfTheDay';
+import type { FeaturedHookah } from '@/types/database';
 
 const MixSkeletons = () => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -80,6 +83,7 @@ const Index = () => {
   const [tobaccoTypes, setTobaccoTypes] = useState<DatabaseTobaccoType[]>([]);
   const [flavors, setFlavors] = useState<DatabaseFlavor[]>([]);
   const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
+  const [featuredHookah, setFeaturedHookah] = useState<FeaturedHookah | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [addIce, setAddIce] = useState(false);
   const [icePercentage, setIcePercentage] = useState(20);
@@ -108,6 +112,7 @@ const Index = () => {
         setTobaccoTypes(menu.tobaccoTypes);
         setFlavors(menu.flavors);
         setRecommendedMixes(menu.recommendedMixes);
+        setFeaturedHookah(menu.hookahOfTheDay);
       } catch (error) {
         console.error('Error loading menu data:', error);
         toast({
@@ -179,6 +184,17 @@ const Index = () => {
   };
 
   const currentFlavors = getExpandedFlavors();
+
+  // Resolved rather than read straight from state: the pointer can name a
+  // hookah that has since been deleted or switched off, and neither should
+  // render. See src/services/hookahOfTheDay.ts.
+  const hookahOfTheDay = resolveHookahOfTheDay(hookahs, featuredHookah);
+
+  const pickHookahOfTheDay = () => {
+    if (!hookahOfTheDay) return;
+    setSelectedHookah(hookahOfTheDay.hookah.id);
+    step1Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   const filteredFlavors = currentFlavors.filter(flavor =>
     flavor.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -675,6 +691,11 @@ const Index = () => {
           <section>
             <WelcomeHeader />
           </section>
+          {hookahOfTheDay && (
+            <section>
+              <HookahOfTheDayCard resolved={hookahOfTheDay} onPick={pickHookahOfTheDay} />
+            </section>
+          )}
           <section>
             <h2 className="text-xl font-semibold mb-6">Recommended Mixes</h2>
             {isLoading ? <MixSkeletons /> : (
@@ -759,14 +780,20 @@ const Index = () => {
             {isLoading ? <HookahSkeletons /> : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {hookahs.map((hookah) => (
-                <Card 
-                  key={hookah.id} 
+                <Card
+                  key={hookah.id}
                   className={`bg-turbo-card border ${getHookahTypeBorder(getHookahTobaccoType(hookah.name))} cursor-pointer transition-all ${
                     selectedHookah === hookah.id ? 'border-4' : 'border-2'
-                  }`}
+                  } ${hookahOfTheDay?.hookah.id === hookah.id ? 'ring-2 ring-amber-400' : ''}`}
                   onClick={() => setSelectedHookah(hookah.id)}
                 >
                   <CardContent className="p-4 text-center">
+                    {hookahOfTheDay?.hookah.id === hookah.id && (
+                      <p className="mb-1 flex items-center justify-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-amber-400">
+                        <Star className="h-3 w-3 fill-current" />
+                        Today
+                      </p>
+                    )}
                     <img
                       src={hookah.image}
                       alt={hookah.name}
