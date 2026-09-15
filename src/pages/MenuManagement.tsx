@@ -591,6 +591,21 @@ const MenuManagement = () => {
                     </SelectContent>
                   </Select>
 
+                  {/* The Select fires onValueChange only when the value
+                      actually changes, so re-picking the hookah that is already
+                      featured saves nothing. Without this button an admin who
+                      wants to reword the promo line - and keep the same hookah -
+                      has no way to save it at all. Shown only when the text
+                      differs from what is stored, so it is never a no-op. */}
+                  {featured && featuredPromo !== (featured.promoText ?? '') && (
+                    <Button
+                      onClick={() => handleSetFeatured(featured.hookahId)}
+                      disabled={featuredSaving}
+                    >
+                      Save promo line
+                    </Button>
+                  )}
+
                   {featured && (
                     <Button
                       variant="outline"
