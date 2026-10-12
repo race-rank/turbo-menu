@@ -158,8 +158,8 @@ const Cart = () => {
                         <h3 className="font-semibold text-turbo-text">{item.name}</h3>
                         {item.type === 'custom' && (
                           <div className="text-sm text-turbo-muted mt-1">
-                            <p>Hookah: {item.hookah}</p>
-                            <p>Flavors: {item.flavors?.join(', ')}</p>
+                            <p>{`Hookah: ${item.hookah}`}</p>
+                            <p>{`Flavors: ${item.flavors?.join(', ')}`}</p>
                             {(item.hasLED || item.hasColoredWater || item.hasAlcohol || item.hasFruits) && (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {item.hasLED && (
@@ -178,7 +178,7 @@ const Cart = () => {
                             )}
                           </div>
                         )}
-                        <p className="text-amber-400 font-bold mt-2">{item.price} Lei</p>
+                        <p className="text-amber-400 font-bold mt-2">{`${item.price} Lei`}</p>
                       </div>
                       
                       <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ const Cart = () => {
               <CardContent className="p-6">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-lg font-semibold">Total:</span>
-                  <span className="text-2xl font-bold text-amber-400">{state.total} Lei</span>
+                  <span className="text-2xl font-bold text-amber-400">{`${state.total} Lei`}</span>
                 </div>
                 <div className="space-y-2">
                   <Button

@@ -223,7 +223,7 @@ const Account: React.FC = () => {
                     {loadingSummary
                       ? <Skeleton className="mt-1 h-6 w-20" />
                       : <p className="text-xl font-bold text-amber-400">
-                          {summary?.totalSpent ?? 0} Lei
+                          {`${summary?.totalSpent ?? 0} Lei`}
                         </p>}
                   </div>
                 </div>
@@ -231,7 +231,7 @@ const Account: React.FC = () => {
                 {/* Hidden rather than shown as "unknown": accounts created
                     before createdAt was recorded genuinely have no join date. */}
                 {memberSince && (
-                  <p className="mt-4 text-xs text-turbo-muted">Member since {memberSince}</p>
+                  <p className="mt-4 text-xs text-turbo-muted">{`Member since ${memberSince}`}</p>
                 )}
               </CardContent>
             </Card>

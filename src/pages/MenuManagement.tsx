@@ -571,7 +571,7 @@ const MenuManagement = () => {
                   className="bg-turbo-bg border-border text-turbo-text"
                 />
                 <p className="text-right text-[10px] text-turbo-muted">
-                  {featuredPromo.length}/{MAX_PROMO_TEXT_LENGTH}
+                  {`${featuredPromo.length}/${MAX_PROMO_TEXT_LENGTH}`}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -649,8 +649,8 @@ const MenuManagement = () => {
                   <CardContent className="p-4">
                     <img src={hookah.image} alt={hookah.name} className="w-full h-32 object-cover rounded mb-2" />
                     <h3 className="font-semibold">{hookah.name}</h3>
-                    <p className="text-amber-400 font-bold">{hookah.price} Lei</p>
-                    <p className="text-xs text-turbo-muted">Active: {hookah.isActive ? 'Yes' : 'No'}</p>
+                    <p className="text-amber-400 font-bold">{`${hookah.price} Lei`}</p>
+                    <p className="text-xs text-turbo-muted">{`Active: ${hookah.isActive ? 'Yes' : 'No'}`}</p>
                     {(hookah.hasLED || hookah.hasColoredWater || hookah.hasAlcohol || hookah.hasFruits) && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {hookah.hasLED && (
@@ -719,8 +719,8 @@ const MenuManagement = () => {
                       <div className="flex-1">
                         <h3 className="font-semibold">{tobacco.name}</h3>
                         <p className="text-sm text-turbo-muted">{tobacco.description}</p>
-                        <p className="text-xs">Type: {tobacco.type}</p>
-                        <p className="text-xs">Strength: {tobacco.strengthRange.min}-{tobacco.strengthRange.max}</p>
+                        <p className="text-xs">{`Type: ${tobacco.type}`}</p>
+                        <p className="text-xs">{`Strength: ${tobacco.strengthRange.min}-${tobacco.strengthRange.max}`}</p>
                       </div>
                     </div>
                     <div className="flex gap-2 mt-2">
@@ -824,7 +824,7 @@ const MenuManagement = () => {
                   <CardContent className="p-4">
                     <img src={mix.mainImage} alt={mix.name} className="w-full h-32 object-cover rounded mb-2" />
                     <h3 className="font-semibold">{mix.name}</h3>
-                    <p className="text-amber-400 font-bold">{mix.price} Lei</p>
+                    <p className="text-amber-400 font-bold">{`${mix.price} Lei`}</p>
                     <p className="text-sm text-turbo-muted">{mix.category}</p>
                     {mix.promoText && (
                       <p className="text-xs text-turbo-muted mt-1">{mix.promoText}</p>
@@ -1219,7 +1219,7 @@ const MenuManagement = () => {
               {mixForm.flavorImages.map((image, index) => (
                 <div key={index} className="mt-3 p-3 border border-border rounded-lg">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium">Flavor Image {index + 1}</span>
+                    <span className="text-sm font-medium">{`Flavor Image ${index + 1}`}</span>
                     {mixForm.flavorImages.length > 1 && (
                       <Button 
                         variant="outline" 

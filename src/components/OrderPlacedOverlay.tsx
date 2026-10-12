@@ -61,9 +61,9 @@ export const OrderPlacedOverlay: React.FC<OrderPlacedOverlayProps> = ({
         <p className="mb-6 text-turbo-muted">Someone is reviewing it now.</p>
 
         <div className="mb-8 space-y-1 text-sm">
-          <p className="font-mono text-base">#{orderId.substring(0, 8).toUpperCase()}</p>
-          {table && <p className="text-turbo-muted">Table {table}</p>}
-          <p className="font-bold text-amber-400">{total} Lei</p>
+          <p className="font-mono text-base">{`#${orderId.substring(0, 8).toUpperCase()}`}</p>
+          {table && <p className="text-turbo-muted">{`Table ${table}`}</p>}
+          <p className="font-bold text-amber-400">{`${total} Lei`}</p>
         </div>
 
         <Button variant="outline" className="w-full max-w-xs" onClick={onDone}>

@@ -751,7 +751,7 @@ const Index = () => {
                             </div>
                           )}
                           <div className="flex justify-between items-center">
-                            <span className="text-lg font-bold text-turbo-text">{mix.price} Lei</span>
+                            <span className="text-lg font-bold text-turbo-text">{`${mix.price} Lei`}</span>
                             <span className="text-sm text-turbo-muted">Category</span>
                           </div>
                           <div className="flex justify-between items-center">
@@ -803,7 +803,7 @@ const Index = () => {
                       className="w-full h-24 object-cover mx-auto mb-2 rounded"
                     />
                     <h3 className="text-sm font-medium text-turbo-text mb-1">{hookah.name}</h3>
-                    <p className="text-lg font-bold text-amber-400">{hookah.price} Lei</p>
+                    <p className="text-lg font-bold text-amber-400">{`${hookah.price} Lei`}</p>
                     {(hookah.hasLED || hookah.hasColoredWater || hookah.hasAlcohol || hookah.hasFruits) && (
                       <div className="mt-2 flex flex-wrap gap-1 justify-center">
                         {hookah.hasLED && (
@@ -861,7 +861,7 @@ const Index = () => {
                           </div>
                           <div className="px-2 py-2 flex flex-col items-center text-center">
                             <h3 className="text-xs font-semibold text-turbo-text">{addon.label}</h3>
-                            <span className="text-xs text-amber-400 font-bold">+{addon.price} Lei</span>
+                            <span className="text-xs text-amber-400 font-bold">{`+${addon.price} Lei`}</span>
                           </div>
                         </CardContent>
                       </Card>
@@ -879,7 +879,7 @@ const Index = () => {
                 <CardContent className="p-6">
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm">Strength: {tobaccoStrength}</span>
+                      <span className="text-sm">{`Strength: ${tobaccoStrength}`}</span>
                       <span className="text-sm font-medium text-primary">{getStrengthLabel(tobaccoStrength)}</span>
                     </div>
                     
@@ -920,7 +920,7 @@ const Index = () => {
                 {selectedFlavors.length > 0 ? (
                   <div className="mb-4 flex flex-wrap items-center gap-3">
                     <p className="text-sm text-turbo-muted">
-                      Selected flavors: {selectedFlavors.length}/3
+                      <span>{`Selected flavors: ${selectedFlavors.length}/3`}</span>
                       <span className="ml-2 text-turbo-text font-medium">
                         {selectedFlavors
                           .map(variantId => {
@@ -1036,16 +1036,16 @@ const Index = () => {
                   <h3 className="text-lg font-semibold mb-4">Your Selection</h3>
                   {selectedHookah && (
                     <p className="text-turbo-muted mb-2">
-                      Hookah: {hookahs.find(h => h.id === selectedHookah)?.name}
+                      {`Hookah: ${hookahs.find(h => h.id === selectedHookah)?.name}`}
                     </p>
                   )}
                   {selectedTobaccoType && (
                     <>
                       <p className="text-turbo-muted mb-2">
-                        Tobacco: {tobaccoTypes.find(t => t.id === selectedTobaccoType)?.name}
+                        {`Tobacco: ${tobaccoTypes.find(t => t.id === selectedTobaccoType)?.name}`}
                       </p>
                       <p className="text-turbo-muted mb-2">
-                        Strength: {tobaccoStrength} - {getStrengthLabel(tobaccoStrength)}
+                        {`Strength: ${tobaccoStrength} - ${getStrengthLabel(tobaccoStrength)}`}
                       </p>
                     </>
                   )}
@@ -1062,7 +1062,7 @@ const Index = () => {
                               <div key={variantId}>
                                 <div className="flex justify-between mb-1">
                                   <span className="text-turbo-muted text-sm">{label}</span>
-                                  <span className="text-primary font-semibold text-sm">{pct}%</span>
+                                  <span className="text-primary font-semibold text-sm">{`${pct}%`}</span>
                                 </div>
                                 <Slider
                                   value={[pct]}
@@ -1078,23 +1078,23 @@ const Index = () => {
                           {addIce && (
                             <div className="flex justify-between">
                               <span className="text-turbo-muted text-sm">Ice</span>
-                              <span className="text-primary font-semibold text-sm">{icePercentage}%</span>
+                              <span className="text-primary font-semibold text-sm">{`${icePercentage}%`}</span>
                             </div>
                           )}
                           <div className="flex justify-between pt-2 border-t border-border">
                             <span className="text-turbo-muted text-sm">Total</span>
                             <span className="text-white font-bold text-sm">
-                              {selectedFlavors.reduce((sum, id) => sum + (flavorPercentages[id] ?? 0), 0) + (addIce ? icePercentage : 0)}%
+                              {`${selectedFlavors.reduce((sum, id) => sum + (flavorPercentages[id] ?? 0), 0) + (addIce ? icePercentage : 0)}%`}
                             </span>
                           </div>
                         </div>
                       ) : (
                         <p className="text-turbo-muted">
-                          Flavors: {selectedFlavors.map(variantId => {
+                          {`Flavors: ${selectedFlavors.map(variantId => {
                             const flavor = currentFlavors.find(f => f.variantId === variantId);
                             if (!flavor) return '';
                             return formatFlavorLabel(flavor);
-                          }).join(', ')}
+                          }).join(', ')}`}
                         </p>
                       )}
                     </div>
@@ -1106,7 +1106,7 @@ const Index = () => {
                     const missing = !hasDB ? 'Darkblend' : 'Virginia';
                     return (
                       <div className="mb-3 p-3 rounded-md border border-yellow-500/40 bg-yellow-500/10 text-xs text-yellow-200">
-                        Mix needs both Darkblend and Virginia. Add at least 1 {missing} flavor.
+                        {`Mix needs both Darkblend and Virginia. Add at least 1 ${missing} flavor.`}
                       </div>
                     );
                   })()}
@@ -1122,7 +1122,7 @@ const Index = () => {
                       <div>
                         <div className="flex justify-between mb-1">
                           <span className="text-xs text-turbo-muted">Ice amount</span>
-                          <span className="text-xs text-primary font-semibold">{icePercentage}%</span>
+                          <span className="text-xs text-primary font-semibold">{`${icePercentage}%`}</span>
                         </div>
                         <Slider
                           value={[icePercentage]}
@@ -1175,7 +1175,7 @@ const Index = () => {
             <DialogTitle>Choose tobacco category</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-turbo-muted">
-            Which tobacco should we use for {recommendedMixes.find(m => m.id === mixDialogId)?.name ?? 'this mix'}?
+            {`Which tobacco should we use for ${recommendedMixes.find(m => m.id === mixDialogId)?.name ?? 'this mix'}?`}
           </p>
           <div className="grid grid-cols-1 gap-2">
             <Button

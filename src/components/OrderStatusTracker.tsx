@@ -72,7 +72,7 @@ export const OrderStatusTracker: React.FC = () => {
             <div className="flex justify-between items-center mb-3">
               <div className="flex items-center gap-2">
                 {getStatusIcon(order.status)}
-                <span className="font-medium">Order #{formatOrderId(order.orderId)}</span>
+                <span className="font-medium">{`Order #${formatOrderId(order.orderId)}`}</span>
               </div>
               
               <div className="flex items-center gap-2">
@@ -125,12 +125,12 @@ export const OrderStatusTracker: React.FC = () => {
               <div className="mt-3 pt-3 border-t border-border">
                 <div className="text-sm mb-2">
                   {order.customerInfo.table && (
-                    <div className="font-medium">Table: {order.customerInfo.table}</div>
+                    <div className="font-medium">{`Table: ${order.customerInfo.table}`}</div>
                   )}
                   {order.customerInfo.name && (
-                    <div>Name: {order.customerInfo.name}</div>
+                    <div>{`Name: ${order.customerInfo.name}`}</div>
                   )}
-                  <div className="text-right font-bold">Total: {order.total} Lei</div>
+                  <div className="text-right font-bold">{`Total: ${order.total} Lei`}</div>
                 </div>
                 
                 <div className="space-y-2 mt-3">
@@ -143,20 +143,20 @@ export const OrderStatusTracker: React.FC = () => {
                           {item.type === 'custom' && item.flavors && (
                             <div className="text-xs text-turbo-muted">
                               {item.tobaccoType && (
-                                <span className="capitalize">{item.tobaccoType} tobacco • </span>
+                                <span className="capitalize">{`${item.tobaccoType} tobacco • `}</span>
                               )}
-                              {item.flavors.join(', ')}
+                              <span>{item.flavors.join(', ')}</span>
                             </div>
                           )}
                         </div>
-                        <span>{item.price} Lei</span>
+                        <span>{`${item.price} Lei`}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
                 
                 <div className="mt-3 text-xs text-turbo-muted">
-                  Ordered at: {new Date(order.timestamp).toLocaleString()}
+                  {`Ordered at: ${new Date(order.timestamp).toLocaleString()}`}
                 </div>
               </div>
             )}

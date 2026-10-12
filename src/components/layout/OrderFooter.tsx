@@ -55,14 +55,13 @@ export const OrderFooter: React.FC<OrderFooterProps> = ({ build, primaryAction }
                       build.onRemoveFlavor?.(f.id);
                     }}
                   >
-                    {f.name}
-                    {typeof f.percentage === 'number' ? ` ${f.percentage}%` : ''}
+                    <span>{`${f.name}${typeof f.percentage === 'number' ? ` ${f.percentage}%` : ''}`}</span>
                     {build.onRemoveFlavor && <X className="h-3 w-3" />}
                   </span>
                 ))}
               </div>
             ) : (
-              <div className="text-turbo-muted mt-1">Pick up to {build.flavorMax} flavors</div>
+              <div className="text-turbo-muted mt-1">{`Pick up to ${build.flavorMax} flavors`}</div>
             )}
           </div>
           <Button
@@ -87,8 +86,8 @@ export const OrderFooter: React.FC<OrderFooterProps> = ({ build, primaryAction }
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm">
             <ShoppingCart className="h-4 w-4 text-primary" />
-            <span className="text-turbo-muted">{itemCount} items</span>
-            <span className="text-amber-400 font-bold">{state.total} Lei</span>
+            <span className="text-turbo-muted">{`${itemCount} items`}</span>
+            <span className="text-amber-400 font-bold">{`${state.total} Lei`}</span>
           </div>
           <Button
             size="sm"
@@ -108,8 +107,8 @@ export const OrderFooter: React.FC<OrderFooterProps> = ({ build, primaryAction }
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm">
           <ShoppingCart className="h-4 w-4 text-primary" />
-          <span className="text-turbo-muted">{itemCount} items</span>
-          <span className="text-amber-400 font-bold">{state.total} Lei</span>
+          <span className="text-turbo-muted">{`${itemCount} items`}</span>
+          <span className="text-amber-400 font-bold">{`${state.total} Lei`}</span>
         </div>
         <Button
           size="sm"
