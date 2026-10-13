@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
+import { PokeButton } from '@/components/PokeButton';
 import { FavoritesList, RatingsList } from '@/components/ComboLists';
 import { getPublicProfile, type PublicProfile } from '@/services/profileService';
 import { listFavorites, type FavoriteCombo } from '@/services/favoritesService';
@@ -86,7 +87,11 @@ const FriendProfile: React.FC = () => {
         <h1 className="truncate text-2xl font-bold tracking-wider">
           {profile?.displayName ?? 'FRIEND'}
         </h1>
-        <div className="w-10" />
+        {uid && !busy && !denied ? (
+          <PokeButton friendUid={uid} friendName={profile?.displayName ?? null} />
+        ) : (
+          <div className="w-10" />
+        )}
       </header>
 
       <div className="mx-auto max-w-md space-y-4 px-4 py-6">

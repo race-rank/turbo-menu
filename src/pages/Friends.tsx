@@ -13,7 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
+import { PokeButton } from '@/components/PokeButton';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePokes } from '@/contexts/PokeContext';
 import { toast } from '@/hooks/use-toast';
 import { getPublicProfile } from '@/services/profileService';
 import {
@@ -71,6 +73,7 @@ const clearPendingInvite = (): void => {
 const Friends: React.FC = () => {
   const { user, isAnonymous, loading } = useAuth();
   const navigate = useNavigate();
+  const { markAllSeen } = usePokes();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [rows, setRows] = useState<FriendRow[]>([]);
@@ -95,6 +98,11 @@ const Friends: React.FC = () => {
   const linkRef = useRef<HTMLParagraphElement>(null);
 
   const signedIn = !!user && !isAnonymous;
+
+  // markAllSeen changes identity with the poke list, so pokes arriving while
+  // this page is open are marked seen too. Once stamped nothing is unseen, so
+  // the re-run writes nothing.
+  useEffect(() => { markAllSeen(); }, [markAllSeen]);
   const paramCode = searchParams.get('code');
 
   /**
@@ -649,6 +657,7 @@ const Friends: React.FC = () => {
                             </span>
                           )}
                         </button>
+                        <PokeButton friendUid={row.otherUid} friendName={row.displayName} />
                         <Button
                           size="sm" variant="ghost" disabled={pendingPairId !== null}
                           onClick={() => void mutate(
