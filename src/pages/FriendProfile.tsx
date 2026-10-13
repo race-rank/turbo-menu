@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { isNowSmokingFresh, nowSmokingItemToFavorite, type NowSmoking } from '@/
 import { getMenuData } from '@/services/menuService';
 import type { MenuSnapshot } from '@/services/reorderService';
 import { useOrderFavorite } from '@/hooks/useOrderFavorite';
+import { toast } from '@/hooks/use-toast';
 
 // Firestore rejects a disallowed read with a bare FirestoreError whose `code`
 // is the literal string 'permission-denied' - no exported class to instanceof
@@ -35,9 +36,49 @@ const FriendProfile: React.FC = () => {
   const [menu, setMenu] = useState<MenuSnapshot | null>(null);
   const orderFavorite = useOrderFavorite(menu);
 
-  useEffect(() => {
-    getMenuData().then(setMenu).catch(() => setMenu(null));
+  // With no published snapshot the menu costs dozens of reads, so it is only
+  // fetched when something here can actually be ordered: eagerly for a live
+  // "now smoking" with an orderable item, otherwise on the first tap.
+  const [menuWanted, setMenuWanted] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<FavoriteCombo | null>(null);
+  const menuRequested = useRef(false);
+
+  const hasOrderableNowSmoking = !!nowSmoking
+    && nowSmoking.items.some((item) => nowSmokingItemToFavorite(item) !== null);
+
+  const loadMenu = useCallback(() => {
+    if (menuRequested.current) return;
+    menuRequested.current = true;
+    getMenuData()
+      .then(setMenu)
+      .catch(() => {
+        // Let the next tap try again.
+        menuRequested.current = false;
+        setPendingOrder(null);
+        toast({ title: "Couldn't load the menu", description: 'Check your connection and try again.', variant: 'destructive' });
+      });
   }, []);
+
+  useEffect(() => {
+    if (hasOrderableNowSmoking || menuWanted) loadMenu();
+  }, [hasOrderableNowSmoking, menuWanted, loadMenu]);
+
+  // A tap that arrived before the menu did is completed once it lands.
+  useEffect(() => {
+    if (menu && pendingOrder) {
+      orderFavorite(pendingOrder);
+      setPendingOrder(null);
+    }
+  }, [menu, pendingOrder, orderFavorite]);
+
+  const orderSame = (favorite: FavoriteCombo) => {
+    if (menu) {
+      orderFavorite(favorite);
+      return;
+    }
+    setPendingOrder(favorite);
+    setMenuWanted(true);
+  };
 
   useEffect(() => {
     if (!uid) return;
@@ -126,7 +167,10 @@ const FriendProfile: React.FC = () => {
                       <div key={item.comboId} className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm">{item.label}</span>
                         {favorite && (
-                          <Button size="sm" variant="outline" onClick={() => orderFavorite(favorite)}>
+                          <Button
+                            size="sm" variant="outline" disabled={pendingOrder !== null}
+                            onClick={() => orderSame(favorite)}
+                          >
                             Order the same
                           </Button>
                         )}
