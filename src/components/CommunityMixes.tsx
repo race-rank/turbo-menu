@@ -3,10 +3,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import type { FavoriteCombo } from '@/services/favoritesService';
 import { resolveReorder, type MenuSnapshot } from '@/services/reorderService';
-import { describeUserMixBuild, userMixToFavorite, type UserMix } from '@/services/userMixes';
+import { describeUserMixBuild, userMixToFavorite, type CommunityMix } from '@/services/userMixes';
 
 interface Props {
-  mixes: UserMix[];
+  mixes: CommunityMix[];
   menu: MenuSnapshot;
   onAdd: (favorite: FavoriteCombo) => void;
 }

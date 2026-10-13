@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { comboIdForCustom } from '../src/services/comboId';
 import {
-  USER_MIX_DESCRIPTION_MAX, USER_MIX_NAME_MAX, describeUserMixBuild,
+  USER_MIX_DESCRIPTION_MAX, USER_MIX_NAME_MAX, describeUserMixBuild, toCommunityMix,
   userMixFromFavorite, userMixToFavorite, validateUserMixInput, type UserMix,
 } from '../src/services/userMixes';
 import type { FavoriteCombo } from '../src/services/favoritesService';
@@ -65,6 +65,32 @@ describe('userMixToFavorite', () => {
   });
 });
 
+describe('toCommunityMix', () => {
+  test('carries the build and the credit, never the creator\'s uid or the moderation state', () => {
+    const projection = toCommunityMix({
+      ...mix, description: 'Zesty', withIce: false,
+      flavorPercentages: { 'mint:virginia': 60, 'lemon:virginia': 40 },
+      createdAt: new Date(0), reviewedAt: new Date(0),
+    });
+    expect(projection).toEqual({
+      id: 'm1', name: 'Lemon Storm', creatorName: 'Alice', description: 'Zesty',
+      hookahId: 'h1', tobaccoType: 'virginia', flavorIds: ['mint:virginia', 'lemon:virginia'],
+      tobaccoStrength: 4, flavorPercentages: { 'mint:virginia': 60, 'lemon:virginia': 40 }, withIce: false,
+    });
+    expect(projection).not.toHaveProperty('creatorUid');
+    expect(JSON.stringify(projection)).not.toContain('alice');
+  });
+  test('leaves absent optionals out rather than writing undefined', () => {
+    const projection = toCommunityMix({ ...mix, tobaccoStrength: undefined });
+    expect(Object.values(projection)).not.toContain(undefined);
+    expect(projection).not.toHaveProperty('tobaccoStrength');
+    expect(projection).not.toHaveProperty('description');
+  });
+  test('still orders as the same combo as the submission', () => {
+    expect(userMixToFavorite(toCommunityMix(mix))).toEqual(userMixToFavorite(mix));
+  });
+});
+
 describe('describeUserMixBuild', () => {
   const hookahs = [{ id: 'h1', name: 'Khalil Mamoon' }] as DatabaseHookah[];
   const flavors = [{ id: 'mint', name: 'Mint' }, { id: 'lemon', name: 'Lemon' }] as DatabaseFlavor[];
@@ -73,5 +99,11 @@ describe('describeUserMixBuild', () => {
   });
   test('falls back to ids when something is gone', () => {
     expect(describeUserMixBuild(mix, [], [])).toBe('h1 · mint, lemon');
+  });
+  test('a malformed document renders instead of throwing', () => {
+    const bad = { hookahId: 'h1', flavorIds: [1, null, 'mint:virginia'] } as unknown as UserMix;
+    expect(describeUserMixBuild(bad, hookahs, flavors)).toBe('Khalil Mamoon · 1, null, Mint');
+    const noList = { hookahId: 'h1', flavorIds: 'mint' } as unknown as UserMix;
+    expect(describeUserMixBuild(noList, hookahs, flavors)).toBe('Khalil Mamoon · ');
   });
 });

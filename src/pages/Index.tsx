@@ -33,7 +33,7 @@ import { resolveHookahOfTheDay } from '@/services/hookahOfTheDay';
 import type { FeaturedHookah } from '@/types/database';
 import { CommunityMixes } from '@/components/CommunityMixes';
 import { useOrderFavorite } from '@/hooks/useOrderFavorite';
-import type { UserMix } from '@/services/userMixes';
+import type { CommunityMix } from '@/services/userMixes';
 
 const MixSkeletons = () => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -86,7 +86,7 @@ const Index = () => {
   const [tobaccoTypes, setTobaccoTypes] = useState<DatabaseTobaccoType[]>([]);
   const [flavors, setFlavors] = useState<DatabaseFlavor[]>([]);
   const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
-  const [communityMixes, setCommunityMixes] = useState<UserMix[]>([]);
+  const [communityMixes, setCommunityMixes] = useState<CommunityMix[]>([]);
   const [featuredHookah, setFeaturedHookah] = useState<FeaturedHookah | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [addIce, setAddIce] = useState(false);

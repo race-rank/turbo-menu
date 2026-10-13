@@ -17,8 +17,8 @@ import { firestore } from '@/lib/firebase';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix, FeaturedHookah } from '@/types/database';
 import { clampPromoText } from './hookahOfTheDay';
 import { safeConvertTimestamp, cleanObject } from './firebaseService';
-import { listApprovedUserMixes } from './userMixService';
-import type { UserMix } from './userMixes';
+import { listCommunityMixes } from './userMixService';
+import type { CommunityMix } from './userMixes';
 
 const MENU_COLLECTIONS = {
   HOOKAHS: 'hookahs',
@@ -45,7 +45,7 @@ export interface MenuData {
   hookahOfTheDay?: FeaturedHookah;
   // Approved community mixes. Optional: a snapshot published before this
   // shipped carries none, and that reads as "no community mixes".
-  communityMixes?: UserMix[];
+  communityMixes?: CommunityMix[];
 }
 
 // Hookah operations
@@ -218,7 +218,7 @@ const fetchMenuCollections = async (): Promise<MenuData> => {
     getFeaturedHookah(),
     // Load-bearing catch: this list must never be able to take the whole menu
     // down with it (guests load through here whenever the snapshot is missing).
-    listApprovedUserMixes().catch(() => [] as UserMix[])
+    listCommunityMixes().catch(() => [] as CommunityMix[])
   ]);
   return { hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay, communityMixes };
 };
@@ -229,6 +229,13 @@ const reviveMenuItems = <T,>(items: unknown): T[] =>
     createdAt: safeConvertTimestamp(item?.createdAt),
     updatedAt: safeConvertTimestamp(item?.updatedAt)
   })) as T[];
+
+// Community mixes carry approvedAt, not createdAt/updatedAt.
+const reviveCommunityMixes = (items: unknown): CommunityMix[] =>
+  (Array.isArray(items) ? items : []).map((item: any) => ({
+    ...item,
+    approvedAt: safeConvertTimestamp(item?.approvedAt)
+  })) as CommunityMix[];
 
 // Firestore rejects undefined. cleanObject() can't be reused here because it
 // flattens Date instances to {} - menu items carry real Dates.
@@ -263,7 +270,7 @@ export const getMenuData = async (): Promise<MenuData> => {
         // Not run through reviveMenuItems: it is a single object with no
         // timestamps, not a list of menu items.
         hookahOfTheDay: data.hookahOfTheDay ?? undefined,
-        communityMixes: reviveMenuItems<UserMix>(data.communityMixes)
+        communityMixes: reviveCommunityMixes(data.communityMixes)
       };
     }
   } catch (error) {

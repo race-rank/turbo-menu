@@ -27,6 +27,53 @@ export interface UserMix {
 
 export type UserMixSubmission = Omit<UserMix, 'id' | 'status' | 'createdAt' | 'reviewedAt'>;
 
+/**
+ * The public copy of an approved mix: communityMixes/{id}, same id as the
+ * submission. Deliberately no creatorUid - a uid is all a friend request
+ * needs, so publishing it would bypass a customer's choice to stay out of
+ * email discovery. firestore.rules pins this shape.
+ */
+export interface CommunityMix {
+  id: string;
+  name: string;
+  description?: string;
+  creatorName: string;
+  hookahId: string;
+  tobaccoType: string;
+  flavorIds: string[];
+  tobaccoStrength?: number;
+  flavorPercentages?: Record<string, number>;
+  withIce?: boolean;
+  approvedAt?: Date;
+}
+
+/** What both a submission and its public copy carry: enough to describe and order it. */
+export type UserMixBuild = Pick<
+  CommunityMix,
+  'name' | 'hookahId' | 'tobaccoType' | 'flavorIds' | 'tobaccoStrength' | 'flavorPercentages' | 'withIce'
+>;
+
+/**
+ * The public projection of a submission. Built field by field, never by
+ * spread, so creatorUid - and anything else added to UserMix later - can
+ * never ride along, and no undefined key reaches Firestore.
+ */
+export const toCommunityMix = (mix: UserMix): CommunityMix => {
+  const community: CommunityMix = {
+    id: mix.id,
+    name: mix.name,
+    creatorName: mix.creatorName,
+    hookahId: mix.hookahId,
+    tobaccoType: mix.tobaccoType,
+    flavorIds: mix.flavorIds,
+  };
+  if (mix.description) community.description = mix.description;
+  if (mix.tobaccoStrength !== undefined) community.tobaccoStrength = mix.tobaccoStrength;
+  if (mix.flavorPercentages) community.flavorPercentages = mix.flavorPercentages;
+  if (mix.withIce !== undefined) community.withIce = mix.withIce;
+  return community;
+};
+
 export interface UserMixInput {
   name: string;
   description?: string;
@@ -77,7 +124,7 @@ export const userMixFromFavorite = (
  * custom-build id, so a customer who orders it, favourites it or rates it
  * lands on the same combo as if they had built it by hand.
  */
-export const userMixToFavorite = (mix: UserMix): FavoriteCombo => {
+export const userMixToFavorite = (mix: UserMixBuild): FavoriteCombo => {
   const favorite: FavoriteCombo = {
     comboId: comboIdForCustom(mix.hookahId, mix.tobaccoType, mix.flavorIds),
     label: mix.name,
@@ -92,15 +139,22 @@ export const userMixToFavorite = (mix: UserMix): FavoriteCombo => {
   return favorite;
 };
 
-/** "Khalil Mamoon · Mint, Lemon", for the admin queue and the menu card. */
+/**
+ * "Khalil Mamoon · Mint, Lemon", for the admin queue and the menu card.
+ *
+ * Defensive on purpose: it renders documents other people wrote. A bad
+ * entry that slipped past older rules must not white-screen the moderation
+ * tab, because that tab is the only place an admin can reject it.
+ */
 export const describeUserMixBuild = (
-  mix: Pick<UserMix, 'hookahId' | 'flavorIds'>,
+  mix: Pick<CommunityMix, 'hookahId' | 'flavorIds'>,
   hookahs: Pick<DatabaseHookah, 'id' | 'name'>[],
   flavors: Pick<DatabaseFlavor, 'id' | 'name'>[],
 ): string => {
-  const hookah = hookahs.find((h) => h.id === mix.hookahId)?.name ?? mix.hookahId;
-  const names = mix.flavorIds.map((variantId) => {
-    const docId = variantId.split(':')[0];
+  const hookah = hookahs.find((h) => h.id === mix.hookahId)?.name ?? String(mix.hookahId);
+  const entries: unknown[] = Array.isArray(mix.flavorIds) ? mix.flavorIds : [];
+  const names = entries.map((entry) => {
+    const docId = String(entry).split(':')[0];
     return flavors.find((f) => f.id === docId)?.name ?? docId;
   });
   return `${hookah} · ${names.join(', ')}`;
