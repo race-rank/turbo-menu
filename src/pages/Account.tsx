@@ -7,7 +7,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
 import { FavoritesList, RatingsList } from '@/components/ComboLists';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCart } from '@/contexts/CartContext';
 import { AuthForms } from '@/components/auth/AuthForms';
 import { logout, updateDisplayName } from '@/services/authService';
 import { getAccountSummary, upsertUserProfile, type AccountSummary } from '@/services/userService';
@@ -15,14 +14,16 @@ import { refreshInviteCodeName } from '@/services/friendsService';
 import { listFavorites, removeFavorite, type FavoriteCombo } from '@/services/favoritesService';
 import { listRatings, type ComboRating } from '@/services/ratingsService';
 import { getMenuData } from '@/services/menuService';
-import { resolveReorder, type MenuSnapshot } from '@/services/reorderService';
-import { isValidTableId, TURBO_TABLE_STORAGE_KEY } from '@/services/tableValidation';
+import type { MenuSnapshot } from '@/services/reorderService';
 import { toast } from '@/hooks/use-toast';
+import { useOrderFavorite } from '@/hooks/useOrderFavorite';
+
+// Module scope, so useOrderFavorite's callback is not rebuilt every render.
+const backInCart = (favorite: FavoriteCombo) => `${favorite.label} is back in your cart.`;
 
 const Account: React.FC = () => {
   const { user, isAnonymous, loading } = useAuth();
   const navigate = useNavigate();
-  const { addItem } = useCart();
 
   const signedIn = !!user && !isAnonymous;
 
@@ -74,42 +75,8 @@ const Account: React.FC = () => {
       .catch(() => setMenu(null));
   }, []);
 
-  const handleReorder = (favorite: FavoriteCombo) => {
-    const tableId = localStorage.getItem(TURBO_TABLE_STORAGE_KEY);
-    if (!isValidTableId(tableId)) {
-      toast({
-        title: 'No table selected',
-        description: "Please scan your table's QR code to place an order.",
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!menu) {
-      toast({
-        title: 'Menu still loading',
-        description: 'Please try again in a moment.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const resolution = resolveReorder(favorite, menu, tableId);
-    if (resolution.status === 'unavailable') {
-      // Names what is gone rather than silently dropping it from the build -
-      // see reorderService.ts.
-      toast({
-        title: 'No longer available',
-        description: `${resolution.missing.join(', ')} ${resolution.missing.length > 1 ? 'are' : 'is'} no longer on the menu.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    addItem(resolution.item);
-    toast({ title: 'Added to cart', description: `${favorite.label} is back in your cart.` });
-    navigate('/cart');
-  };
+  const orderFavorite = useOrderFavorite(menu, { navigateToCart: true, addedDescription: backInCart });
+  const handleReorder = (favorite: FavoriteCombo) => { orderFavorite(favorite); };
 
   // The only caller that ever passes onRemove to FavoritesList - this is the
   // owner's own list, guest or signed in. FriendProfile renders the same
