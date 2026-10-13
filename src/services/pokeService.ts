@@ -1,5 +1,5 @@
 import {
-  collection, doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc,
+  collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc,
   type FirestoreError, type Unsubscribe,
 } from 'firebase/firestore';
 import { firestore } from '@/lib/firebase';
@@ -12,11 +12,6 @@ import type { Poke } from './pokes';
  */
 export const pokeFriend = (me: string, friendUid: string): Promise<void> =>
   setDoc(doc(firestore, 'users', friendUid, 'pokes', me), { at: serverTimestamp() }, { merge: true });
-
-export const getMyLastPokeAt = async (me: string, friendUid: string): Promise<Date | null> => {
-  const snapshot = await getDoc(doc(firestore, 'users', friendUid, 'pokes', me));
-  return snapshot.exists() ? snapshot.data().at?.toDate?.() ?? null : null;
-};
 
 export const subscribeToPokes = (
   uid: string,

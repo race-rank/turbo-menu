@@ -2,24 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { getMyLastPokeAt, pokeFriend } from '@/services/pokeService';
+import { pokeFriend } from '@/services/pokeService';
 import { pokeCooldownRemainingMs } from '@/services/pokes';
 
 export const PokeButton: React.FC<{ friendUid: string; friendName: string | null }> = ({ friendUid, friendName }) => {
   const { user } = useAuth();
+  // Local only: the poke document carries the recipient's seenAt, so the
+  // rules no longer let the poker read it. The rules still enforce the
+  // cooldown; this just keeps the button honest within a visit.
   const [lastAt, setLastAt] = useState<Date | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!user) return undefined;
-    let cancelled = false;
-    setLastAt(null);
-    getMyLastPokeAt(user.uid, friendUid)
-      .then((at) => { if (!cancelled) setLastAt(at); })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [user, friendUid]);
 
   // Re-render each 30s so the button re-enables when the cooldown ends.
   useEffect(() => {
