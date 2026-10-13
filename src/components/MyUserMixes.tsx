@@ -42,9 +42,13 @@ export const MyUserMixes: React.FC<{ uid: string; refreshToken: number }> = ({ u
               <p className="truncate text-sm">{mix.name}</p>
               <p className="text-xs text-turbo-muted">{STATUS_LABEL[mix.status]}</p>
             </div>
-            <Button size="sm" variant="ghost" onClick={() => withdraw(mix.id)}>
-              {mix.status === 'approved' ? 'Remove' : 'Withdraw'}
-            </Button>
+            {/* An approved mix is on the public menu, and only the bar can
+                republish that - so only the bar can take it off. */}
+            {mix.status === 'approved' ? (
+              <p className="shrink-0 text-xs text-turbo-muted">Ask the bar to remove it</p>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => withdraw(mix.id)}>Withdraw</Button>
+            )}
           </div>
         ))}
       </CardContent>
