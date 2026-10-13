@@ -209,16 +209,34 @@ export const getRecommendedMixes = async (): Promise<DatabaseRecommendedMix[]> =
 
 // Menu snapshot (single-document read path for guests)
 
-const fetchMenuCollections = async (): Promise<MenuData> => {
+/**
+ * 'publish' is strict: any failure throws, so publishMenuSnapshot fails, the
+ * admin sees "Saved, but not published", and the previous snapshot stays.
+ * Swallowing an error here would publish a menu with every community mix
+ * (or the featured hookah) silently gone, and report success.
+ *
+ * 'guest' is the fallback when the snapshot is missing: the optional extras
+ * degrade to nothing rather than taking the whole menu down with them. The
+ * four core collections still throw - without them there is no menu.
+ */
+type FetchMode = 'publish' | 'guest';
+
+const optional = <T,>(mode: FetchMode, what: string, read: Promise<T>, fallback: T): Promise<T> =>
+  mode === 'publish'
+    ? read
+    : read.catch((error) => {
+        console.warn(`Menu: ${what} unavailable, showing the menu without it:`, error);
+        return fallback;
+      });
+
+const fetchMenuCollections = async (mode: FetchMode): Promise<MenuData> => {
   const [hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay, communityMixes] = await Promise.all([
     getHookahs(),
     getTobaccoTypes(),
     getFlavors(),
     getRecommendedMixes(),
-    getFeaturedHookah(),
-    // Load-bearing catch: this list must never be able to take the whole menu
-    // down with it (guests load through here whenever the snapshot is missing).
-    listCommunityMixes().catch(() => [] as CommunityMix[])
+    optional<FeaturedHookah | undefined>(mode, 'featured hookah', getFeaturedHookah(), undefined),
+    optional<CommunityMix[]>(mode, 'community mixes', listCommunityMixes(), [])
   ]);
   return { hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay, communityMixes };
 };
@@ -277,7 +295,7 @@ export const getMenuData = async (): Promise<MenuData> => {
     console.warn('Menu snapshot unavailable, falling back to collection queries:', error);
   }
 
-  return fetchMenuCollections();
+  return fetchMenuCollections('guest');
 };
 
 /**
@@ -285,7 +303,7 @@ export const getMenuData = async (): Promise<MenuData> => {
  * otherwise guests keep seeing the previously published menu.
  */
 export const publishMenuSnapshot = async (): Promise<void> => {
-  const menu = await fetchMenuCollections();
+  const menu = await fetchMenuCollections('publish');
 
   // serverTimestamp() is added outside stripUndefined so the sentinel survives.
   await setDoc(doc(firestore, MENU_SNAPSHOT_COLLECTION, MENU_SNAPSHOT_ID), {
