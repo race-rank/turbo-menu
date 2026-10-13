@@ -284,3 +284,54 @@ so the indexes step is a separate, deliberate action, not part of the rules depl
 
 Push notifications, poke messages or emoji, reactions on now smoking, comments or ratings
 on community mixes, editing a submitted mix, and per-customer submission limits.
+
+---
+
+## Changes after review
+
+Code review found defects in this design. The implementation follows the corrected
+design below; where it conflicts with the sections above, this section wins.
+
+**Submissions are private; the public menu reads a projection.** Approved `userMixes`
+documents were world-readable and carried `creatorUid`. Sending a friend request needs
+only a uid, and even a pending request unlocks the target's profile, so sharing one mix
+defeated a customer's choice to keep email discovery off. Rules cannot hide one field,
+so:
+
+- `userMixes/{id}` is readable only by its creator and admins.
+- On approval an admin writes `communityMixes/{id}` — name, description, creator name,
+  build, `approvedAt` — with **no uid**, in the same batch that sets the status.
+  Rejecting or removing deletes it in the same batch.
+- The menu snapshot, the menu section and the admin "on the menu" list read
+  `communityMixes`.
+
+**Creators cannot withdraw an approved mix.** A customer cannot republish the menu
+snapshot, so their delete would leave the mix on the menu. Withdrawal is for pending and
+rejected mixes; once a mix is on the menu, the bar removes it.
+
+**Entries are validated, not just counts.** `flavorIds: [1]` passed the rules and then
+crashed the admin moderation tab, leaving no way to reject it. Every `flavorIds` entry
+must be a string of at most 100 characters, every `flavorPercentages` value a number,
+and `tobaccoStrength` a number from 0 to 20. Checking list slots one by one exceeded the
+rules engine's 1000-expression limit for a valid five-item status, so the list check
+round-trips the list through `join`/`split` instead.
+
+**A poker cannot read their poke.** It carried the recipient's `seenAt`, revealing when
+they last opened `/friends`. Only the recipient reads pokes; the button keeps the
+cooldown locally, and the rule enforces the real one.
+
+**"Now smoking" expiry is enforced by the rules.** A friend can read a status only
+within 2 hours of `since`; the owner can always read their own.
+
+**Publishing is strict; guest reads are tolerant.** Publishing the snapshot now fails
+loudly if any read fails, rather than publishing a menu with the community mixes
+silently missing. The guest fallback still degrades optional data (featured hookah,
+community mixes) to nothing.
+
+**Unavailable community mixes do not list what is missing.** For a deleted document the
+only name left is a raw id. The card says "Some ingredients are no longer on the menu".
+
+**Deploy order changes: rules first, then the app.** The app now reads
+`communityMixes` when publishing. Shipped before the rules, every admin menu edit
+would report "Saved, but not published". Deploying the rules first is safe, because
+the previous app reads none of the new collections.
