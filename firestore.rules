@@ -57,6 +57,28 @@ service cloud.firestore {
         && get(friendshipPath(owner)).data.status == 'accepted';
     }
 
+    // ---------------------------------------------- now smoking (item shape)
+    // One shared combo. Rules cannot loop, so smokingItemsOk below checks each
+    // of the at-most-five slots by index. Bounds match the favourites block.
+    function smokingItemOk(item) {
+      return item is map
+        && item.keys().hasOnly(['comboId', 'label', 'hookahId', 'tobaccoType', 'flavorIds'])
+        && item.comboId is string && item.comboId.size() <= 100
+        && item.label is string && item.label.size() <= 200
+        && (!('hookahId' in item) || (item.hookahId is string && item.hookahId.size() <= 100))
+        && (!('tobaccoType' in item) || (item.tobaccoType is string && item.tobaccoType.size() <= 100))
+        && (!('flavorIds' in item) || (item.flavorIds is list && item.flavorIds.size() <= 10));
+    }
+
+    function smokingItemsOk(items) {
+      return items is list && items.size() >= 1 && items.size() <= 5
+        && smokingItemOk(items[0])
+        && (items.size() < 2 || smokingItemOk(items[1]))
+        && (items.size() < 3 || smokingItemOk(items[2]))
+        && (items.size() < 4 || smokingItemOk(items[3]))
+        && (items.size() < 5 || smokingItemOk(items[4]));
+    }
+
     function claimPath(anonUid) {
       return /databases/$(database)/documents/accountClaims/$(anonUid);
     }
@@ -166,6 +188,40 @@ service cloud.firestore {
         && (!('ratedAt' in request.resource.data)
             || request.resource.data.ratedAt == request.time);
       allow delete: if isSignedIn() && (request.auth.uid == uid || hasClaimOn(uid));
+    }
+
+    // ------------------------------------------------------------- pokes
+    // One document per poker, overwritten on each poke. The deterministic id
+    // is what makes the cooldown enforceable: with a new document per poke,
+    // nothing short of a server could count them. src/services/pokes.ts
+    // mirrors the 10 minutes.
+    match /users/{toUid}/pokes/{fromUid} {
+      allow get: if isSignedIn()
+        && (request.auth.uid == toUid || request.auth.uid == fromUid);
+      allow list: if isSignedIn() && request.auth.uid == toUid;
+
+      allow create: if isSignedIn() && isRealAccount()
+        && request.auth.uid == fromUid && fromUid != toUid
+        && isFriendOf(toUid)
+        && request.resource.data.keys().hasOnly(['at'])
+        && request.resource.data.at == request.time;
+
+      // Two writers, disjoint fields. The poker may only move `at`, and only
+      // once the cooldown has passed - written with merge so the recipient's
+      // seenAt survives and stays out of affectedKeys. The recipient may only
+      // stamp seenAt.
+      allow update: if isSignedIn() && (
+        (request.auth.uid == fromUid && isRealAccount() && isFriendOf(toUid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['at'])
+          && request.resource.data.at == request.time
+          && resource.data.at < request.time - duration.value(10, 'm'))
+        || (request.auth.uid == toUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seenAt'])
+          && request.resource.data.seenAt == request.time));
+
+      // Recipient only. A poker who could delete would reset their own
+      // cooldown with a delete-then-create.
+      allow delete: if isSignedIn() && request.auth.uid == toUid;
     }
 
     match /orders/{orderId} {
@@ -416,6 +472,76 @@ service cloud.firestore {
             || request.resource.data.acceptedAt == request.time);
 
       allow delete: if isSignedIn() && request.auth.uid in resource.data.uids;
+    }
+
+    // -------------------------------------------------------- now smoking
+    // A friend-readable projection of an order, written at checkout by an
+    // opted-in customer - the same pattern as users/{uid}/ratings. The order
+    // itself stays owner-only; this is what keeps it that way.
+    match /nowSmoking/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isFriendOf(uid));
+      allow create, update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['items', 'since'])
+        && request.resource.data.since == request.time
+        && smokingItemsOk(request.resource.data.items);
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // --------------------------------------------------------- user mixes
+    // Customers submit; admins approve onto the public menu. Approved mixes
+    // are public like hookahs and recommendedMixes, because the menu can load
+    // before the anonymous session exists. Bounds mirror
+    // src/services/userMixes.ts.
+    match /userMixes/{mixId} {
+      allow read: if resource.data.status == 'approved'
+        || (isSignedIn() && (resource.data.creatorUid == request.auth.uid || isAdmin()));
+
+      allow create: if isSignedIn() && isRealAccount()
+        && request.resource.data.keys().hasOnly([
+             'creatorUid', 'creatorName', 'name', 'description', 'hookahId', 'tobaccoType',
+             'flavorIds', 'tobaccoStrength', 'flavorPercentages', 'withIce', 'status', 'createdAt'])
+        && request.resource.data.keys().hasAll([
+             'creatorUid', 'creatorName', 'name', 'hookahId', 'tobaccoType', 'flavorIds',
+             'status', 'createdAt'])
+        && request.resource.data.creatorUid == request.auth.uid
+        // Credited publicly, so it must be the submitter's own profile name.
+        // Non-empty too: the profiles block accepts '' as a displayName, and
+        // a mix credited to nobody is the "no display name" case in disguise.
+        && request.resource.data.creatorName is string
+        && request.resource.data.creatorName.size() >= 1
+        && request.resource.data.creatorName
+             == get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.get('displayName', null)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 40
+        && (!('description' in request.resource.data)
+            || (request.resource.data.description is string
+                && request.resource.data.description.size() <= 140))
+        && request.resource.data.hookahId is string
+        && request.resource.data.hookahId.size() <= 100
+        && request.resource.data.tobaccoType is string
+        && request.resource.data.tobaccoType.size() <= 100
+        && request.resource.data.flavorIds is list
+        && request.resource.data.flavorIds.size() >= 1
+        && request.resource.data.flavorIds.size() <= 10
+        && (!('tobaccoStrength' in request.resource.data)
+            || request.resource.data.tobaccoStrength is number)
+        && (!('flavorPercentages' in request.resource.data)
+            || (request.resource.data.flavorPercentages is map
+                && request.resource.data.flavorPercentages.size() <= 10))
+        && (!('withIce' in request.resource.data) || request.resource.data.withIce is bool);
+
+      // Admins only, and only the verdict. A creator who wants changes
+      // withdraws and resubmits.
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedAt'])
+        && request.resource.data.status in ['approved', 'rejected']
+        && request.resource.data.reviewedAt == request.time;
+
+      allow delete: if isSignedIn()
+        && (resource.data.creatorUid == request.auth.uid || isAdmin());
     }
 
     // Code -> uid, for invite links and QR. get is open to any signed-in user
