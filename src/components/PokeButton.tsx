@@ -71,9 +71,11 @@ export const PokeButton: React.FC<{ friendUid: string; friendName: string | null
       const code = errorCode(error);
       let description = 'Try again in a moment.';
       if (code === 'permission-denied') {
-        description = pokeCooldownRemainingMs(lastAt, new Date()) > 0
-          ? 'You poked them recently'
-          : 'You can only poke friends';
+        // This button only renders for accepted friends, so a denial is
+        // almost always the cooldown - including one started from another
+        // device, which the local timer cannot see. An unfriend mid-session
+        // is the rare exception, and /friends refreshes to show it.
+        description = 'You poked them recently. Try again in a few minutes.';
       } else if (code === 'unavailable' || code === 'network-request-failed' || !window.navigator.onLine) {
         description = "You're offline";
       }
