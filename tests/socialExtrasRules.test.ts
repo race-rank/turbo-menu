@@ -4,7 +4,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   Timestamp, collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp,
-  setDoc, updateDoc, where,
+  setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 import { beforeAll, afterAll, beforeEach, describe, test } from 'vitest';
 
@@ -55,6 +55,10 @@ const befriend = (a: string, b: string, status: 'pending' | 'accepted' = 'accept
   seed(`friendships/${pair(a, b)}`, { uids: [a, b].sort(), requestedBy: a, status });
 
 const minutesAgo = (m: number) => Timestamp.fromMillis(Date.now() - m * 60_000);
+
+// Ten flavour ids, the last one (slot 9) swapped for `last`. Proves the
+// final per-index check is really made, not just the first.
+const tenFlavors = (last: unknown = 'z:virginia') => [...Array(9).fill('a:virginia'), last];
 
 // ------------------------------------------------------------------ pokes
 
@@ -113,10 +117,14 @@ describe('pokes', () => {
     await assertFails(updateDoc(doc(alice(), 'users', BOB, 'pokes', ALICE), { seenAt: serverTimestamp() }));
   });
 
-  test('reads: the recipient lists, the poker gets their own, others nothing', async () => {
-    await seed(`users/${BOB}/pokes/${ALICE}`, { at: minutesAgo(1) });
+  test('reads: the recipient gets and lists; the poker and others nothing', async () => {
+    await befriend(ALICE, BOB);
+    await seed(`users/${BOB}/pokes/${ALICE}`, { at: minutesAgo(1), seenAt: minutesAgo(1) });
     await assertSucceeds(getDocs(collection(bob(), 'users', BOB, 'pokes')));
-    await assertSucceeds(getDoc(doc(alice(), 'users', BOB, 'pokes', ALICE)));
+    await assertSucceeds(getDoc(doc(bob(), 'users', BOB, 'pokes', ALICE)));
+    // The poke doc carries the recipient's seenAt - a read receipt for when
+    // they last opened /friends. The poker must not be able to see it.
+    await assertFails(getDoc(doc(alice(), 'users', BOB, 'pokes', ALICE)));
     await assertFails(getDocs(collection(alice(), 'users', BOB, 'pokes')));
     await assertFails(getDoc(doc(carol(), 'users', BOB, 'pokes', ALICE)));
   });
@@ -152,6 +160,34 @@ describe('now smoking', () => {
     await assertFails(getDoc(doc(carol(), 'nowSmoking', ALICE)));
     await befriend(ALICE, CAROL, 'pending');
     await assertFails(getDoc(doc(carol(), 'nowSmoking', ALICE)));
+  });
+
+  test('a friend cannot read a status older than two hours; the owner still can', async () => {
+    await befriend(ALICE, BOB);
+    await seed(`nowSmoking/${ALICE}`, { items: [item], since: minutesAgo(121) });
+    await assertFails(getDoc(doc(bob(), 'nowSmoking', ALICE)));
+    await assertSucceeds(getDoc(doc(alice(), 'nowSmoking', ALICE)));
+  });
+
+  test('a friend reads a fresh status, and a missing one reads as absent', async () => {
+    await befriend(ALICE, BOB);
+    await assertSucceeds(getDoc(doc(bob(), 'nowSmoking', ALICE)));
+    await seed(`nowSmoking/${ALICE}`, { items: [item], since: minutesAgo(119) });
+    await assertSucceeds(getDoc(doc(bob(), 'nowSmoking', ALICE)));
+  });
+
+  test('every flavour id in every item is a bounded string', async () => {
+    const custom = { comboId: 'custom:abc', label: 'Khalil · Mint', hookahId: 'h1', tobaccoType: 'virginia' };
+    await assertSucceeds(write({
+      items: Array(5).fill({ ...custom, flavorIds: tenFlavors('z'.repeat(100)) }), since: serverTimestamp(),
+    }));
+    await assertFails(write({ items: [{ ...custom, flavorIds: [1] }], since: serverTimestamp() }));
+    await assertFails(write({
+      items: [{ ...custom, flavorIds: tenFlavors('z'.repeat(101)) }], since: serverTimestamp(),
+    }));
+    await assertFails(write({
+      items: [...Array(4).fill(item), { ...custom, flavorIds: tenFlavors(7) }], since: serverTimestamp(),
+    }));
   });
 
   test('a friend still cannot read the order behind it', async () => {
@@ -191,7 +227,9 @@ describe('user mixes', () => {
     status: 'pending', createdAt: serverTimestamp(),
     ...overrides,
   });
-  const submit = (data: Record<string, unknown>, db = alice()) => setDoc(doc(db, 'userMixes', 'new'), data);
+  // A fresh id per call: a second write to one id is an update, which only
+  // admins may make, so it would fail for the wrong reason.
+  const submit = (data: Record<string, unknown>, db = alice()) => setDoc(doc(collection(db, 'userMixes')), data);
 
   test('a customer submits a pending mix', async () => {
     await assertSucceeds(submit(submission({
@@ -227,15 +265,48 @@ describe('user mixes', () => {
     await assertFails(submit(submission({ hasLED: true })));
   });
 
+  test('list and map entries are validated, not just counted', async () => {
+    const tenPercentages = Object.fromEntries('abcdefghij'.split('').map((k) => [k, 10]));
+    await assertSucceeds(submit(submission({
+      flavorIds: tenFlavors('z'.repeat(100)), flavorPercentages: tenPercentages, tobaccoStrength: 20,
+    })));
+    await assertFails(submit(submission({ flavorIds: [1] })));
+    // The separator stringListOk joins on cannot be used to smuggle an
+    // overlong entry through as two short ones.
+    await assertFails(submit(submission({ flavorIds: [`${'z'.repeat(60)}\n${'z'.repeat(60)}`] })));
+    await assertFails(submit(submission({ flavorIds: tenFlavors('z'.repeat(101)) })));
+    await assertFails(submit(submission({ flavorIds: tenFlavors(null) })));
+    await assertFails(submit(submission({ flavorPercentages: { 'mint:virginia': 'lots' } })));
+    await assertFails(submit(submission({
+      flavorPercentages: { a: 10, b: 10, c: 10, d: 10, e: 10, f: 10, g: 10, h: 10, i: 10, j: 'x' },
+    })));
+  });
+
+  test('strength is a number from 0 to 20', async () => {
+    await assertSucceeds(submit(submission({ tobaccoStrength: 0 })));
+    await assertSucceeds(submit(submission({ tobaccoStrength: 20 })));
+    await assertFails(submit(submission({ tobaccoStrength: 21 })));
+    await assertFails(submit(submission({ tobaccoStrength: -1 })));
+    await assertFails(submit(submission({ tobaccoStrength: '5' })));
+  });
+
   describe('reading', () => {
     beforeEach(async () => {
       await seed('userMixes/approved', { ...submission(), createdAt: minutesAgo(5), status: 'approved' });
       await seed('userMixes/pending', { ...submission(), createdAt: minutesAgo(5) });
     });
 
-    test('anyone, even signed out, reads an approved mix', async () => {
-      await assertSucceeds(getDoc(doc(nobody(), 'userMixes', 'approved')));
-      await assertSucceeds(getDocs(query(collection(nobody(), 'userMixes'), where('status', '==', 'approved'))));
+    // The public copy lives in communityMixes, without creatorUid. A uid is
+    // all a friend request needs, so a public submission would bypass a
+    // customer's choice to stay out of email discovery.
+    test('nobody but the creator and admins reads a submission, even an approved one', async () => {
+      await assertFails(getDoc(doc(nobody(), 'userMixes', 'approved')));
+      await assertFails(getDoc(doc(bob(), 'userMixes', 'approved')));
+      await assertFails(getDoc(doc(guest('g1'), 'userMixes', 'approved')));
+      await assertFails(getDocs(query(collection(nobody(), 'userMixes'), where('status', '==', 'approved'))));
+      await assertFails(getDocs(query(collection(bob(), 'userMixes'), where('status', '==', 'approved'))));
+      await assertSucceeds(getDoc(doc(alice(), 'userMixes', 'approved')));
+      await assertSucceeds(getDoc(doc(admin(), 'userMixes', 'approved')));
     });
 
     test('a pending mix is visible to its creator and admins only', async () => {
@@ -291,6 +362,100 @@ describe('user mixes', () => {
       await seed('userMixes/m2', { ...submission(), createdAt: minutesAgo(5) });
       await assertSucceeds(deleteDoc(doc(admin(), 'userMixes', 'm2')));
     });
+
+    // The creator cannot republish the snapshot, so deleting an approved
+    // submission would leave it on the menu. The bar removes those.
+    test('a creator withdraws a pending or rejected mix, but not an approved one', async () => {
+      await seed('userMixes/r1', { ...submission(), createdAt: minutesAgo(5), status: 'rejected' });
+      await seed('userMixes/a1', { ...submission(), createdAt: minutesAgo(5), status: 'approved' });
+      await assertSucceeds(deleteDoc(doc(alice(), 'userMixes', 'r1')));
+      await assertFails(deleteDoc(doc(alice(), 'userMixes', 'a1')));
+      await assertSucceeds(deleteDoc(doc(admin(), 'userMixes', 'a1')));
+    });
+  });
+});
+
+// -------------------------------------------------------- community mixes
+
+describe('community mixes', () => {
+  const projection = (overrides: Record<string, unknown> = {}) => ({
+    name: 'Lemon Storm', creatorName: 'Alice',
+    hookahId: 'h1', tobaccoType: 'virginia', flavorIds: ['mint:virginia', 'lemon:virginia'],
+    approvedAt: serverTimestamp(),
+    ...overrides,
+  });
+  const publish = (data: Record<string, unknown>, db = admin()) => setDoc(doc(db, 'communityMixes', 'm1'), data);
+  const pendingSubmission = {
+    creatorUid: ALICE, creatorName: 'Alice', name: 'Lemon Storm',
+    hookahId: 'h1', tobaccoType: 'virginia', flavorIds: ['mint:virginia', 'lemon:virginia'],
+    status: 'pending', createdAt: minutesAgo(5),
+  };
+
+  test('anyone, even signed out, reads and lists them', async () => {
+    await seed('communityMixes/m1', { ...projection(), approvedAt: minutesAgo(1) });
+    await assertSucceeds(getDoc(doc(nobody(), 'communityMixes', 'm1')));
+    await assertSucceeds(getDocs(collection(nobody(), 'communityMixes')));
+    await assertSucceeds(getDocs(collection(guest('g1'), 'communityMixes')));
+  });
+
+  test('an admin publishes the full projection', async () => {
+    await assertSucceeds(publish(projection({
+      description: 'Zesty', tobaccoStrength: 4, withIce: true,
+      flavorPercentages: { 'mint:virginia': 60, 'lemon:virginia': 40 },
+    })));
+  });
+
+  test('nobody else writes or deletes one', async () => {
+    await assertFails(publish(projection(), alice()));
+    await assertFails(publish(projection(), guest('g1')));
+    await assertFails(publish(projection(), nobody()));
+    await seed('communityMixes/m1', { ...projection(), approvedAt: minutesAgo(1) });
+    await assertFails(updateDoc(doc(alice(), 'communityMixes', 'm1'), { name: 'Mine now' }));
+    await assertFails(deleteDoc(doc(alice(), 'communityMixes', 'm1')));
+    await assertSucceeds(deleteDoc(doc(admin(), 'communityMixes', 'm1')));
+  });
+
+  test('the projection can never carry the creator\'s uid', async () => {
+    await assertFails(publish(projection({ creatorUid: ALICE })));
+    await assertFails(publish(projection({ status: 'approved' })));
+  });
+
+  test('shape and bounds are enforced, even for an admin', async () => {
+    await assertFails(publish(projection({ approvedAt: Timestamp.fromMillis(0) })));
+    const { creatorName: _omit, ...uncredited } = projection();
+    await assertFails(publish(uncredited));
+    await assertFails(publish(projection({ creatorName: '' })));
+    await assertFails(publish(projection({ name: 'x'.repeat(41) })));
+    await assertFails(publish(projection({ description: 'x'.repeat(141) })));
+    await assertFails(publish(projection({ flavorIds: [] })));
+    await assertFails(publish(projection({ flavorIds: [1] })));
+    await assertFails(publish(projection({ flavorIds: tenFlavors('z'.repeat(101)) })));
+    await assertFails(publish(projection({ flavorPercentages: { 'mint:virginia': 'lots' } })));
+    await assertFails(publish(projection({ tobaccoStrength: 21 })));
+    await assertFails(publish(projection({ tobaccoStrength: -1 })));
+  });
+
+  test('an admin approves in one batch, and removes in one batch', async () => {
+    await seed('userMixes/m1', pendingSubmission);
+    const db = admin();
+    const approve = writeBatch(db);
+    approve.set(doc(db, 'communityMixes', 'm1'), projection());
+    approve.update(doc(db, 'userMixes', 'm1'), { status: 'approved', reviewedAt: serverTimestamp() });
+    await assertSucceeds(approve.commit());
+
+    const remove = writeBatch(db);
+    remove.delete(doc(db, 'communityMixes', 'm1'));
+    remove.update(doc(db, 'userMixes', 'm1'), { status: 'rejected', reviewedAt: serverTimestamp() });
+    await assertSucceeds(remove.commit());
+  });
+
+  test('a creator cannot self-publish by batching their own approval', async () => {
+    await seed('userMixes/m1', pendingSubmission);
+    const db = alice();
+    const approve = writeBatch(db);
+    approve.set(doc(db, 'communityMixes', 'm1'), projection());
+    approve.update(doc(db, 'userMixes', 'm1'), { status: 'approved', reviewedAt: serverTimestamp() });
+    await assertFails(approve.commit());
   });
 });
 
@@ -429,6 +594,8 @@ describe('user mixes: attacks', () => {
     await assertFails(getDocs(query(collection(bob(), 'userMixes'),
       where('status', 'in', ['approved', 'pending']))));
     await assertFails(getDoc(doc(nobody(), 'userMixes', 'm1')));
+    await assertFails(getDoc(doc(nobody(), 'userMixes', 'a1')));
+    await assertFails(getDoc(doc(bob(), 'userMixes', 'a1')));
   });
 
   test('the credited name cannot be spoofed when the profile has none', async () => {
