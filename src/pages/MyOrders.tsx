@@ -117,7 +117,7 @@ const MyOrders: React.FC = () => {
                 <p className="text-sm mb-2">
                   {order.items.map((item) => item.name).join(', ')}
                 </p>
-                <p className="text-lg font-bold text-amber-400">{order.total} Lei</p>
+                <p className="text-lg font-bold text-amber-400">{`${order.total} Lei`}</p>
                 {ratedItem(order)?.comboId && (
                   <div className="mt-3 border-t border-border pt-3">
                     <p className="mb-1 text-xs uppercase text-turbo-muted">

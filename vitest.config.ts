@@ -8,7 +8,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.{ts,tsx}'],
     testTimeout: 15000,
     // clearFirestore + seeding on a cold JVM can approach the 10s default.
     hookTimeout: 15000,

@@ -25,7 +25,7 @@ export const NewOrderFlash = ({ order, onDismiss }: NewOrderFlashProps) => {
       <div className="bg-turbo-dark/90 border-2 border-amber-400 rounded-xl px-8 py-6 text-center shadow-2xl">
         <p className="text-3xl font-bold text-amber-400">🔔 New Order</p>
         <p className="text-lg text-turbo-text mt-2">
-          Table {order.table ?? '—'} · {order.total} Lei
+          {`Table ${order.table ?? '—'} · ${order.total} Lei`}
         </p>
       </div>
     </div>

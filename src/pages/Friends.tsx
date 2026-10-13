@@ -578,11 +578,11 @@ const Friends: React.FC = () => {
                   <Card className="bg-turbo-card border-border">
                     <CardContent className="space-y-2 p-4">
                       <h2 className="text-sm font-bold uppercase text-turbo-muted">
-                        Requests sent ({outgoing.length})
+                        {`Requests sent (${outgoing.length})`}
                       </h2>
                       {outgoing.map((row) => (
                         <p key={row.pairId} className="text-sm text-turbo-muted">
-                          {row.displayName ?? 'Someone'} — request sent
+                          {`${row.displayName ?? 'Someone'} — request sent`}
                         </p>
                       ))}
                     </CardContent>
@@ -592,7 +592,7 @@ const Friends: React.FC = () => {
                 <Card className="bg-turbo-card border-border">
                   <CardContent className="space-y-2 p-4">
                     <h2 className="text-sm font-bold uppercase text-turbo-muted">
-                      Friends ({accepted.length})
+                      {`Friends (${accepted.length})`}
                     </h2>
                     {accepted.length === 0 && <p className="text-sm text-turbo-muted">No friends yet.</p>}
                     {accepted.map((row) => (

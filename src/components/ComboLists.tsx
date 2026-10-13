@@ -39,7 +39,7 @@ export const FavoritesList: React.FC<FavoritesListProps> = ({
   <Card className="bg-turbo-card border-border">
     <CardContent className="p-4">
       <h2 className="mb-3 text-sm font-bold uppercase text-turbo-muted">
-        {heading} ({favorites.length})
+        {`${heading} (${favorites.length})`}
       </h2>
       {favorites.length === 0 && <p className="text-sm text-turbo-muted">{emptyText}</p>}
       {favorites.map((favorite) => (
@@ -74,8 +74,7 @@ export const FavoritesList: React.FC<FavoritesListProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Remove this favourite?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    &ldquo;{favorite.label}&rdquo; will no longer appear on your favourites
-                    list.
+                    {`“${favorite.label}” will no longer appear on your favourites list.`}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -106,7 +105,7 @@ export const RatingsList: React.FC<RatingsListProps> = ({
   <Card className="bg-turbo-card border-border">
     <CardContent className="p-4">
       <h2 className="mb-3 text-sm font-bold uppercase text-turbo-muted">
-        {heading} ({ratings.length})
+        {`${heading} (${ratings.length})`}
       </h2>
       {ratings.length === 0 && <p className="text-sm text-turbo-muted">{emptyText}</p>}
       {ratings.map((rating) => (

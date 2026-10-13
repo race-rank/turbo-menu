@@ -33,7 +33,7 @@ export const HookahOfTheDayCard: React.FC<Props> = ({ resolved, onPick }) => {
             {promoText && (
               <p className="text-sm text-turbo-muted line-clamp-2">{promoText}</p>
             )}
-            <p className="mt-1 font-bold text-amber-400">{hookah.price} Lei</p>
+            <p className="mt-1 font-bold text-amber-400">{`${hookah.price} Lei`}</p>
           </div>
           <Button
             className="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white"

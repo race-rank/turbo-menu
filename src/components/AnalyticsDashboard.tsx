@@ -142,7 +142,7 @@ export const AnalyticsDashboard = ({ orders, isLoading = false }: AnalyticsDashb
               {analyticsService.formatCurrency(revenueAnalytics.totalRevenue)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {orderAnalytics.total} total orders
+              {`${orderAnalytics.total} total orders`}
             </p>
           </CardContent>
         </Card>
@@ -157,7 +157,7 @@ export const AnalyticsDashboard = ({ orders, isLoading = false }: AnalyticsDashb
               {analyticsService.formatCurrency(revenueAnalytics.averageOrderValue)}
             </div>
             <p className="text-xs text-muted-foreground">
-              from {orderAnalytics.total} orders
+              {`from ${orderAnalytics.total} orders`}
             </p>
           </CardContent>
         </Card>
@@ -170,7 +170,7 @@ export const AnalyticsDashboard = ({ orders, isLoading = false }: AnalyticsDashb
           <CardContent>
             <div className="text-2xl font-bold">{orderAnalytics.completed}</div>
             <p className="text-xs text-muted-foreground">
-              {orderAnalytics.total > 0 ? analyticsService.formatPercentage((orderAnalytics.completed / orderAnalytics.total) * 100) : '0%'} completion rate
+              {`${orderAnalytics.total > 0 ? analyticsService.formatPercentage((orderAnalytics.completed / orderAnalytics.total) * 100) : '0%'} completion rate`}
             </p>
           </CardContent>
         </Card>
@@ -434,7 +434,7 @@ export const AnalyticsDashboard = ({ orders, isLoading = false }: AnalyticsDashb
                     <div>
                       <p className="font-medium">{addon.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {addon.count} times selected
+                        {`${addon.count} times selected`}
                       </p>
                     </div>
                     <div className="text-right">
