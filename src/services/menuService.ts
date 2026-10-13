@@ -17,6 +17,8 @@ import { firestore } from '@/lib/firebase';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix, FeaturedHookah } from '@/types/database';
 import { clampPromoText } from './hookahOfTheDay';
 import { safeConvertTimestamp, cleanObject } from './firebaseService';
+import { listApprovedUserMixes } from './userMixService';
+import type { UserMix } from './userMixes';
 
 const MENU_COLLECTIONS = {
   HOOKAHS: 'hookahs',
@@ -41,6 +43,9 @@ export interface MenuData {
   // Optional: a snapshot published before this shipped carries no such key, and
   // that must read as "nothing featured" rather than as an error.
   hookahOfTheDay?: FeaturedHookah;
+  // Approved community mixes. Optional: a snapshot published before this
+  // shipped carries none, and that reads as "no community mixes".
+  communityMixes?: UserMix[];
 }
 
 // Hookah operations
@@ -205,14 +210,17 @@ export const getRecommendedMixes = async (): Promise<DatabaseRecommendedMix[]> =
 // Menu snapshot (single-document read path for guests)
 
 const fetchMenuCollections = async (): Promise<MenuData> => {
-  const [hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay] = await Promise.all([
+  const [hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay, communityMixes] = await Promise.all([
     getHookahs(),
     getTobaccoTypes(),
     getFlavors(),
     getRecommendedMixes(),
-    getFeaturedHookah()
+    getFeaturedHookah(),
+    // Load-bearing catch: this list must never be able to take the whole menu
+    // down with it (guests load through here whenever the snapshot is missing).
+    listApprovedUserMixes().catch(() => [] as UserMix[])
   ]);
-  return { hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay };
+  return { hookahs, tobaccoTypes, flavors, recommendedMixes, hookahOfTheDay, communityMixes };
 };
 
 const reviveMenuItems = <T,>(items: unknown): T[] =>
@@ -254,7 +262,8 @@ export const getMenuData = async (): Promise<MenuData> => {
         recommendedMixes: reviveMenuItems<DatabaseRecommendedMix>(data.recommendedMixes),
         // Not run through reviveMenuItems: it is a single object with no
         // timestamps, not a list of menu items.
-        hookahOfTheDay: data.hookahOfTheDay ?? undefined
+        hookahOfTheDay: data.hookahOfTheDay ?? undefined,
+        communityMixes: reviveMenuItems<UserMix>(data.communityMixes)
       };
     }
   } catch (error) {
