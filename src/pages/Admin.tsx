@@ -19,16 +19,29 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
 import { NewOrderFlash, FlashOrder } from '@/components/NewOrderFlash';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAdminSession } from '@/contexts/AdminSessionContext';
+import { diffNewOrders } from '@/services/adminSession';
+
+// Order ids already announced in this tab. Module scope, not a ref, so it
+// outlives the component: after a dead session the guard unmounts this page,
+// staff sign in again, and the page mounts fresh. A ref would start from null
+// and silently baseline the orders that arrived meanwhile - exactly the ones
+// staff missed. Kept here they ring once when the feed comes back, while the
+// orders already on screen stay quiet.
+let knownOrderIds: Set<string> | null = null;
 
 const Admin = () => {
   const [orders, setOrders] = useState<OrderDetails[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
-  const knownOrderIds = useRef<Set<string> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const [flashOrder, setFlashOrder] = useState<FlashOrder | null>(null);
   const dismissFlash = useCallback(() => setFlashOrder(null), []);
+  const { user, isAdmin } = useAuth();
+  const { reportError, retryToken } = useAdminSession();
+  const uid = user?.uid;
 
   const ensureAudioCtx = () => {
     if (!audioCtxRef.current) {
@@ -142,35 +155,36 @@ const Admin = () => {
     loadNotifications();
   }, [activeTab]);
 
+  // Keyed on who is signed in and on retryToken, not []: a listener that
+  // errors is dead for good, so this must resubscribe after a re-login and
+  // after the session recovers from a lost connection. playNewOrderSound is
+  // deliberately absent - it only touches refs, so a stale copy is fine.
   useEffect(() => {
+    if (!uid || !isAdmin) return;
     const unsubscribe = subscribeToAdminOrders((newOrders) => {
-      if (knownOrderIds.current === null) {
-        knownOrderIds.current = new Set(newOrders.map(o => o.orderId));
-      } else {
-        const fresh = newOrders.filter(o => !knownOrderIds.current!.has(o.orderId));
-        if (fresh.length > 0) {
-          playNewOrderSound();
-          setFlashOrder({
-            orderId: fresh[0].orderId,
-            table: fresh[0].table,
-            total: fresh[0].total
-          });
-        }
-        knownOrderIds.current = new Set(newOrders.map(o => o.orderId));
+      // One sound and one flash per snapshot however many are fresh, so a
+      // feed that comes back with a backlog rings once, not once per order.
+      const { fresh, known } = diffNewOrders(knownOrderIds, newOrders);
+      knownOrderIds = known;
+      if (fresh.length > 0) {
+        playNewOrderSound();
+        setFlashOrder({
+          orderId: fresh[0].orderId,
+          table: fresh[0].table,
+          total: fresh[0].total
+        });
       }
       setOrders(newOrders);
       setIsLoading(false);
     }, (error) => {
       console.error('Orders listener failed:', error);
       setIsLoading(false);
-      toast({
-        title: "Error",
-        description: "Failed to load orders. Please try again.",
-        variant: "destructive"
-      });
+      // The persistent banner, not a toast: this listener is now dead and
+      // the list below is frozen until the session recovers.
+      reportError(error);
     });
     return () => unsubscribe();
-  }, []);
+  }, [uid, isAdmin, retryToken, reportError]);
 
   return (
     <div className="min-h-screen bg-turbo-dark text-turbo-text pb-20">
@@ -204,14 +218,14 @@ const Admin = () => {
                     <DropdownMenuItem key={notif.id} className="p-3 border-b border-border">
                       {notif.type === 'new-order' && (
                         <div>
-                          <p className="font-medium">New Order: {notif.data?.orderId || 'Unknown'}</p>
+                          <p className="font-medium">{`New Order: ${notif.data?.orderId || 'Unknown'}`}</p>
                           <p className="text-xs text-turbo-muted">{formatDate(notif?.timestamp)}</p>
                         </div>
                       )}
                       {notif.type === 'status-change' && (
                         <div>
-                          <p className="font-medium">Status Change: {notif.data?.orderId || 'Unknown'}</p>
-                          <p className="text-xs">{notif.data?.previousStatus || 'Unknown'} → {notif.data?.status || 'Unknown'}</p>
+                          <p className="font-medium">{`Status Change: ${notif.data?.orderId || 'Unknown'}`}</p>
+                          <p className="text-xs">{`${notif.data?.previousStatus || 'Unknown'} → ${notif.data?.status || 'Unknown'}`}</p>
                           <p className="text-xs text-turbo-muted">{formatDate(notif?.timestamp)}</p>
                         </div>
                       )}
@@ -292,15 +306,15 @@ const Admin = () => {
                             </span>
                           </div>
                           <p className="text-sm text-turbo-muted">
-                            Created: {formatDate(order?.createdAt) || '—'}
+                            {`Created: ${formatDate(order?.createdAt) || '—'}`}
                           </p>
                           {order.table && (
                             <p className="text-sm text-turbo-muted">
-                              Table: {order.table}
+                              {`Table: ${order.table}`}
                             </p>
                           )}
                           <p className="font-semibold mt-2">
-                            {order.items.length} items · {order.total} Lei
+                            {`${order.items.length} items · ${order.total} Lei`}
                           </p>
                         </div>
                         
@@ -308,7 +322,7 @@ const Admin = () => {
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="outline" size="sm">
-                                Update Status <MoreHorizontal className="ml-2 h-4 w-4" />
+                                <span>Update Status</span><MoreHorizontal className="ml-2 h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -318,7 +332,7 @@ const Admin = () => {
                                   disabled={order.status === status.value}
                                   onClick={() => handleStatusChange(order.orderId, status.value)}
                                 >
-                                  Set to {status.label}
+                                  {`Set to ${status.label}`}
                                 </DropdownMenuItem>
                               ))}
                             </DropdownMenuContent>
@@ -346,16 +360,16 @@ const Admin = () => {
                           {order.items.map((item, index) => (
                             <div key={index} className="flex flex-col gap-1 text-sm p-2 bg-muted/30 rounded">
                               <div className="flex items-center justify-between">
-                                <span className="flex-1">• 1x {item.name}</span>
-                                <span className="font-medium">{item.price} Lei</span>
+                                <span className="flex-1">{`• 1x ${item.name}`}</span>
+                                <span className="font-medium">{`${item.price} Lei`}</span>
                               </div>
                               {item.type === 'custom' && (
                                 <>
                                   {item.hookah && (
-                                    <span className="text-xs text-turbo-muted ml-4">Hookah: {item.hookah}</span>
+                                    <span className="text-xs text-turbo-muted ml-4">{`Hookah: ${item.hookah}`}</span>
                                   )}
                                   {item.flavors && item.flavors.length > 0 && (
-                                    <span className="text-xs text-turbo-muted ml-4">Flavors: {item.flavors.join(', ')}</span>
+                                    <span className="text-xs text-turbo-muted ml-4">{`Flavors: ${item.flavors.join(', ')}`}</span>
                                   )}
                                   {(item.hasLED || item.hasColoredWater || item.hasAlcohol || item.hasFruits) && (
                                     <div className="flex flex-wrap gap-1 ml-4 mt-1">
