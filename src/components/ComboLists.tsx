@@ -31,10 +31,13 @@ interface FavoritesListProps {
   // control is structurally impossible to reach for someone else's list
   // rather than merely hidden by a page-level check.
   onRemove?: (favorite: FavoriteCombo) => void;
+  // Account's signed-in list only. Rendered for custom builds - a curated
+  // mix is already on the menu.
+  onShare?: (favorite: FavoriteCombo) => void;
 }
 
 export const FavoritesList: React.FC<FavoritesListProps> = ({
-  favorites, heading, emptyText, footer, onReorder, onRemove,
+  favorites, heading, emptyText, footer, onReorder, onRemove, onShare,
 }) => (
   <Card className="bg-turbo-card border-border">
     <CardContent className="p-4">
@@ -53,6 +56,16 @@ export const FavoritesList: React.FC<FavoritesListProps> = ({
               onClick={() => onReorder(favorite)}
             >
               Order again
+            </Button>
+          )}
+          {onShare && favorite.kind === 'custom' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 text-xs"
+              onClick={() => onShare(favorite)}
+            >
+              Share as a mix
             </Button>
           )}
           {onRemove && (
