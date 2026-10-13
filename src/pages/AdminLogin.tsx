@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { signInWithEmail } from '@/services/authService';
 import { toast } from "sonner";
+import type { AdminLoginReason } from "@/components/AdminGuard";
+
+// Why AdminGuard sent staff here. Without it a dead session looked like being
+// logged out for no reason - or, before, like being dropped on the menu.
+const REASON_MESSAGES: Record<AdminLoginReason, string> = {
+  expired: 'Your session expired — please sign in again.',
+  required: 'Please sign in with an admin account to continue.',
+};
 
 const AdminLogin: React.FC = () => {
   const [userInput, setUserInput] = useState('');
@@ -14,6 +22,9 @@ const AdminLogin: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const { isAdmin, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const reason = (location.state as { reason?: AdminLoginReason } | null)?.reason;
+  const reasonMessage = reason ? REASON_MESSAGES[reason] : undefined;
 
   useEffect(() => {
     if (!loading && isAdmin) {
@@ -43,6 +54,14 @@ const AdminLogin: React.FC = () => {
       <Card className="w-full max-w-md">
         <CardContent className="p-8">
           <h1 className="text-2xl font-bold mb-6 text-center">Hookah Bar Admin</h1>
+          {reasonMessage && (
+            <p
+              role="alert"
+              className="mb-6 rounded-md border border-red-500 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-600"
+            >
+              {reasonMessage}
+            </p>
+          )}
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="user">Email</Label>
