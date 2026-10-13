@@ -6,9 +6,12 @@ import type { DatabaseFlavor, DatabaseHookah } from '@/types/database';
 import {
   approveUserMix, listCommunityMixes, listPendingUserMixes, rejectUserMix,
 } from '@/services/userMixService';
-import { describeUserMixBuild, type CommunityMix, type UserMix } from '@/services/userMixes';
+import { describeUserMixBuild, describeUserMixRecipe, type CommunityMix, type UserMix } from '@/services/userMixes';
 
-type MixRow = Pick<CommunityMix, 'id' | 'name' | 'creatorName' | 'description' | 'hookahId' | 'flavorIds'>;
+type MixRow = Pick<
+  CommunityMix,
+  'id' | 'name' | 'creatorName' | 'description' | 'hookahId' | 'flavorIds' | 'tobaccoStrength' | 'withIce' | 'flavorPercentages'
+>;
 
 interface Props {
   hookahs: DatabaseHookah[];
@@ -29,7 +32,7 @@ export const CommunityMixesAdmin: React.FC<Props> = ({ hookahs, flavors, onChang
   }, []);
 
   useEffect(() => {
-    load().catch((error) => toast({ title: 'Could not load community mixes', description: String(error), variant: 'destructive' }));
+    load().catch(() => toast({ title: 'Could not load community mixes', description: 'Check your connection and try again.', variant: 'destructive' }));
   }, [load]);
 
   const review = async (id: string, verdict: () => Promise<void>) => {
@@ -38,8 +41,8 @@ export const CommunityMixesAdmin: React.FC<Props> = ({ hookahs, flavors, onChang
       await verdict();
       await onChanged();
       await load();
-    } catch (error) {
-      toast({ title: 'Could not update that mix', description: String(error), variant: 'destructive' });
+    } catch {
+      toast({ title: 'Could not update that mix', description: 'Check your connection and try again.', variant: 'destructive' });
     } finally {
       setBusyId(null);
     }
@@ -51,6 +54,9 @@ export const CommunityMixesAdmin: React.FC<Props> = ({ hookahs, flavors, onChang
         <p className="font-semibold">{mix.name}</p>
         <p className="text-xs text-turbo-muted">{`by ${mix.creatorName}`}</p>
         <p className="text-sm">{describeUserMixBuild(mix, hookahs, flavors)}</p>
+        {describeUserMixRecipe(mix, flavors).map((line) => (
+          <p key={line} className="text-xs text-turbo-muted">{line}</p>
+        ))}
         {mix.description && <p className="text-sm text-turbo-muted">{mix.description}</p>}
         <div className="flex gap-2 pt-2">{actions}</div>
       </CardContent>

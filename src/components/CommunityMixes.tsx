@@ -24,7 +24,11 @@ export const CommunityMixes: React.FC<Props> = ({ mixes, menu, onAdd }) => {
           // live menu, never from the submission. The table is irrelevant here.
           const resolution = resolveReorder(favorite, menu, '');
           return (
-            <Card key={mix.id} className="bg-turbo-card border-border">
+            <Card
+              key={mix.id}
+              className={resolution.status === 'ok' ? 'bg-turbo-card border-border' : 'bg-turbo-card border-border opacity-70'}
+              aria-disabled={resolution.status !== 'ok'}
+            >
               <CardContent className="p-4 space-y-1">
                 <p className="font-semibold">{mix.name}</p>
                 <p className="text-xs text-turbo-muted">{`by ${mix.creatorName}`}</p>
@@ -39,8 +43,10 @@ export const CommunityMixes: React.FC<Props> = ({ mixes, menu, onAdd }) => {
                       </Button>
                     </>
                   ) : (
+                    // The resolver can only name deleted documents by raw id, so
+                    // none of them are shown to guests.
                     <span className="text-sm text-turbo-muted">
-                      {`Unavailable — no longer on the menu: ${resolution.missing.join(', ')}`}
+                      Some ingredients are no longer on the menu
                     </span>
                   )}
                 </div>

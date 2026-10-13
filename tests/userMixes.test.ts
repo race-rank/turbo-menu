@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { comboIdForCustom } from '../src/services/comboId';
 import {
-  USER_MIX_DESCRIPTION_MAX, USER_MIX_NAME_MAX, describeUserMixBuild, toCommunityMix,
+  USER_MIX_DESCRIPTION_MAX, USER_MIX_NAME_MAX, describeUserMixBuild, describeUserMixRecipe, toCommunityMix,
   userMixFromFavorite, userMixToFavorite, validateUserMixInput, type UserMix,
 } from '../src/services/userMixes';
 import type { FavoriteCombo } from '../src/services/favoritesService';
@@ -105,5 +105,25 @@ describe('describeUserMixBuild', () => {
     expect(describeUserMixBuild(bad, hookahs, flavors)).toBe('Khalil Mamoon · 1, null, Mint');
     const noList = { hookahId: 'h1', flavorIds: 'mint' } as unknown as UserMix;
     expect(describeUserMixBuild(noList, hookahs, flavors)).toBe('Khalil Mamoon · ');
+  });
+});
+
+describe('describeUserMixRecipe', () => {
+  const flavors = [{ id: 'mint', name: 'Mint' }, { id: 'lemon', name: 'Lemon' }] as DatabaseFlavor[];
+  test('lists strength, ice and percentages', () => {
+    expect(describeUserMixRecipe({
+      tobaccoStrength: 4, withIce: true,
+      flavorPercentages: { 'mint:virginia': 60, 'lemon:virginia': 40 },
+    }, flavors)).toEqual(['Strength 4', 'With ice', 'Mint 60%, Lemon 40%']);
+  });
+  test('says so when there is no ice', () => {
+    expect(describeUserMixRecipe({ withIce: false }, flavors)).toEqual(['No ice']);
+  });
+  test('leaves out what the mix does not carry', () => {
+    expect(describeUserMixRecipe({}, flavors)).toEqual([]);
+  });
+  test('falls back to ids and ignores malformed percentages', () => {
+    const bad = { flavorPercentages: { 'gone:x': 50, 'mint:x': 'lots' } } as unknown as UserMix;
+    expect(describeUserMixRecipe(bad, flavors)).toEqual(['gone 50%']);
   });
 });

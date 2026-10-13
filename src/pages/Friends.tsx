@@ -538,8 +538,8 @@ const Friends: React.FC = () => {
                       try {
                         await setDiscoverable(user, checked);
                         setDiscoverableState(checked);
-                      } catch (error) {
-                        toast({ title: 'Could not change that', description: String(error), variant: 'destructive' });
+                      } catch {
+                        toast({ title: 'Could not change that', description: 'Check your connection and try again.', variant: 'destructive' });
                       }
                     }}
                   />
@@ -559,8 +559,8 @@ const Friends: React.FC = () => {
                       try {
                         await setShareNowSmoking(user.uid, checked);
                         setShareSmokingState(checked);
-                      } catch (error) {
-                        toast({ title: 'Could not change that', description: String(error), variant: 'destructive' });
+                      } catch {
+                        toast({ title: 'Could not change that', description: 'Check your connection and try again.', variant: 'destructive' });
                       }
                     }}
                   />

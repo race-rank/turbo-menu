@@ -159,3 +159,27 @@ export const describeUserMixBuild = (
   });
   return `${hookah} · ${names.join(', ')}`;
 };
+
+/**
+ * The rest of the recipe, for the admin to read before approving:
+ * ["Strength 4", "With ice", "Mint 60%, Lemon 40%"]. A part the mix does not
+ * carry is left out. Defensive for the same reason as describeUserMixBuild.
+ */
+export const describeUserMixRecipe = (
+  mix: Pick<CommunityMix, 'tobaccoStrength' | 'withIce' | 'flavorPercentages'>,
+  flavors: Pick<DatabaseFlavor, 'id' | 'name'>[],
+): string[] => {
+  const lines: string[] = [];
+  if (typeof mix.tobaccoStrength === 'number') lines.push(`Strength ${mix.tobaccoStrength}`);
+  if (typeof mix.withIce === 'boolean') lines.push(mix.withIce ? 'With ice' : 'No ice');
+  const percentages = mix.flavorPercentages && typeof mix.flavorPercentages === 'object'
+    ? Object.entries(mix.flavorPercentages).filter(([, value]) => typeof value === 'number')
+    : [];
+  if (percentages.length > 0) {
+    lines.push(percentages.map(([key, value]) => {
+      const docId = String(key).split(':')[0];
+      return `${flavors.find((f) => f.id === docId)?.name ?? docId} ${value}%`;
+    }).join(', '));
+  }
+  return lines;
+};

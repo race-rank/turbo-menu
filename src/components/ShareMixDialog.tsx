@@ -48,8 +48,8 @@ export const ShareMixDialog: React.FC<Props> = ({ favorite, uid, onClose, onSubm
       toast({ title: 'Submitted for review', description: 'The bar will take a look before it goes on the menu.' });
       onSubmitted();
       close();
-    } catch (error) {
-      toast({ title: 'Could not submit your mix', description: String(error), variant: 'destructive' });
+    } catch {
+      toast({ title: 'Could not submit your mix', description: 'Check your connection and try again.', variant: 'destructive' });
     } finally {
       setBusy(false);
     }
