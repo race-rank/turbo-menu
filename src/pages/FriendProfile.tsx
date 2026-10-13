@@ -8,6 +8,11 @@ import { FavoritesList, RatingsList } from '@/components/ComboLists';
 import { getPublicProfile, type PublicProfile } from '@/services/profileService';
 import { listFavorites, type FavoriteCombo } from '@/services/favoritesService';
 import { listRatings, type ComboRating } from '@/services/ratingsService';
+import { getNowSmoking } from '@/services/nowSmokingService';
+import { isNowSmokingFresh, nowSmokingItemToFavorite, type NowSmoking } from '@/services/nowSmoking';
+import { getMenuData } from '@/services/menuService';
+import type { MenuSnapshot } from '@/services/reorderService';
+import { useOrderFavorite } from '@/hooks/useOrderFavorite';
 
 // Firestore rejects a disallowed read with a bare FirestoreError whose `code`
 // is the literal string 'permission-denied' - no exported class to instanceof
@@ -25,6 +30,13 @@ const FriendProfile: React.FC = () => {
   const [denied, setDenied] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [retryToken, setRetryToken] = useState(0);
+  const [nowSmoking, setNowSmoking] = useState<NowSmoking | null>(null);
+  const [menu, setMenu] = useState<MenuSnapshot | null>(null);
+  const orderFavorite = useOrderFavorite(menu);
+
+  useEffect(() => {
+    getMenuData().then(setMenu).catch(() => setMenu(null));
+  }, []);
 
   useEffect(() => {
     if (!uid) return;
@@ -38,10 +50,16 @@ const FriendProfile: React.FC = () => {
       getPublicProfile(uid),
       listFavorites(uid),
       listRatings(uid),
-    ]).then(([profileResult, favoritesResult, ratingsResult]) => {
+      getNowSmoking(uid),
+    ]).then(([profileResult, favoritesResult, ratingsResult, nowSmokingResult]) => {
       setProfile(profileResult.status === 'fulfilled' ? profileResult.value : null);
       setFavorites(favoritesResult.status === 'fulfilled' ? favoritesResult.value : []);
       setRatings(ratingsResult.status === 'fulfilled' ? ratingsResult.value : []);
+
+      // Deliberately not in `failures` below: a denial or absence just means the
+      // friend has not opted in, which must not read as "you are not friends".
+      const smoking = nowSmokingResult.status === 'fulfilled' ? nowSmokingResult.value : null;
+      setNowSmoking(smoking && isNowSmokingFresh(smoking.since, new Date()) ? smoking : null);
 
       const failures = [profileResult, favoritesResult, ratingsResult]
         .filter((result): result is PromiseRejectedResult => result.status === 'rejected');
@@ -89,6 +107,27 @@ const FriendProfile: React.FC = () => {
                   <Button variant="outline" size="sm" onClick={() => setRetryToken((n) => n + 1)}>
                     Retry
                   </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {nowSmoking && (
+              <Card className="bg-turbo-card border-border">
+                <CardContent className="p-4 space-y-2">
+                  <h3 className="font-semibold">Now smoking</h3>
+                  {nowSmoking.items.map((item) => {
+                    const favorite = nowSmokingItemToFavorite(item);
+                    return (
+                      <div key={item.comboId} className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm">{item.label}</span>
+                        {favorite && (
+                          <Button size="sm" variant="outline" onClick={() => orderFavorite(favorite)}>
+                            Order the same
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </CardContent>
               </Card>
             )}
