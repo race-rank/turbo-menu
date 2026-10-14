@@ -18,14 +18,6 @@ const SRC = path.resolve(__dirname, '../src');
 
 // shadcn/ui primitives only forward `{children}`; never mix text.
 const EXEMPT_DIRS = [path.join(SRC, 'components', 'ui') + path.sep];
-// TODO: owned by a concurrent fix; remove from this list once that lands.
-const EXEMPT_FILES = [
-  'components/AdminGuard.tsx',
-  'pages/Admin.tsx',
-  'pages/AdminLogin.tsx',
-  'contexts/AuthContext.tsx',
-].map((f) => path.join(SRC, f));
-
 function tsxFiles(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     const p = path.join(dir, name);
@@ -65,7 +57,7 @@ function findOffenders(file: string, text = readFileSync(file, 'utf8')): string[
 describe('translate-safe text guard', () => {
   it('no element mixes static text with an interpolated value', () => {
     const files = tsxFiles(SRC).filter(
-      (f) => !EXEMPT_FILES.includes(f) && !EXEMPT_DIRS.some((d) => f.startsWith(d)),
+      (f) => !EXEMPT_DIRS.some((d) => f.startsWith(d)),
     );
     const offenders = files.flatMap((f) => findOffenders(f));
     expect(offenders, `Use a single template string, e.g. {\`Total: \${n} Lei\`}:\n${offenders.join('\n')}`).toEqual([]);
