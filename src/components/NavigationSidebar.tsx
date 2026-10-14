@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Home, ShoppingCart, Settings, LogOut, LogIn, Utensils, Star, BarChart2, Receipt, UserCircle, Users } from 'lucide-react';
 import { useAuth } from "@/contexts/AuthContext";
+import { usePokes } from "@/contexts/PokeContext";
 import { logout } from "@/services/authService";
 import { cn } from "@/lib/utils";
 import { performRedirect } from "@/utils/redirects";
@@ -13,6 +14,7 @@ export const NavigationSidebar = () => {
   const { user, isAdmin, isAnonymous } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { unseenCount } = usePokes();
 
   const handleLogout = async () => {
     await logout();
@@ -40,8 +42,19 @@ export const NavigationSidebar = () => {
     <>
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetTrigger asChild>
-          <Button variant="outline" size="icon" className="relative m-4 z-40">
+          <Button
+            variant="outline" size="icon" className="relative m-4 z-40"
+            aria-label={unseenCount > 0 ? `Menu, ${unseenCount} unseen pokes` : 'Menu'}
+          >
             <Menu className="h-4 w-4" />
+            {unseenCount > 0 && (
+              <span
+                className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground"
+                aria-hidden="true"
+              >
+                {unseenCount}
+              </span>
+            )}
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="w-64">

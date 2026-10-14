@@ -13,7 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
+import { PokeButton } from '@/components/PokeButton';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePokes } from '@/contexts/PokeContext';
 import { toast } from '@/hooks/use-toast';
 import { getPublicProfile } from '@/services/profileService';
 import {
@@ -21,6 +23,8 @@ import {
   getDiscoverable, listFriendships, removeFriendship, resolveInviteCode,
   rotateInviteCode, sendFriendRequest, setDiscoverable, type Friendship,
 } from '@/services/friendsService';
+import { getNowSmoking, getShareNowSmoking, setShareNowSmoking } from '@/services/nowSmokingService';
+import { isNowSmokingFresh, type NowSmoking } from '@/services/nowSmoking';
 
 interface FriendRow extends Friendship {
   displayName: string | null;
@@ -69,6 +73,7 @@ const clearPendingInvite = (): void => {
 const Friends: React.FC = () => {
   const { user, isAnonymous, loading } = useAuth();
   const navigate = useNavigate();
+  const { markAllSeen } = usePokes();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [rows, setRows] = useState<FriendRow[]>([]);
@@ -80,6 +85,8 @@ const Friends: React.FC = () => {
   const [resetting, setResetting] = useState(false);
   const [email, setEmail] = useState('');
   const [discoverable, setDiscoverableState] = useState(false);
+  const [shareSmoking, setShareSmokingState] = useState(false);
+  const [smokingByUid, setSmokingByUid] = useState<Record<string, NowSmoking>>({});
   const [pendingPairId, setPendingPairId] = useState<string | null>(null);
 
   // Ref as well as state: two taps landing in the same tick both read the same
@@ -91,6 +98,11 @@ const Friends: React.FC = () => {
   const linkRef = useRef<HTMLParagraphElement>(null);
 
   const signedIn = !!user && !isAnonymous;
+
+  // markAllSeen changes identity with the poke list, so pokes arriving while
+  // this page is open are marked seen too. Once stamped nothing is unseen, so
+  // the re-run writes nothing.
+  useEffect(() => { markAllSeen(); }, [markAllSeen]);
   const paramCode = searchParams.get('code');
 
   /**
@@ -169,6 +181,7 @@ const Friends: React.FC = () => {
     // Without this the switch renders off for someone who already opted in,
     // and flipping it would write the value it already had.
     getDiscoverable(user.uid).then(setDiscoverableState).catch(() => setDiscoverableState(false));
+    getShareNowSmoking(user.uid).then(setShareSmokingState).catch(() => setShareSmokingState(false));
   }, [signedIn, user, loadInviteCode]);
 
   const request = useCallback(async (otherUid: string, name: string | null) => {
@@ -387,6 +400,23 @@ const Friends: React.FC = () => {
   const outgoing = rows.filter((r) => r.status === 'pending' && r.requestedBy === user?.uid);
   const accepted = rows.filter((r) => r.status === 'accepted');
 
+  // One read per friend. Denied or missing simply means "nothing to show" -
+  // they may not have opted in, and that is not an error.
+  const acceptedUids = accepted.map((row) => row.otherUid).join(',');
+  useEffect(() => {
+    if (!acceptedUids) { setSmokingByUid({}); return; }
+    let cancelled = false;
+    Promise.all(acceptedUids.split(',').map(async (uid) =>
+      [uid, await getNowSmoking(uid).catch(() => null)] as const))
+      .then((entries) => {
+        if (cancelled) return;
+        const now = new Date();
+        setSmokingByUid(Object.fromEntries(entries.filter(
+          (entry): entry is readonly [string, NowSmoking] => !!entry[1] && isNowSmokingFresh(entry[1].since, now))));
+      });
+    return () => { cancelled = true; };
+  }, [acceptedUids]);
+
   return (
     <div className="min-h-screen pb-24">
       <header className="flex items-center justify-between border-b border-border p-4">
@@ -508,8 +538,8 @@ const Friends: React.FC = () => {
                       try {
                         await setDiscoverable(user, checked);
                         setDiscoverableState(checked);
-                      } catch (error) {
-                        toast({ title: 'Could not change that', description: String(error), variant: 'destructive' });
+                      } catch {
+                        toast({ title: 'Could not change that', description: 'Check your connection and try again.', variant: 'destructive' });
                       }
                     }}
                   />
@@ -517,6 +547,24 @@ const Friends: React.FC = () => {
                 <p className="text-xs text-turbo-muted">
                   Off by default. While it is off, nobody can find you by email.
                 </p>
+
+                <div className="flex items-center justify-between border-t border-border pt-3">
+                  <Label htmlFor="share-smoking" className="text-sm">
+                    Let friends see what I'm smoking
+                  </Label>
+                  <Switch
+                    id="share-smoking" checked={shareSmoking}
+                    onCheckedChange={async (checked) => {
+                      if (!user) return;
+                      try {
+                        await setShareNowSmoking(user.uid, checked);
+                        setShareSmokingState(checked);
+                      } catch {
+                        toast({ title: 'Could not change that', description: 'Check your connection and try again.', variant: 'destructive' });
+                      }
+                    }}
+                  />
+                </div>
               </CardContent>
             </Card>
 
@@ -599,11 +647,17 @@ const Friends: React.FC = () => {
                       <div key={row.pairId} className="flex items-center gap-2">
                         <button
                           type="button"
-                          className="flex-1 truncate text-left underline"
+                          className="flex-1 truncate text-left"
                           onClick={() => navigate(`/friends/${row.otherUid}`)}
                         >
-                          {row.displayName ?? 'Friend'}
+                          <span className="block truncate underline">{row.displayName ?? 'Friend'}</span>
+                          {smokingByUid[row.otherUid] && (
+                            <span className="block truncate text-xs text-turbo-muted">
+                              {`smoking ${smokingByUid[row.otherUid].items.map((item) => item.label).join(', ')}`}
+                            </span>
+                          )}
                         </button>
+                        <PokeButton friendUid={row.otherUid} friendName={row.displayName} />
                         <Button
                           size="sm" variant="ghost" disabled={pendingPairId !== null}
                           onClick={() => void mutate(

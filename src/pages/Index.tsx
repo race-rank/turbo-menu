@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Autoplay from 'embla-carousel-autoplay';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { Search, ShoppingCart, Trash2, Shuffle, Star } from 'lucide-react';
@@ -31,6 +31,9 @@ import { isValidTableId } from '@/services/tableValidation';
 import { HookahOfTheDayCard } from '@/components/HookahOfTheDayCard';
 import { resolveHookahOfTheDay } from '@/services/hookahOfTheDay';
 import type { FeaturedHookah } from '@/types/database';
+import { CommunityMixes } from '@/components/CommunityMixes';
+import { useOrderFavorite } from '@/hooks/useOrderFavorite';
+import type { CommunityMix } from '@/services/userMixes';
 
 const MixSkeletons = () => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -83,6 +86,7 @@ const Index = () => {
   const [tobaccoTypes, setTobaccoTypes] = useState<DatabaseTobaccoType[]>([]);
   const [flavors, setFlavors] = useState<DatabaseFlavor[]>([]);
   const [recommendedMixes, setRecommendedMixes] = useState<DatabaseRecommendedMix[]>([]);
+  const [communityMixes, setCommunityMixes] = useState<CommunityMix[]>([]);
   const [featuredHookah, setFeaturedHookah] = useState<FeaturedHookah | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [addIce, setAddIce] = useState(false);
@@ -101,6 +105,13 @@ const Index = () => {
   const summaryRef = useRef<HTMLDivElement>(null);
   const mixAutoplay = useRef(Autoplay({ delay: 4000, stopOnInteraction: false, stopOnMouseEnter: true }));
   const [mixDialogId, setMixDialogId] = useState<string | null>(null);
+  // Same object shape resolveReorder takes; memoised so the hook's callback
+  // and every card's resolution are not rebuilt on each keystroke.
+  const menuSnapshot = useMemo(
+    () => ({ hookahs, flavors, recommendedMixes }),
+    [hookahs, flavors, recommendedMixes],
+  );
+  const orderCommunityMix = useOrderFavorite(menuSnapshot);
 
   useEffect(() => {
     const loadMenuData = async () => {
@@ -112,6 +123,7 @@ const Index = () => {
         setTobaccoTypes(menu.tobaccoTypes);
         setFlavors(menu.flavors);
         setRecommendedMixes(menu.recommendedMixes);
+        setCommunityMixes(menu.communityMixes ?? []);
         setFeaturedHookah(menu.hookahOfTheDay);
       } catch (error) {
         console.error('Error loading menu data:', error);
@@ -775,6 +787,9 @@ const Index = () => {
             </Carousel>
             )}
           </section>
+          {!isLoading && (
+            <CommunityMixes mixes={communityMixes} menu={menuSnapshot} onAdd={orderCommunityMix} />
+          )}
           <section ref={step1Ref}>
             <h2 className="text-xl font-semibold mb-6">Step 1: Choose Hookah</h2>
             {isLoading ? <HookahSkeletons /> : (

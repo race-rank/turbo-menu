@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Flame, Leaf, Droplets, Sparkles } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search, Flame, Leaf, Droplets, Sparkles, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
+import { CommunityMixesAdmin } from '@/components/admin/CommunityMixesAdmin';
 import {
   getHookahs,
   getTobaccoTypes,
@@ -539,6 +540,7 @@ const MenuManagement = () => {
             <TabsTrigger value="tobacco">Tobacco Types</TabsTrigger>
             <TabsTrigger value="flavors">Flavors</TabsTrigger>
             <TabsTrigger value="mixes">Recommended Mixes</TabsTrigger>
+            <TabsTrigger value="community">Community Mixes</TabsTrigger>
           </TabsList>
 
           <TabsContent value="hookahs">
@@ -851,6 +853,10 @@ const MenuManagement = () => {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="community">
+            <CommunityMixesAdmin hookahs={hookahs} flavors={flavors} onChanged={publishAndReload} />
           </TabsContent>
         </Tabs>
       </div>
@@ -1340,6 +1346,15 @@ const MenuManagement = () => {
           >
             <Sparkles className="h-5 w-5 mb-1" />
             <span className="text-xs">Mixes</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('community')}
+            className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
+              activeTab === 'community' ? 'text-turbo-accent' : 'text-turbo-muted'
+            }`}
+          >
+            <Users className="h-5 w-5 mb-1" />
+            <span className="text-xs">Community</span>
           </button>
         </div>
       </nav>

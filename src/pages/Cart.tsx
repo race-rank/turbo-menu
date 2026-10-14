@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { submitOrder } from '@/services/orderService';
 import { ensureSignedIn } from '@/services/authService';
 import { recordOrderPlaced } from '@/services/userService';
+import { shareWhatImSmoking } from '@/services/nowSmokingService';
 import { OrderFooter } from '@/components/layout/OrderFooter';
 import { OrderPlacedOverlay } from '@/components/OrderPlacedOverlay';
 
@@ -81,6 +82,11 @@ const Cart = () => {
 
       const result = await submitOrder(orderData);
       await recordOrderPlaced(user).catch(() => undefined);
+
+      // Not awaited: it can never fail or delay the order - see
+      // shareWhatImSmoking. orderData.items is captured here, before
+      // clearCart() empties state.items below.
+      void shareWhatImSmoking(user, orderData.items);
 
       // Add the order to tracking
       addOrder(result);

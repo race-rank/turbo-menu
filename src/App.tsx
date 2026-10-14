@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { PokeProvider } from "@/contexts/PokeContext";
 import { OrderTrackingProvider } from "@/contexts/OrderTrackingContext";
 import { TableProvider } from '@/contexts/TableContext';
 import { AdminGuard } from "@/components/AdminGuard";
@@ -38,53 +39,55 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <CartProvider>
-            <TableProvider>
-              <OrderTrackingProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
-                  <Suspense fallback={<RouteFallback />}>
-                    <Routes>
-                      <Route path="/" element={<RedirectPage />} />
-                      <Route path="/cart" element={<Cart />} />
-                      <Route path="/hookah-bar-admin" element={<AdminLogin />} />
-                      <Route
-                        path="/admin"
-                        element={
-                          <AdminGuard>
-                            <Admin />
-                          </AdminGuard>
-                        }
-                      />
-                      <Route
-                        path="/menu-management"
-                        element={
-                          <AdminGuard>
-                            <MenuManagement />
-                          </AdminGuard>
-                        }
-                      />
-                      <Route
-                        path="/statistics"
-                        element={
-                          <AdminGuard>
-                            <Statistics />
-                          </AdminGuard>
-                        }
-                      />
-                      <Route path="/account" element={<Account />} />
-                      <Route path="/my-orders" element={<MyOrders />} />
-                      <Route path="/friends" element={<Friends />} />
-                      <Route path="/friends/:uid" element={<FriendProfile />} />
-                      <Route path="*" element={<Index />} />
-                    </Routes>
-                  </Suspense>
-                  <OrderStatusTracker />
-                </BrowserRouter>
-              </OrderTrackingProvider>
-            </TableProvider>
-          </CartProvider>
+          <PokeProvider>
+            <CartProvider>
+              <TableProvider>
+                <OrderTrackingProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
+                    <Suspense fallback={<RouteFallback />}>
+                      <Routes>
+                        <Route path="/" element={<RedirectPage />} />
+                        <Route path="/cart" element={<Cart />} />
+                        <Route path="/hookah-bar-admin" element={<AdminLogin />} />
+                        <Route
+                          path="/admin"
+                          element={
+                            <AdminGuard>
+                              <Admin />
+                            </AdminGuard>
+                          }
+                        />
+                        <Route
+                          path="/menu-management"
+                          element={
+                            <AdminGuard>
+                              <MenuManagement />
+                            </AdminGuard>
+                          }
+                        />
+                        <Route
+                          path="/statistics"
+                          element={
+                            <AdminGuard>
+                              <Statistics />
+                            </AdminGuard>
+                          }
+                        />
+                        <Route path="/account" element={<Account />} />
+                        <Route path="/my-orders" element={<MyOrders />} />
+                        <Route path="/friends" element={<Friends />} />
+                        <Route path="/friends/:uid" element={<FriendProfile />} />
+                        <Route path="*" element={<Index />} />
+                      </Routes>
+                    </Suspense>
+                    <OrderStatusTracker />
+                  </BrowserRouter>
+                </OrderTrackingProvider>
+              </TableProvider>
+            </CartProvider>
+          </PokeProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

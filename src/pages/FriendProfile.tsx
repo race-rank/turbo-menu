@@ -1,13 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NavigationSidebar } from '@/components/NavigationSidebar';
+import { PokeButton } from '@/components/PokeButton';
 import { FavoritesList, RatingsList } from '@/components/ComboLists';
 import { getPublicProfile, type PublicProfile } from '@/services/profileService';
 import { listFavorites, type FavoriteCombo } from '@/services/favoritesService';
 import { listRatings, type ComboRating } from '@/services/ratingsService';
+import { getNowSmoking } from '@/services/nowSmokingService';
+import { isNowSmokingFresh, nowSmokingItemToFavorite, type NowSmoking } from '@/services/nowSmoking';
+import { getMenuData } from '@/services/menuService';
+import type { MenuSnapshot } from '@/services/reorderService';
+import { useOrderFavorite } from '@/hooks/useOrderFavorite';
+import { toast } from '@/hooks/use-toast';
 
 // Firestore rejects a disallowed read with a bare FirestoreError whose `code`
 // is the literal string 'permission-denied' - no exported class to instanceof
@@ -25,6 +32,53 @@ const FriendProfile: React.FC = () => {
   const [denied, setDenied] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [retryToken, setRetryToken] = useState(0);
+  const [nowSmoking, setNowSmoking] = useState<NowSmoking | null>(null);
+  const [menu, setMenu] = useState<MenuSnapshot | null>(null);
+  const orderFavorite = useOrderFavorite(menu);
+
+  // With no published snapshot the menu costs dozens of reads, so it is only
+  // fetched when something here can actually be ordered: eagerly for a live
+  // "now smoking" with an orderable item, otherwise on the first tap.
+  const [menuWanted, setMenuWanted] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<FavoriteCombo | null>(null);
+  const menuRequested = useRef(false);
+
+  const hasOrderableNowSmoking = !!nowSmoking
+    && nowSmoking.items.some((item) => nowSmokingItemToFavorite(item) !== null);
+
+  const loadMenu = useCallback(() => {
+    if (menuRequested.current) return;
+    menuRequested.current = true;
+    getMenuData()
+      .then(setMenu)
+      .catch(() => {
+        // Let the next tap try again.
+        menuRequested.current = false;
+        setPendingOrder(null);
+        toast({ title: "Couldn't load the menu", description: 'Check your connection and try again.', variant: 'destructive' });
+      });
+  }, []);
+
+  useEffect(() => {
+    if (hasOrderableNowSmoking || menuWanted) loadMenu();
+  }, [hasOrderableNowSmoking, menuWanted, loadMenu]);
+
+  // A tap that arrived before the menu did is completed once it lands.
+  useEffect(() => {
+    if (menu && pendingOrder) {
+      orderFavorite(pendingOrder);
+      setPendingOrder(null);
+    }
+  }, [menu, pendingOrder, orderFavorite]);
+
+  const orderSame = (favorite: FavoriteCombo) => {
+    if (menu) {
+      orderFavorite(favorite);
+      return;
+    }
+    setPendingOrder(favorite);
+    setMenuWanted(true);
+  };
 
   useEffect(() => {
     if (!uid) return;
@@ -38,10 +92,16 @@ const FriendProfile: React.FC = () => {
       getPublicProfile(uid),
       listFavorites(uid),
       listRatings(uid),
-    ]).then(([profileResult, favoritesResult, ratingsResult]) => {
+      getNowSmoking(uid),
+    ]).then(([profileResult, favoritesResult, ratingsResult, nowSmokingResult]) => {
       setProfile(profileResult.status === 'fulfilled' ? profileResult.value : null);
       setFavorites(favoritesResult.status === 'fulfilled' ? favoritesResult.value : []);
       setRatings(ratingsResult.status === 'fulfilled' ? ratingsResult.value : []);
+
+      // Deliberately not in `failures` below: a denial or absence just means the
+      // friend has not opted in, which must not read as "you are not friends".
+      const smoking = nowSmokingResult.status === 'fulfilled' ? nowSmokingResult.value : null;
+      setNowSmoking(smoking && isNowSmokingFresh(smoking.since, new Date()) ? smoking : null);
 
       const failures = [profileResult, favoritesResult, ratingsResult]
         .filter((result): result is PromiseRejectedResult => result.status === 'rejected');
@@ -68,7 +128,11 @@ const FriendProfile: React.FC = () => {
         <h1 className="truncate text-2xl font-bold tracking-wider">
           {profile?.displayName ?? 'FRIEND'}
         </h1>
-        <div className="w-10" />
+        {uid && !busy && !denied ? (
+          <PokeButton friendUid={uid} friendName={profile?.displayName ?? null} />
+        ) : (
+          <div className="w-10" />
+        )}
       </header>
 
       <div className="mx-auto max-w-md space-y-4 px-4 py-6">
@@ -89,6 +153,30 @@ const FriendProfile: React.FC = () => {
                   <Button variant="outline" size="sm" onClick={() => setRetryToken((n) => n + 1)}>
                     Retry
                   </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {nowSmoking && (
+              <Card className="bg-turbo-card border-border">
+                <CardContent className="p-4 space-y-2">
+                  <h3 className="font-semibold">Now smoking</h3>
+                  {nowSmoking.items.map((item) => {
+                    const favorite = nowSmokingItemToFavorite(item);
+                    return (
+                      <div key={item.comboId} className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm">{item.label}</span>
+                        {favorite && (
+                          <Button
+                            size="sm" variant="outline" disabled={pendingOrder !== null}
+                            onClick={() => orderSame(favorite)}
+                          >
+                            Order the same
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </CardContent>
               </Card>
             )}
