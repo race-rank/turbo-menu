@@ -570,7 +570,7 @@ const MenuManagement = () => {
                   // so keystrokes typed during the round trip would be silently
                   // discarded.
                   disabled={featuredSaving}
-                  className="bg-turbo-bg border-border text-turbo-text"
+                  className="bg-turbo-dark border-border text-turbo-text"
                 />
                 <p className="text-right text-[10px] text-turbo-muted">
                   {`${featuredPromo.length}/${MAX_PROMO_TEXT_LENGTH}`}
@@ -582,7 +582,7 @@ const MenuManagement = () => {
                     onValueChange={handleSetFeatured}
                     disabled={featuredSaving}
                   >
-                    <SelectTrigger className="w-64 bg-turbo-bg border-border">
+                    <SelectTrigger className="w-64 bg-turbo-dark border-border">
                       <SelectValue placeholder="Choose a hookah" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1314,7 +1314,7 @@ const MenuManagement = () => {
           <button
             onClick={() => setActiveTab('hookahs')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'hookahs' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'hookahs' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <Flame className="h-5 w-5 mb-1" />
@@ -1323,7 +1323,7 @@ const MenuManagement = () => {
           <button
             onClick={() => setActiveTab('tobacco')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'tobacco' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'tobacco' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <Leaf className="h-5 w-5 mb-1" />
@@ -1332,7 +1332,7 @@ const MenuManagement = () => {
           <button
             onClick={() => setActiveTab('flavors')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'flavors' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'flavors' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <Droplets className="h-5 w-5 mb-1" />
@@ -1341,7 +1341,7 @@ const MenuManagement = () => {
           <button
             onClick={() => setActiveTab('mixes')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'mixes' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'mixes' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <Sparkles className="h-5 w-5 mb-1" />
@@ -1350,7 +1350,7 @@ const MenuManagement = () => {
           <button
             onClick={() => setActiveTab('community')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'community' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'community' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <Users className="h-5 w-5 mb-1" />
