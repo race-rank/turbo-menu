@@ -408,7 +408,7 @@ const Admin = () => {
           <button
             onClick={() => setActiveTab('all')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'all' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'all' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <List className="h-5 w-5 mb-1" />
@@ -417,7 +417,7 @@ const Admin = () => {
           <button
             onClick={() => setActiveTab('pending')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'pending' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'pending' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <Clock className="h-5 w-5 mb-1" />
@@ -426,7 +426,7 @@ const Admin = () => {
           <button
             onClick={() => setActiveTab('confirmed')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'confirmed' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'confirmed' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <CheckCircle className="h-5 w-5 mb-1" />
@@ -435,7 +435,7 @@ const Admin = () => {
           <button
             onClick={() => setActiveTab('preparing')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'preparing' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'preparing' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <Package className="h-5 w-5 mb-1" />
@@ -444,7 +444,7 @@ const Admin = () => {
           <button
             onClick={() => setActiveTab('ready')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'ready' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'ready' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <Sparkles className="h-5 w-5 mb-1" />
@@ -453,7 +453,7 @@ const Admin = () => {
           <button
             onClick={() => setActiveTab('completed')}
             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-              activeTab === 'completed' ? 'text-turbo-accent' : 'text-turbo-muted'
+              activeTab === 'completed' ? 'text-turbo-text' : 'text-turbo-muted'
             }`}
           >
             <History className="h-5 w-5 mb-1" />
