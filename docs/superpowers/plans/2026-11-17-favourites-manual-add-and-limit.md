@@ -387,6 +387,14 @@ describe('overwriting and deleting favourites', () => {
 });
 
 describe('the counter itself', () => {
+  // Before the backfill runs, a customer can have favourites and no counter.
+  // Creating one at 1 with no favourite behind it would buy them 19 extra slots.
+  test('cannot be created without a favourite appearing', async () => {
+    await seed(ALICE, 20, false);
+    await assertFails(setDoc(doc(alice(), counterPath(ALICE)), { count: 1, changed: 'mix:0' }));
+    await assertFails(setDoc(doc(alice(), counterPath(ALICE)), { count: 1, changed: 'mix:new' }));
+  });
+
   test('cannot go up without a favourite appearing', async () => {
     await seed(ALICE, 3);
     await assertFails(setDoc(doc(alice(), counterPath(ALICE)), { count: 4, changed: 'mix:new' }));
@@ -530,14 +538,14 @@ Then replace the favourites block's `allow create, update: if isSignedIn() && re
     match /users/{uid}/favorites/{comboId} {
       allow read: if isSignedIn()
         && (request.auth.uid == uid || isFriendOf(uid) || hasClaimOn(uid));
-      // A new favourite must raise the counter by exactly one, to at most
-      // maxFavorites(), in the same write. The counter's own rule below checks
-      // the other direction: that the favourite it names really appeared.
+      // A new favourite must raise the counter by exactly one in the same
+      // write. The counter's own rule below holds the other half: the cap of
+      // maxFavorites(), and that the favourite it names really appeared. Each
+      // check lives in one place only, so each has a test that fails without it.
       allow create: if isSignedIn() && request.auth.uid == uid
         && favoriteShapeOk(request.resource.data)
         && existsAfter(favoriteCounterPath(uid))
-        && getAfter(favoriteCounterPath(uid)).data.count == favoriteCountBefore(uid) + 1
-        && getAfter(favoriteCounterPath(uid)).data.count <= maxFavorites();
+        && getAfter(favoriteCounterPath(uid)).data.count == favoriteCountBefore(uid) + 1;
       // Overwriting a favourite that exists (e.g. recording the tobacco type a
       // mix was ordered with) never changes the count.
       allow update: if isSignedIn() && request.auth.uid == uid
@@ -550,9 +558,9 @@ Then replace the favourites block's `allow create, update: if isSignedIn() && re
 
     match /users/{uid}/counters/favorites {
       allow read: if isSignedIn() && request.auth.uid == uid;
+      // Starts at 1: the favourite's create rule requires 0 + 1.
       allow create: if isSignedIn() && request.auth.uid == uid
         && favoriteCounterShapeOk(request.resource.data)
-        && request.resource.data.count == 1
         && favoriteAdded(uid, request.resource.data.changed);
       allow update: if isSignedIn() && request.auth.uid == uid
         && favoriteCounterShapeOk(request.resource.data)
@@ -602,12 +610,16 @@ For each line below, edit `firestore.rules`, run `npx firebase emulators:exec --
 
 | Weaken | Test that must fail |
 |---|---|
-| drop `&& getAfter(...).data.count <= maxFavorites()` from favourite create | the 21st favourite is refused |
-| drop the `existsAfter(...) && getAfter(...) == before + 1` lines from favourite create | a favourite created without moving the counter is refused |
+| drop `request.resource.data.count <= maxFavorites()` from the counter's +1 branch | the 21st favourite is refused |
+| drop the `existsAfter(...)` and `== favoriteCountBefore(uid) + 1` lines from favourite create | a favourite created without moving the counter is refused |
+| change `== favoriteCountBefore(uid) + 1` to `> favoriteCountBefore(uid)` | a new counter must start at 1 |
 | replace `favoriteAdded(...)` in the counter update with `true` | cannot go up without a favourite appearing |
+| drop `favoriteAdded(...)` from the counter create | cannot be created without a favourite appearing |
 | replace `favoriteRemoved(...)` with `true` | cannot go down without a favourite disappearing |
-| drop `request.resource.data.count == 1` from counter create | a new counter must start at 1 |
 | add `allow delete: if isSignedIn() && request.auth.uid == uid;` to the counter | cannot be deleted |
+| replace `d.keys().hasOnly(['count', 'changed'])` with `true` | cannot carry extra fields |
+
+Each check lives in exactly one rule. A check duplicated in two rules survives the removal of either copy, so no test can prove it is needed; keep it in one place.
 
 - [ ] **Step 7: Commit**
 

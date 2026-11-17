@@ -3,7 +3,7 @@ import {
   initializeTestEnvironment, assertSucceeds, assertFails, RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
-  collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc,
+  collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc, writeBatch,
 } from 'firebase/firestore';
 import { beforeAll, afterAll, beforeEach, describe, test } from 'vitest';
 
@@ -413,14 +413,20 @@ describe('favourites and ratings', () => {
   });
 
   // The full favourite shape a custom build produces must still be writable.
+  // Written with its counter, as favoritesService does - see
+  // favoritesLimitRules.test.ts for the limit itself.
   test('a full custom-build favourite is accepted', async () => {
-    await assertSucceeds(setDoc(doc(alice(), `users/${ALICE}/favorites/custom:abc`), {
+    const db = alice();
+    const batch = writeBatch(db);
+    batch.set(doc(db, `users/${ALICE}/favorites/custom:abc`), {
       comboId: 'custom:abc', label: 'Khalil Mamoon - Mint, Lemon', kind: 'custom',
       hookahId: 'h1', tobaccoType: 'virginia', flavorIds: ['mint:virginia'],
       tobaccoStrength: 6, flavorPercentages: { 'mint:virginia': 100 },
       withIce: true, hasLED: true, hasColoredWater: false,
       hasAlcohol: false, hasFruits: false, createdAt: serverTimestamp(),
-    }));
+    });
+    batch.set(doc(db, `users/${ALICE}/counters/favorites`), { count: 1, changed: 'custom:abc' });
+    await assertSucceeds(batch.commit());
   });
 
   // comboId sat unconstrained next to label, which IS bounded - a friend

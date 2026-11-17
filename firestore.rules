@@ -175,6 +175,91 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
+    // ------------------------------------------------- favourites limit
+    // Rules cannot count a collection, so each customer's count lives in
+    // users/{uid}/counters/favorites and moves in the SAME write as the
+    // favourite it counts. Not a field on users/{uid}: that document's rule
+    // lets its owner write anything, so a count there could be reset to 0.
+    // Mirrors MAX_FAVORITES in src/services/favoriteLimit.ts.
+    function maxFavorites() {
+      return 20;
+    }
+
+    function favoriteCounterPath(uid) {
+      return /databases/$(database)/documents/users/$(uid)/counters/favorites;
+    }
+
+    function favoriteDocPath(uid, comboId) {
+      return /databases/$(database)/documents/users/$(uid)/favorites/$(comboId);
+    }
+
+    // exists() before get(): get() on a missing document raises.
+    function favoriteCountBefore(uid) {
+      return exists(favoriteCounterPath(uid)) ? get(favoriteCounterPath(uid)).data.count : 0;
+    }
+
+    function favoriteAdded(uid, comboId) {
+      return !exists(favoriteDocPath(uid, comboId)) && existsAfter(favoriteDocPath(uid, comboId));
+    }
+
+    function favoriteRemoved(uid, comboId) {
+      return exists(favoriteDocPath(uid, comboId)) && !existsAfter(favoriteDocPath(uid, comboId));
+    }
+
+    function favoriteCounterShapeOk(d) {
+      return d.keys().hasOnly(['count', 'changed'])
+        && d.count is int
+        && d.changed is string && d.changed.size() >= 1 && d.changed.size() <= 100;
+    }
+
+    // Shared by create and update on favourites below.
+    function favoriteShapeOk(d) {
+      return d.keys().hasOnly([
+          'comboId', 'label', 'kind', 'mixId', 'hookahId', 'tobaccoType',
+          'flavorIds', 'tobaccoStrength', 'flavorPercentages', 'withIce',
+          'hasLED', 'hasColoredWater', 'hasAlcohol', 'hasFruits', 'createdAt'])
+        // Bound what a friend downloads: this list is re-read on every visit to
+        // their profile. Same reasoning as the profiles block above.
+        && d.label is string
+        && d.label.size() <= 200
+        // comboId is `mix:{docId}` or `custom:{16 hex}` - see comboId.ts -
+        // never anywhere near this bound. Left unconstrained, this is the
+        // same 700KB-string hole label had, just on the field next to it.
+        && d.comboId is string
+        && d.comboId.size() <= 100
+        && d.kind in ['mix', 'custom']
+        && (!('mixId' in d)
+            || (d.mixId is string
+              && d.mixId.size() <= 100))
+        && (!('hookahId' in d)
+            || (d.hookahId is string
+              && d.hookahId.size() <= 100))
+        && (!('tobaccoType' in d)
+            || (d.tobaccoType is string
+              && d.tobaccoType.size() <= 100))
+        // A friend downloads these too, so size is bounded like every other
+        // list/map a friend can pull down, not just its element type.
+        && (!('flavorIds' in d)
+            || (d.flavorIds is list
+              && d.flavorIds.size() <= 10))
+        && (!('flavorPercentages' in d)
+            || (d.flavorPercentages is map
+              && d.flavorPercentages.size() <= 10))
+        && (!('tobaccoStrength' in d)
+            || d.tobaccoStrength is number)
+        && (!('withIce' in d) || d.withIce is bool)
+        && (!('hasLED' in d) || d.hasLED is bool)
+        && (!('hasColoredWater' in d)
+            || d.hasColoredWater is bool)
+        && (!('hasAlcohol' in d) || d.hasAlcohol is bool)
+        && (!('hasFruits' in d) || d.hasFruits is bool)
+        // Server time only, matching the acceptedAt idiom on friendships.
+        // Optional because a full-document setDoc without merge (what the
+        // tests here use) simply omits the field rather than sending a value.
+        && (!('createdAt' in d)
+            || d.createdAt == request.time);
+    }
+
     // match /users/{uid} above is NOT recursive, so these subcollections need
     // their own blocks. They are the friend-readable projection of a customer's
     // taste; the user document itself stays owner-only.
@@ -188,54 +273,42 @@ service cloud.firestore {
         && (request.auth.uid == uid || isFriendOf(uid) || hasClaimOn(uid));
       // Split from delete because request.resource is null on a delete, so a
       // field check in a combined `write` would raise and deny legitimate ones.
-      allow create, update: if isSignedIn() && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly([
-             'comboId', 'label', 'kind', 'mixId', 'hookahId', 'tobaccoType',
-             'flavorIds', 'tobaccoStrength', 'flavorPercentages', 'withIce',
-             'hasLED', 'hasColoredWater', 'hasAlcohol', 'hasFruits', 'createdAt'])
-        // Bound what a friend downloads: this list is re-read on every visit to
-        // their profile. Same reasoning as the profiles block above.
-        && request.resource.data.label is string
-        && request.resource.data.label.size() <= 200
-        // comboId is `mix:{docId}` or `custom:{16 hex}` - see comboId.ts -
-        // never anywhere near this bound. Left unconstrained, this is the
-        // same 700KB-string hole label had, just on the field next to it.
-        && request.resource.data.comboId is string
-        && request.resource.data.comboId.size() <= 100
-        && request.resource.data.kind in ['mix', 'custom']
-        && (!('mixId' in request.resource.data)
-            || (request.resource.data.mixId is string
-                && request.resource.data.mixId.size() <= 100))
-        && (!('hookahId' in request.resource.data)
-            || (request.resource.data.hookahId is string
-                && request.resource.data.hookahId.size() <= 100))
-        && (!('tobaccoType' in request.resource.data)
-            || (request.resource.data.tobaccoType is string
-                && request.resource.data.tobaccoType.size() <= 100))
-        // A friend downloads these too, so size is bounded like every other
-        // list/map a friend can pull down, not just its element type.
-        && (!('flavorIds' in request.resource.data)
-            || (request.resource.data.flavorIds is list
-                && request.resource.data.flavorIds.size() <= 10))
-        && (!('flavorPercentages' in request.resource.data)
-            || (request.resource.data.flavorPercentages is map
-                && request.resource.data.flavorPercentages.size() <= 10))
-        && (!('tobaccoStrength' in request.resource.data)
-            || request.resource.data.tobaccoStrength is number)
-        && (!('withIce' in request.resource.data) || request.resource.data.withIce is bool)
-        && (!('hasLED' in request.resource.data) || request.resource.data.hasLED is bool)
-        && (!('hasColoredWater' in request.resource.data)
-            || request.resource.data.hasColoredWater is bool)
-        && (!('hasAlcohol' in request.resource.data) || request.resource.data.hasAlcohol is bool)
-        && (!('hasFruits' in request.resource.data) || request.resource.data.hasFruits is bool)
-        // Server time only, matching the acceptedAt idiom on friendships.
-        // Optional because a full-document setDoc without merge (what the
-        // tests here use) simply omits the field rather than sending a value.
-        && (!('createdAt' in request.resource.data)
-            || request.resource.data.createdAt == request.time);
+      //
+      // A new favourite must raise the counter by exactly one in the same
+      // write. The counter's own rule below holds the other half: the cap of
+      // maxFavorites(), and that the favourite it names really appeared. Each
+      // check lives in one place only, so each has a test that fails without it.
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && favoriteShapeOk(request.resource.data)
+        && existsAfter(favoriteCounterPath(uid))
+        && getAfter(favoriteCounterPath(uid)).data.count == favoriteCountBefore(uid) + 1;
+      // Overwriting a favourite that exists (e.g. recording the tobacco type a
+      // mix was ordered with) never changes the count.
+      allow update: if isSignedIn() && request.auth.uid == uid
+        && favoriteShapeOk(request.resource.data);
       // The claimer deletes the originals once it has copied them, so the dead
       // guest uid is not left holding a second copy of the customer's taste.
+      // Counter-free on purpose: a stale or missing count must never stop
+      // anyone removing a favourite. Skipping the decrement only costs the
+      // customer a slot; it can never grant one.
       allow delete: if isSignedIn() && (request.auth.uid == uid || hasClaimOn(uid));
+    }
+
+    match /users/{uid}/counters/favorites {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      // Starts at 1: the favourite's create rule requires 0 + 1.
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && favoriteCounterShapeOk(request.resource.data)
+        && favoriteAdded(uid, request.resource.data.changed);
+      allow update: if isSignedIn() && request.auth.uid == uid
+        && favoriteCounterShapeOk(request.resource.data)
+        && ((request.resource.data.count == resource.data.count + 1
+             && request.resource.data.count <= maxFavorites()
+             && favoriteAdded(uid, request.resource.data.changed))
+          || (request.resource.data.count == resource.data.count - 1
+             && request.resource.data.count >= 0
+             && favoriteRemoved(uid, request.resource.data.changed)));
+      // No delete: removing the counter would reset the count to 0.
     }
 
     match /users/{uid}/ratings/{comboId} {
