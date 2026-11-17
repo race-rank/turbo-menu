@@ -159,25 +159,22 @@ const Index = () => {
   };
 
   /**
-   * Save mode's replacement for every "add to cart". Already-saved combos are
-   * not rewritten: the comboId is the document id, so a second copy is
-   * impossible anyway, and rewriting would only move createdAt.
+   * Save mode's replacement for every "add to cart". An already-saved combo is
+   * overwritten, not skipped: the comboId is the document id, so it stays one
+   * favourite and uses no new slot, but it picks up what was just chosen - the
+   * tobacco for a mix hearted from the grid, or new strength and percentages.
    */
   const saveFavoriteFromMenu = async (favorite: FavoriteCombo) => {
     if (!user) {
       toast({ title: 'Could not save', description: 'Please try again in a moment.', variant: 'destructive' });
       return;
     }
-    if (favoriteIds.has(favorite.comboId)) {
-      toast({ title: 'Already in your favourites' });
-      navigate('/account');
-      return;
-    }
+    const alreadySaved = favoriteIds.has(favorite.comboId);
     try {
       await addFavorite(user.uid, favorite);
       setFavoriteIds((prev) => new Set(prev).add(favorite.comboId));
       successHaptic();
-      toast({ title: 'Saved to favourites' });
+      toast({ title: alreadySaved ? 'Updated in your favourites' : 'Saved to favourites' });
       navigate('/account');
     } catch (error) {
       if (error instanceof FavoritesFullError) {

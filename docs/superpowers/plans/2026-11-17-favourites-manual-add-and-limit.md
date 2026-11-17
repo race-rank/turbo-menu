@@ -539,13 +539,16 @@ Then replace the favourites block's `allow create, update: if isSignedIn() && re
       allow read: if isSignedIn()
         && (request.auth.uid == uid || isFriendOf(uid) || hasClaimOn(uid));
       // A new favourite must raise the counter by exactly one in the same
-      // write. The counter's own rule below holds the other half: the cap of
+      // write, and the counter must name THIS favourite - otherwise every
+      // favourite in one batch would pass against the same single +1. The
+      // counter's own rule below holds the other half: the cap of
       // maxFavorites(), and that the favourite it names really appeared. Each
       // check lives in one place only, so each has a test that fails without it.
       allow create: if isSignedIn() && request.auth.uid == uid
         && favoriteShapeOk(request.resource.data)
         && existsAfter(favoriteCounterPath(uid))
-        && getAfter(favoriteCounterPath(uid)).data.count == favoriteCountBefore(uid) + 1;
+        && getAfter(favoriteCounterPath(uid)).data.count == favoriteCountBefore(uid) + 1
+        && getAfter(favoriteCounterPath(uid)).data.changed == comboId;
       // Overwriting a favourite that exists (e.g. recording the tobacco type a
       // mix was ordered with) never changes the count.
       allow update: if isSignedIn() && request.auth.uid == uid
@@ -613,6 +616,7 @@ For each line below, edit `firestore.rules`, run `npx firebase emulators:exec --
 | drop `request.resource.data.count <= maxFavorites()` from the counter's +1 branch | the 21st favourite is refused |
 | drop the `existsAfter(...)` and `== favoriteCountBefore(uid) + 1` lines from favourite create | a favourite created without moving the counter is refused |
 | change `== favoriteCountBefore(uid) + 1` to `> favoriteCountBefore(uid)` | a new counter must start at 1 |
+| drop `&& getAfter(...).data.changed == comboId` from favourite create | one write cannot create two favourites on a single +1 |
 | replace `favoriteAdded(...)` in the counter update with `true` | cannot go up without a favourite appearing |
 | drop `favoriteAdded(...)` from the counter create | cannot be created without a favourite appearing |
 | replace `favoriteRemoved(...)` with `true` | cannot go down without a favourite disappearing |

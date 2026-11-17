@@ -84,6 +84,18 @@ describe('creating favourites', () => {
     await assertFails(setDoc(doc(alice(), favPath(ALICE, 'mix:new')), fav('mix:new')));
   });
 
+  // Every favourite in a batch used to pass against the same single +1, so
+  // one write could add any number of them.
+  test('one write cannot create two favourites on a single +1', async () => {
+    await seed(ALICE, 19);
+    const db = alice();
+    const batch = writeBatch(db);
+    batch.set(doc(db, favPath(ALICE, 'mix:a')), fav('mix:a'));
+    batch.set(doc(db, favPath(ALICE, 'mix:b')), fav('mix:b'));
+    batch.set(doc(db, counterPath(ALICE)), { count: 20, changed: 'mix:a' });
+    await assertFails(batch.commit());
+  });
+
   test('the counter cannot skip ahead', async () => {
     await seed(ALICE, 3);
     await assertFails(add(alice(), ALICE, 'mix:new', 5));

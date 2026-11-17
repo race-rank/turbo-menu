@@ -275,13 +275,16 @@ service cloud.firestore {
       // field check in a combined `write` would raise and deny legitimate ones.
       //
       // A new favourite must raise the counter by exactly one in the same
-      // write. The counter's own rule below holds the other half: the cap of
+      // write, and the counter must name THIS favourite - otherwise every
+      // favourite in one batch would pass against the same single +1. The
+      // counter's own rule below holds the other half: the cap of
       // maxFavorites(), and that the favourite it names really appeared. Each
       // check lives in one place only, so each has a test that fails without it.
       allow create: if isSignedIn() && request.auth.uid == uid
         && favoriteShapeOk(request.resource.data)
         && existsAfter(favoriteCounterPath(uid))
-        && getAfter(favoriteCounterPath(uid)).data.count == favoriteCountBefore(uid) + 1;
+        && getAfter(favoriteCounterPath(uid)).data.count == favoriteCountBefore(uid) + 1
+        && getAfter(favoriteCounterPath(uid)).data.changed == comboId;
       // Overwriting a favourite that exists (e.g. recording the tobacco type a
       // mix was ordered with) never changes the count.
       allow update: if isSignedIn() && request.auth.uid == uid
