@@ -249,3 +249,19 @@ after step 2.
 - **`Index.tsx` is already 1,256 lines.** Save mode is a flag threaded through it, not
   a copy of it; the save-mode banner and the "save instead of add" decision live in
   small components and a helper so the page grows as little as possible.
+
+## Changes during implementation
+
+- **Save mode lives at `/save-favourite`, not `/?mode=save-favourite`.** `/` is
+  `RedirectPage`, which reads its own query parameters; the menu is the `*` route.
+- **The hookah-of-the-day card is hidden in save mode.** Its button orders
+  (#20 made it add straight to the cart), and save mode orders nothing.
+- **Each rules check lives in exactly one place.** The cap of 20 is checked only
+  on the counter's +1, and "a new counter starts at 1" only through the
+  favourite's `before + 1`. Written twice, either copy could be deleted without
+  any test noticing; written once, every check was removed in turn and a test
+  failed each time. One test was added from that exercise: a counter cannot be
+  created without a favourite appearing (otherwise a customer with favourites
+  but no counter, before the backfill, could reset themselves to 1).
+- **The backfill script has a `--dry-run` flag** to see how many customers it
+  would touch, and how many are over 20, before writing.
