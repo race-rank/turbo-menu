@@ -4,12 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useOrderTracking } from '@/contexts/OrderTrackingContext';
 import { cn } from '@/lib/utils';
+import { useLocation } from 'react-router-dom';
+import { isSaveFavoriteMode } from '@/services/saveFavoriteMode';
 
 export const OrderStatusTracker: React.FC = () => {
   const { activeOrders, removeOrder } = useOrderTracking();
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  
-  if (activeOrders.length === 0) return null;
+  const location = useLocation();
+
+  // Save mode orders nothing, so an order card there would only confuse.
+  if (activeOrders.length === 0 || isSaveFavoriteMode(location.pathname)) return null;
   
   const getStatusIcon = (status: string) => {
     switch (status) {

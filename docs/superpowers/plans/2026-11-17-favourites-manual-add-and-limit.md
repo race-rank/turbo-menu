@@ -921,6 +921,13 @@ import { OrderFooter, type BuildState } from '../src/components/layout/OrderFoot
 
 afterEach(cleanup);
 
+// StickyFooter measures itself; jsdom has no ResizeObserver.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
+
 const build: BuildState = {
   hookahName: 'Darkblend', tobaccoLabel: 'Darkblend · Medium',
   flavors: [{ id: 'mint', name: 'Mint' }], flavorMax: 3, complete: true, onAdd: () => {},
@@ -929,9 +936,11 @@ const build: BuildState = {
 /** Puts one item in the cart, so the cart summary would normally show. */
 function WithCartItem({ children }: { children: React.ReactNode }) {
   const { addItem } = useCart();
+  // Once: addItem is a new function on every render, so depending on it loops.
   useEffect(() => {
     addItem({ id: 'x', type: 'mix', name: 'Turbo Mix', price: 100, image: '', comboId: 'mix:x', table: '/table-1' });
-  }, [addItem]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return <>{children}</>;
 }
 
@@ -967,7 +976,7 @@ describe('OrderFooter in save mode', () => {
 });
 ```
 
-If `addItem` from `useCart` is not referentially stable and the effect loops, change the effect's dependency array to `[]` with an `// eslint-disable-next-line react-hooks/exhaustive-deps` comment.
+`addItem` from `useCart` is a new function on every render, so the effect runs once (`[]`); depending on `addItem` loops forever. `StickyFooter` uses `ResizeObserver`, which jsdom lacks, hence the stub.
 
 - [ ] **Step 2: Run and watch it fail**
 

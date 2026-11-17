@@ -9,9 +9,11 @@ interface Props {
   mixes: CommunityMix[];
   menu: MenuSnapshot;
   onAdd: (favorite: FavoriteCombo) => void;
+  /** "Add" on the menu; "Save" in save mode. */
+  actionLabel?: string;
 }
 
-export const CommunityMixes: React.FC<Props> = ({ mixes, menu, onAdd }) => {
+export const CommunityMixes: React.FC<Props> = ({ mixes, menu, onAdd, actionLabel = 'Add' }) => {
   if (mixes.length === 0) return null;
 
   return (
@@ -39,7 +41,7 @@ export const CommunityMixes: React.FC<Props> = ({ mixes, menu, onAdd }) => {
                     <>
                       <span className="text-lg font-bold text-amber-400">{`${resolution.item.price} Lei`}</span>
                       <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => onAdd(favorite)}>
-                        Add
+                        {actionLabel}
                       </Button>
                     </>
                   ) : (

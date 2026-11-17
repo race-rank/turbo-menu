@@ -19,15 +19,22 @@ export interface BuildState {
 interface OrderFooterProps {
   build?: BuildState;
   primaryAction?: { label: string; onClick: () => void; disabled?: boolean };
+  /**
+   * The menu at /save-favourite: the build's button saves a favourite, and the
+   * cart summary is hidden - nothing on this screen is ordered.
+   */
+  saveMode?: boolean;
 }
 
-export const OrderFooter: React.FC<OrderFooterProps> = ({ build, primaryAction }) => {
+export const OrderFooter: React.FC<OrderFooterProps> = ({ build, primaryAction, saveMode = false }) => {
   const navigate = useNavigate();
   const { state, getItemCount } = useCart();
 
   const itemCount = getItemCount();
   const hasBuild =
     !!build && (!!build.hookahName || !!build.tobaccoLabel || build.flavors.length > 0);
+
+  if (saveMode && !hasBuild) return null;
 
   if (!hasBuild && itemCount === 0 && !primaryAction) return null;
 
@@ -73,7 +80,7 @@ export const OrderFooter: React.FC<OrderFooterProps> = ({ build, primaryAction }
             }}
             disabled={!build.complete}
           >
-            Add to Cart
+            {saveMode ? 'Save to favourites' : 'Add to Cart'}
           </Button>
         </div>
       </StickyFooter>

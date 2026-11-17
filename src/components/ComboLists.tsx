@@ -22,6 +22,8 @@ interface FavoritesListProps {
   favorites: FavoriteCombo[];
   heading: string;
   emptyText: string;
+  // "7/20" on the customer's own list. Friends see a plain count.
+  countLabel?: string;
   footer?: React.ReactNode;
   // Omitted entirely on FriendProfile - re-ordering someone else's favourite
   // is not part of this feature, and the row simply renders without a
@@ -37,12 +39,12 @@ interface FavoritesListProps {
 }
 
 export const FavoritesList: React.FC<FavoritesListProps> = ({
-  favorites, heading, emptyText, footer, onReorder, onRemove, onShare,
+  favorites, heading, emptyText, countLabel, footer, onReorder, onRemove, onShare,
 }) => (
   <Card className="bg-turbo-card border-border">
     <CardContent className="p-4">
       <h2 className="mb-3 text-sm font-bold uppercase text-turbo-muted">
-        {`${heading} (${favorites.length})`}
+        {`${heading} (${countLabel ?? favorites.length})`}
       </h2>
       {favorites.length === 0 && <p className="text-sm text-turbo-muted">{emptyText}</p>}
       {favorites.map((favorite) => (
