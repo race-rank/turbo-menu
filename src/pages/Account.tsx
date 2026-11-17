@@ -19,6 +19,8 @@ import { getMenuData } from '@/services/menuService';
 import type { MenuSnapshot } from '@/services/reorderService';
 import { toast } from '@/hooks/use-toast';
 import { useOrderFavorite } from '@/hooks/useOrderFavorite';
+import { formatFavoriteCount, hasRoomForFavorite } from '@/services/favoriteLimit';
+import { SAVE_FAVORITE_PATH } from '@/services/saveFavoriteMode';
 
 // Module scope, so useOrderFavorite's callback is not rebuilt every render.
 const backInCart = (favorite: FavoriteCombo) => `${favorite.label} is back in your cart.`;
@@ -211,10 +213,26 @@ const Account: React.FC = () => {
             <FavoritesList
               favorites={favorites}
               heading="Favourites"
-              emptyText="Tap the heart on a mix to save it."
+              countLabel={formatFavoriteCount(favorites.length)}
+              emptyText="Tap the heart on a mix, or add one below."
               onReorder={handleReorder}
               onRemove={handleRemoveFavorite}
               onShare={setSharing}
+              footer={(
+                <div className="mt-3 space-y-1">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled={!hasRoomForFavorite(favorites.length)}
+                    onClick={() => navigate(SAVE_FAVORITE_PATH)}
+                  >
+                    + Add favourite
+                  </Button>
+                  {!hasRoomForFavorite(favorites.length) && (
+                    <p className="text-center text-xs text-turbo-muted">Remove one to add another</p>
+                  )}
+                </div>
+              )}
             />
             <MyUserMixes uid={user.uid} refreshToken={mixesRefresh} />
             <ShareMixDialog
