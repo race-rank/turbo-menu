@@ -163,16 +163,17 @@ It covers anonymous guests too: their favourites live under the same path.
 
 ### Release order
 
-1. Merge the PR (Vercel deploys the app).
-2. Deploy the rules: `npx firebase deploy --only firestore:rules --project turbo-menu-30079`.
-3. Run `node scripts/backfill-favorite-counts.mjs`.
+1. Deploy the rules: `npx firebase deploy --only firestore:rules --project turbo-menu-30079`.
+2. Run `node scripts/backfill-favorite-counts.mjs` straight away (`--dry-run` first to preview).
+3. Merge the PR (Vercel deploys the app).
 
-Between 1 and 2 the new app's counter writes are denied by the old rules, and between
-2 and a page reload the old app's favourite writes are denied by the new rules. Either
-way the customer sees "could not update favourites" for a few minutes; nothing is
-lost. Between 2 and 3, a customer with existing favourites but no counter could create
-a counter of 1; step 3 overwrites it with the real count, so it must run straight
-after step 2.
+Rules first because it breaks less. Between 1 and 3, pages running the old app
+cannot ADD a favourite (their plain write has no counter) but can still remove
+one. Merging first would be worse: the new app's counter writes are denied by
+the old rules, so every heart, save and remove fails until the rules land.
+Between 1 and 2, a customer with favourites but no counter cannot get one
+either - creating a counter needs a favourite created alongside it, which the
+old app never sends - and step 2 sets everyone's real count.
 
 ---
 
@@ -201,8 +202,8 @@ after step 2.
   `userMixToFavorite`-style conversion to a custom favourite.
 - **Hearts** on recommended mixes keep working as they do outside save mode.
 - **After saving:** back to `/account` with "Saved to favourites". If the combo was
-  already a favourite: "Already in your favourites", no second copy (the comboId is
-  the document id, so a duplicate is impossible by construction).
+  already a favourite, it is updated in place ("Updated in your favourites") - no
+  second copy and no new slot, since the comboId is the document id.
 - **Full:** "You have 20 favourites — remove one to add another"; the customer stays
   on the menu.
 
@@ -249,3 +250,28 @@ after step 2.
 - **`Index.tsx` is already 1,256 lines.** Save mode is a flag threaded through it, not
   a copy of it; the save-mode banner and the "save instead of add" decision live in
   small components and a helper so the page grows as little as possible.
+
+## Changes during implementation
+
+- **Save mode lives at `/save-favourite`, not `/?mode=save-favourite`.** `/` is
+  `RedirectPage`, which reads its own query parameters; the menu is the `*` route.
+- **The hookah-of-the-day card is hidden in save mode.** Its button orders
+  (#20 made it add straight to the cart), and save mode orders nothing.
+- **Each rules check lives in exactly one place.** The cap of 20 is checked only
+  on the counter's +1, and "a new counter starts at 1" only through the
+  favourite's `before + 1`. Written twice, either copy could be deleted without
+  any test noticing; written once, every check was removed in turn and a test
+  failed each time. One test was added from that exercise: a counter cannot be
+  created without a favourite appearing (otherwise a customer with favourites
+  but no counter, before the backfill, could reset themselves to 1).
+- **Release order is rules, backfill, then merge** - reversed from the first
+  draft after review. See "Release order".
+- **One rule was added after review:** the counter must name the favourite
+  being created. Without it, one batch could create any number of favourites
+  against a single +1, so the cap did not hold. Proven by a regression test
+  that fails without the check.
+- **Re-saving an existing favourite in save mode updates it** instead of
+  saying "Already in your favourites", so a mix hearted from the grid picks up
+  the tobacco chosen in save mode. No new slot is used.
+- **The backfill script has a `--dry-run` flag** to see how many customers it
+  would touch, and how many are over 20, before writing.

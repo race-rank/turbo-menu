@@ -9,7 +9,12 @@ import { truncateLabel } from '@/services/comboId';
 // so a secure context - see the note in ensureGuestClaim about what that
 // costs here and why there is no way around it.
 import { sha256Hex } from '@/services/friendsService';
-import { addFavorite, listFavorites, removeFavorite } from '@/services/favoritesService';
+import {
+  addFavorite, deleteGuestFavorite, getFavoriteCount, listFavorites,
+} from '@/services/favoritesService';
+import {
+  FavoritesFullError, describeFavoritesThatDidNotFit, favoritesThatFit,
+} from '@/services/favoriteLimit';
 import { listRatings } from '@/services/ratingsService';
 
 /**
@@ -71,6 +76,13 @@ export interface ClaimSummary {
   orders: number;
   favorites: number;
   ratings: number;
+  /**
+   * Guest favourites left behind because the account was full. Not part of
+   * `outstanding`: a retry cannot make room, so they must not keep the claim
+   * record alive. They stay on the guest uid - not deleted, but unreachable
+   * once the claim completes.
+   */
+  favoritesDidNotFit: number;
   /**
    * How much was meant to move and did not - orders, favourites and ratings
    * together. Non-zero means this run was interrupted or denied, the local
@@ -304,6 +316,10 @@ interface MoveResult {
   failed: number;
 }
 
+interface FavoriteMoveResult extends MoveResult {
+  didNotFit: number;
+}
+
 /**
  * COLLISION RULE, for both favourites and ratings: the EXISTING account wins.
  *
@@ -315,48 +331,72 @@ interface MoveResult {
  * replace personalisation (strength, percentages, ice) on a saved build. So a
  * colliding guest entry is dropped, and only guest-only entries are added.
  *
- * The guest copy is deleted either way, so the dead uid is not left holding a
- * second copy of the customer's taste.
+ * The guest copy of a colliding or moved entry is deleted, so the dead uid is
+ * not left holding a second copy of the customer's taste.
  *
  * Copy before delete, one item at a time, so an interrupted run can never lose
  * an entry: the worst it can leave behind is a guest copy that has already been
  * carried across, which the next run deletes.
+ *
+ * FAVOURITES LIMIT: only as many guest-only favourites as fit under
+ * MAX_FAVORITES move, newest first. The rest stay on the guest uid and are
+ * reported in didNotFit - never deleted, though unreachable once the claim
+ * completes.
  */
-const copyFavorites = async (anonUid: string, newUid: string): Promise<MoveResult> => {
+const copyFavorites = async (anonUid: string, newUid: string): Promise<FavoriteMoveResult> => {
   let guestFavorites: Awaited<ReturnType<typeof listFavorites>>;
   let existing: Awaited<ReturnType<typeof listFavorites>>;
+  let count: number;
   try {
-    [guestFavorites, existing] = await Promise.all([
+    [guestFavorites, existing, count] = await Promise.all([
       listFavorites(anonUid),
       listFavorites(newUid),
+      getFavoriteCount(newUid),
     ]);
   } catch (error) {
     // Reading the guest's list needs the claim, so this is also how "the take
     // did not work" shows up. Unknown how much is left, so report one failure
     // and let the retry find out.
     console.error('Could not read the favourites to move:', error);
-    return { copied: 0, failed: 1 };
+    return { copied: 0, failed: 1, didNotFit: 0 };
   }
   const mine = new Set(existing.map((favorite) => favorite.comboId));
+  const { fit, left } = favoritesThatFit(
+    guestFavorites.filter((favorite) => !mine.has(favorite.comboId)),
+    count,
+  );
 
   let copied = 0;
   let failed = 0;
-  for (const favorite of guestFavorites) {
+  let didNotFit = left.length;
+  // Already on the account: only the guest copy needs to go.
+  for (const favorite of guestFavorites.filter((f) => mine.has(f.comboId))) {
     try {
-      if (!mine.has(favorite.comboId)) {
-        // addFavorite re-stamps createdAt with serverTimestamp(), and has to:
-        // the rule pins it to request.time, so the original date cannot be
-        // carried over. "Saved on" becomes "moved on" for these entries.
-        await addFavorite(newUid, favorite);
-        copied += 1;
-      }
-      await removeFavorite(anonUid, favorite.comboId);
+      await deleteGuestFavorite(anonUid, favorite.comboId);
     } catch (error) {
-      console.error(`Favourite ${favorite.comboId} could not be moved:`, error);
+      console.error(`Favourite ${favorite.comboId} could not be removed from the guest:`, error);
       failed += 1;
     }
   }
-  return { copied, failed };
+  for (const favorite of fit) {
+    try {
+      // addFavorite re-stamps createdAt with serverTimestamp(), and has to:
+      // the rule pins it to request.time, so the original date cannot be
+      // carried over. "Saved on" becomes "moved on" for these entries.
+      await addFavorite(newUid, favorite);
+      copied += 1;
+      await deleteGuestFavorite(anonUid, favorite.comboId);
+    } catch (error) {
+      // Filled up from another device mid-transfer: as good as not fitting.
+      if (error instanceof FavoritesFullError) {
+        didNotFit += 1;
+      } else {
+        console.error(`Favourite ${favorite.comboId} could not be moved:`, error);
+        failed += 1;
+      }
+    }
+  }
+  return { copied, failed, didNotFit };
 };
 
 const copyRatings = async (anonUid: string, newUid: string): Promise<MoveResult> => {
@@ -484,6 +524,7 @@ const runClaim = async (newUser: User): Promise<ClaimSummary | null> => {
     orders,
     favorites: favorites.copied,
     ratings: ratings.copied,
+    favoritesDidNotFit: favorites.didNotFit,
     outstanding,
   };
 };
@@ -542,17 +583,20 @@ export const describeClaim = (summary: ClaimSummary | null): string | null => {
   if (summary.orders) parts.push(plural(summary.orders, 'order'));
   if (summary.favorites) parts.push(plural(summary.favorites, 'favourite'));
   if (summary.ratings) parts.push(plural(summary.ratings, 'rating'));
+  const full = describeFavoritesThatDidNotFit(summary.favoritesDidNotFit);
+  const withFull = (text: string) => (full ? `${text} ${full}` : text);
 
   if (!parts.length) {
-    return summary.outstanding
-      ? 'We could not move your guest data over just now - we will try again next time you sign in.'
-      : null;
+    if (summary.outstanding) {
+      return withFull('We could not move your guest data over just now - we will try again next time you sign in.');
+    }
+    return full;
   }
 
   const list = parts.length === 1
     ? parts[0]
     : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
-  return summary.outstanding
+  return withFull(summary.outstanding
     ? `${list} from this device moved to your account; the rest will follow next time you sign in.`
-    : `${list} from this device moved to your account.`;
+    : `${list} from this device moved to your account.`);
 };

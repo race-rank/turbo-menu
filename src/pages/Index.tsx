@@ -24,6 +24,9 @@ import { buildComboLabel, buildFlavorDisplayNames } from '@/services/comboDispla
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix } from '@/types/database';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { addFavorite, listFavorites, removeFavorite } from '@/services/favoritesService';
+import { FAVORITES_FULL_MESSAGE, FavoritesFullError, hasRoomForFavorite } from '@/services/favoriteLimit';
+import { isSaveFavoriteMode } from '@/services/saveFavoriteMode';
+import { SaveFavoriteBanner } from '@/components/SaveFavoriteBanner';
 import type { FavoriteCombo } from '@/services/favoritesService';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADDONS, ADDON_PRICES } from '@/services/addons';
@@ -74,6 +77,8 @@ const Index = () => {
   const location = useLocation();
   const { setTable } = useTable();
   const { user } = useAuth();
+  // /save-favourite: the same menu, but every "add to cart" saves a favourite.
+  const saveMode = isSaveFavoriteMode(location.pathname);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [lastBuild, setLastBuild] = useState<FavoriteCombo | null>(null);
   const [selectedHookah, setSelectedHookah] = useState<string | null>(null);
@@ -147,6 +152,39 @@ const Index = () => {
       // A failed favourites read must not take the menu down with it.
       .catch(() => setFavoriteIds(new Set()));
   }, [user]);
+
+  const showFavoritesFull = () => {
+    errorHaptic();
+    toast({ title: 'Favourites full', description: FAVORITES_FULL_MESSAGE, variant: 'destructive' });
+  };
+
+  /**
+   * Save mode's replacement for every "add to cart". An already-saved combo is
+   * overwritten, not skipped: the comboId is the document id, so it stays one
+   * favourite and uses no new slot, but it picks up what was just chosen - the
+   * tobacco for a mix hearted from the grid, or new strength and percentages.
+   */
+  const saveFavoriteFromMenu = async (favorite: FavoriteCombo) => {
+    if (!user) {
+      toast({ title: 'Could not save', description: 'Please try again in a moment.', variant: 'destructive' });
+      return;
+    }
+    const alreadySaved = favoriteIds.has(favorite.comboId);
+    try {
+      await addFavorite(user.uid, favorite);
+      setFavoriteIds((prev) => new Set(prev).add(favorite.comboId));
+      successHaptic();
+      toast({ title: alreadySaved ? 'Updated in your favourites' : 'Saved to favourites' });
+      navigate('/account');
+    } catch (error) {
+      if (error instanceof FavoritesFullError) {
+        showFavoritesFull();
+      } else {
+        errorHaptic();
+        toast({ title: 'Could not save', variant: 'destructive' });
+      }
+    }
+  };
 
   // Create expanded flavor list with separate entries for dual-compatible flavors
   const getExpandedFlavors = () => {
@@ -248,6 +286,11 @@ const Index = () => {
   };
 
   const addMixToCart = (mixId: string) => {
+    // No table needed: nothing is ordered in save mode.
+    if (saveMode) {
+      setMixDialogId(mixId);
+      return;
+    }
     const tableId = localStorage.getItem('turbo-table');
 
     if (!isValidTableId(tableId)) {
@@ -267,6 +310,12 @@ const Index = () => {
     if (!user) return;
     const comboId = comboIdForMix(mix.id);
     const wasFavorite = favoriteIds.has(comboId);
+
+    // The heart stays tappable at the limit so this message can be seen.
+    if (!wasFavorite && !hasRoomForFavorite(favoriteIds.size)) {
+      showFavoritesFull();
+      return;
+    }
 
     // Functional updates throughout, including the rollback below: two
     // hearts tapped inside the same render frame each start from their own
@@ -294,7 +343,11 @@ const Index = () => {
         if (wasFavorite) next.add(comboId); else next.delete(comboId);
         return next;
       });
-      toast({ title: 'Could not update favourites', variant: 'destructive' });
+      if (error instanceof FavoritesFullError) {
+        showFavoritesFull();
+      } else {
+        toast({ title: 'Could not update favourites', variant: 'destructive' });
+      }
     }
   };
 
@@ -302,7 +355,17 @@ const Index = () => {
     const mix = recommendedMixes.find(m => m.id === mixDialogId);
     const tableId = localStorage.getItem('turbo-table');
     setMixDialogId(null);
-    if (!mix || !tableId) return;
+    if (!mix) return;
+
+    if (saveMode) {
+      // The tobacco chosen here is stored, so "order again" restores this
+      // exact version rather than resolveMixCategory's fallback.
+      void saveFavoriteFromMenu({
+        comboId: comboIdForMix(mix.id), label: mix.name, kind: 'mix', mixId: mix.id, tobaccoType: category,
+      });
+      return;
+    }
+    if (!tableId) return;
 
     const categoryLabels = { virginia: 'Virginia', darkblend: 'Darkblend', mix: 'Mix' };
     const comboId = comboIdForMix(mix.id);
@@ -493,7 +556,7 @@ const Index = () => {
 
   const requestAddToCart = () => {
     const tableId = localStorage.getItem('turbo-table');
-    if (!isValidTableId(tableId)) {
+    if (!saveMode && !isValidTableId(tableId)) {
       errorHaptic();
       toast({
         title: "No table selected",
@@ -532,7 +595,7 @@ const Index = () => {
   const finalizeAddToCart = (withIce: boolean) => {
     const tableId = localStorage.getItem('turbo-table');
     const selectedHookahData = hookahs.find(h => h.id === selectedHookah);
-    if (!selectedHookahData || !tableId || !selectedTobaccoType) return;
+    if (!selectedHookahData || !selectedTobaccoType || (!saveMode && !tableId)) return;
 
     const finalTobaccoType = resolveFinalTobaccoType() ?? selectedTobaccoType;
 
@@ -584,6 +647,30 @@ const Index = () => {
         )
       : undefined;
 
+    // The same object the "Save this combo?" prompt offers after ordering, and
+    // what save mode stores directly.
+    const favorite: FavoriteCombo = {
+      comboId: comboIdForCustom(selectedHookahData.id, finalTobaccoType, flavorIds),
+      label: buildComboLabel(selectedHookahData.name, selectedFlavorNames),
+      kind: 'custom',
+      hookahId: selectedHookahData.id,
+      tobaccoType: finalTobaccoType,
+      flavorIds,
+      tobaccoStrength,
+      flavorPercentages: favoriteFlavorPercentages,
+      withIce,
+      hasLED: selectedAddons.hasLED,
+      hasColoredWater: selectedAddons.hasColoredWater,
+      hasAlcohol: selectedAddons.hasAlcohol,
+      hasFruits: selectedAddons.hasFruits,
+    };
+
+    if (saveMode) {
+      void saveFavoriteFromMenu(favorite);
+      return;
+    }
+    if (!tableId) return;
+
     let totalPrice = selectedHookahData.price || 0;
     if (selectedAddons.hasLED) totalPrice += ADDON_PRICES.hasLED;
     if (selectedAddons.hasColoredWater) totalPrice += ADDON_PRICES.hasColoredWater;
@@ -618,21 +705,7 @@ const Index = () => {
 
     // Offered rather than automatic: not every build is worth keeping, and a
     // favourites list that fills itself is noise.
-    setLastBuild({
-      comboId: comboIdForCustom(selectedHookahData.id, finalTobaccoType, flavorIds),
-      label: buildComboLabel(selectedHookahData.name, selectedFlavorNames),
-      kind: 'custom',
-      hookahId: selectedHookahData.id,
-      tobaccoType: finalTobaccoType,
-      flavorIds,
-      tobaccoStrength,
-      flavorPercentages: favoriteFlavorPercentages,
-      withIce,
-      hasLED: selectedAddons.hasLED,
-      hasColoredWater: selectedAddons.hasColoredWater,
-      hasAlcohol: selectedAddons.hasAlcohol,
-      hasFruits: selectedAddons.hasFruits,
-    });
+    setLastBuild(favorite);
 
     successHaptic();
     toast({
@@ -710,22 +783,29 @@ const Index = () => {
         <header className="flex items-center justify-between p-1">
           <NavigationSidebar />
           <h1 className="text-2xl font-bold tracking-wider">TURBO</h1>
-          <Button variant="ghost" size="icon" className="text-turbo-text relative" onClick={navigateToCart}>
-            <ShoppingCart className="h-6 w-6" />
-            {cartItemCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {cartItemCount}
-              </span>
-            )}
-          </Button>
+          {saveMode ? (
+            // Keeps the title centred where the cart button would be.
+            <div className="w-10" />
+          ) : (
+            <Button variant="ghost" size="icon" className="text-turbo-text relative" onClick={navigateToCart}>
+              <ShoppingCart className="h-6 w-6" />
+              {cartItemCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {cartItemCount}
+                </span>
+              )}
+            </Button>
+          )}
         </header>
       </StickyHeader>
       <main className="container mx-auto px-4 py-6">
         <div className="container mx-auto px-4 py-6 space-y-8">
+          {saveMode && <SaveFavoriteBanner onCancel={() => navigate('/account')} />}
           <section>
             <WelcomeHeader />
           </section>
-          {hookahOfTheDay && (
+          {/* Its button orders; save mode orders nothing. */}
+          {!saveMode && hookahOfTheDay && (
             <section>
               <HookahOfTheDayCard resolved={hookahOfTheDay} onOrder={orderHookahOfTheDay} />
             </section>
@@ -795,7 +875,7 @@ const Index = () => {
                               className="bg-amber-600 hover:bg-amber-700 text-white"
                               onClick={() => addMixToCart(mix.id)}
                             >
-                              Add
+                              {saveMode ? 'Save' : 'Add'}
                             </Button>
                           </div>
                         </div>
@@ -810,7 +890,12 @@ const Index = () => {
             )}
           </section>
           {!isLoading && (
-            <CommunityMixes mixes={communityMixes} menu={menuSnapshot} onAdd={orderCommunityMix} />
+            <CommunityMixes
+              mixes={communityMixes}
+              menu={menuSnapshot}
+              onAdd={saveMode ? (favorite) => { void saveFavoriteFromMenu(favorite); } : orderCommunityMix}
+              actionLabel={saveMode ? 'Save' : 'Add'}
+            />
           )}
           <section ref={step1Ref}>
             <h2 className="text-xl font-semibold mb-6">Step 1: Choose Hookah</h2>
@@ -1185,6 +1270,7 @@ const Index = () => {
         </div>
       </main>
       <OrderFooter
+        saveMode={saveMode}
         build={{
           hookahName: selectedHookah ? hookahs.find(h => h.id === selectedHookah)?.name ?? null : null,
           tobaccoLabel: selectedTobaccoType
@@ -1239,7 +1325,7 @@ const Index = () => {
           </div>
         </DialogContent>
       </Dialog>
-      {user && lastBuild && (
+      {user && lastBuild && hasRoomForFavorite(favoriteIds.size) && (
         // OrderStatusTracker pins a card stack to bottom-0 at z-50 (a single
         // collapsed order card runs ~106px plus its own 16px bottom padding,
         // taller once expanded or with more than one live order); bottom-36
@@ -1259,8 +1345,9 @@ const Index = () => {
                     await addFavorite(user.uid, lastBuild);
                     setFavoriteIds((current) => new Set(current).add(lastBuild.comboId));
                     toast({ title: 'Saved to favourites' });
-                  } catch {
-                    toast({ title: 'Could not save', variant: 'destructive' });
+                  } catch (error) {
+                    if (error instanceof FavoritesFullError) showFavoritesFull();
+                    else toast({ title: 'Could not save', variant: 'destructive' });
                   } finally {
                     setLastBuild(null);
                   }
