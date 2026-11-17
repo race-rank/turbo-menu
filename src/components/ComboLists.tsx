@@ -48,58 +48,65 @@ export const FavoritesList: React.FC<FavoritesListProps> = ({
       </h2>
       {favorites.length === 0 && <p className="text-sm text-turbo-muted">{emptyText}</p>}
       {favorites.map((favorite) => (
-        <div key={favorite.comboId} className="flex items-center justify-between gap-2 py-1">
-          <p className="flex-1 truncate text-sm">{favorite.label}</p>
-          {onReorder && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="shrink-0 text-xs"
-              onClick={() => onReorder(favorite)}
-            >
-              Order again
-            </Button>
-          )}
-          {onShare && favorite.kind === 'custom' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="shrink-0 text-xs"
-              onClick={() => onShare(favorite)}
-            >
-              Share as a mix
-            </Button>
-          )}
-          {onRemove && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
+        // Name on its own line, wrapped in full, actions underneath: a build's
+        // name lists its flavours, and truncating it beside three buttons left
+        // only "Darkblend · Lapt…" on a phone.
+        <div key={favorite.comboId} className="border-b border-border py-2 last:border-b-0">
+          <p className="break-words text-sm">{favorite.label}</p>
+          {(onReorder || onShare || onRemove) && (
+            <div className="mt-1 flex flex-wrap items-center justify-end gap-1">
+              {onReorder && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 text-xs"
+                  onClick={() => onReorder(favorite)}
+                >
+                  Order again
+                </Button>
+              )}
+              {onShare && favorite.kind === 'custom' && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="shrink-0 text-xs text-turbo-muted"
-                  aria-label={`Remove ${favorite.label} from favourites`}
+                  className="shrink-0 text-xs"
+                  onClick={() => onShare(favorite)}
                 >
-                  Remove
+                  Share as a mix
                 </Button>
-              </AlertDialogTrigger>
-              {/* Destructive and easy to mis-tap on a phone next to "Order
-                  again" - confirm before it is gone, same precedent as the
-                  invite-code reset on Friends.tsx. */}
-              <AlertDialogContent className="bg-turbo-card border-border">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Remove this favourite?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {`“${favorite.label}” will no longer appear on your favourites list.`}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Keep it</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onRemove(favorite)}>
-                    Remove
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              )}
+              {onRemove && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 text-xs text-turbo-muted"
+                      aria-label={`Remove ${favorite.label} from favourites`}
+                    >
+                      Remove
+                    </Button>
+                  </AlertDialogTrigger>
+                  {/* Destructive and easy to mis-tap on a phone next to "Order
+                      again" - confirm before it is gone, same precedent as the
+                      invite-code reset on Friends.tsx. */}
+                  <AlertDialogContent className="bg-turbo-card border-border">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remove this favourite?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {`“${favorite.label}” will no longer appear on your favourites list.`}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Keep it</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => onRemove(favorite)}>
+                        Remove
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
           )}
         </div>
       ))}
@@ -124,8 +131,8 @@ export const RatingsList: React.FC<RatingsListProps> = ({
       </h2>
       {ratings.length === 0 && <p className="text-sm text-turbo-muted">{emptyText}</p>}
       {ratings.map((rating) => (
-        <div key={rating.comboId} className="flex items-center justify-between py-1">
-          <span className="flex-1 truncate text-sm">{rating.label}</span>
+        <div key={rating.comboId} className="flex items-start justify-between gap-2 py-1">
+          <span className="flex-1 break-words text-sm">{rating.label}</span>
           <StarRating value={rating.score} size="sm" />
         </div>
       ))}
