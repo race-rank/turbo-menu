@@ -1,3 +1,5 @@
+import type { CartItem } from '@/contexts/CartContext';
+import { fnv1a64, truncateLabel } from '@/services/comboId';
 import type { DatabaseHookah, FeaturedHookah } from '@/types/database';
 
 /**
@@ -53,4 +55,44 @@ export const resolveHookahOfTheDay = (
 
   const promoText = featured.promoText?.trim();
   return promoText ? { hookah, promoText } : { hookah };
+};
+
+/**
+ * The cart line for ordering the hookah of the day straight from its card.
+ *
+ * Ordered the way a recommended mix like Turbo Mix is - one tap, one line, the
+ * bar prepares it - not by dropping the customer into the custom builder. Bars
+ * use the promo line for the day's recipe ("Red Tea | Blackberry | ..."), which
+ * is free text with no flavour ids behind it, so the builder could never
+ * reproduce it. The recipe rides in the name, where the cart, the customer's
+ * order tracker and the staff dashboard all already show a mix's name.
+ *
+ * The combo id covers the promo line as well as the hookah: the same tier with
+ * a new recipe tomorrow is a different combo, and must not inherit today's
+ * ratings. `hotd:` is its own namespace, so it can never collide with a mix or
+ * a custom build, and nowSmokingItemToFavorite treats it as not re-orderable.
+ */
+export const hookahOfTheDayCartItem = (
+  { hookah, promoText }: ResolvedHookahOfTheDay,
+  tobaccoType: CartItem['tobaccoType'] | null,
+  table: string,
+): Omit<CartItem, 'quantity'> => {
+  const hash = fnv1a64(`${hookah.id}|${promoText ?? ''}`);
+  const name = promoText
+    ? `Hookah of the day: ${hookah.name} (${promoText})`
+    : `Hookah of the day: ${hookah.name}`;
+
+  return {
+    id: `hotd-${hash}`,
+    type: 'mix',
+    name,
+    price: hookah.price,
+    image: hookah.image,
+    comboId: `hotd:${hash}`,
+    comboLabel: truncateLabel(name),
+    hookahId: hookah.id,
+    hookah: hookah.name,
+    ...(tobaccoType ? { tobaccoType } : {}),
+    table,
+  };
 };

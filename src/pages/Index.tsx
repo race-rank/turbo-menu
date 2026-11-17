@@ -29,7 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ADDONS, ADDON_PRICES } from '@/services/addons';
 import { isValidTableId } from '@/services/tableValidation';
 import { HookahOfTheDayCard } from '@/components/HookahOfTheDayCard';
-import { resolveHookahOfTheDay } from '@/services/hookahOfTheDay';
+import { hookahOfTheDayCartItem, resolveHookahOfTheDay } from '@/services/hookahOfTheDay';
 import type { FeaturedHookah } from '@/types/database';
 import { CommunityMixes } from '@/components/CommunityMixes';
 import { useOrderFavorite } from '@/hooks/useOrderFavorite';
@@ -202,10 +202,32 @@ const Index = () => {
   // render. See src/services/hookahOfTheDay.ts.
   const hookahOfTheDay = resolveHookahOfTheDay(hookahs, featuredHookah);
 
-  const pickHookahOfTheDay = () => {
+  // Ordered like a recommended mix, straight into the cart - not by selecting
+  // the hookah in the builder, which left the customer to rebuild a recipe
+  // that only exists as promo text. See hookahOfTheDayCartItem.
+  const orderHookahOfTheDay = () => {
     if (!hookahOfTheDay) return;
-    setSelectedHookah(hookahOfTheDay.hookah.id);
-    step1Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const tableId = localStorage.getItem('turbo-table');
+
+    if (!isValidTableId(tableId)) {
+      errorHaptic();
+      toast({
+        title: "No table selected",
+        description: "Please scan your table's QR code to place an order.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const item = hookahOfTheDayCartItem(
+      hookahOfTheDay, getHookahTobaccoType(hookahOfTheDay.hookah.name), tableId,
+    );
+    addItem(item);
+    successHaptic();
+    toast({
+      title: "Added to cart",
+      description: `${item.name} has been added to your cart!`,
+    });
   };
 
   const filteredFlavors = currentFlavors.filter(flavor =>
@@ -705,7 +727,7 @@ const Index = () => {
           </section>
           {hookahOfTheDay && (
             <section>
-              <HookahOfTheDayCard resolved={hookahOfTheDay} onPick={pickHookahOfTheDay} />
+              <HookahOfTheDayCard resolved={hookahOfTheDay} onOrder={orderHookahOfTheDay} />
             </section>
           )}
           <section>

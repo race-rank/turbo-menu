@@ -6,11 +6,11 @@ import type { ResolvedHookahOfTheDay } from '@/services/hookahOfTheDay';
 
 interface Props {
   resolved: ResolvedHookahOfTheDay;
-  /** Selects the hookah in the builder and scrolls the customer to it. */
-  onPick: () => void;
+  /** Adds the day's hookah to the cart, as ordering a recommended mix does. */
+  onOrder: () => void;
 }
 
-export const HookahOfTheDayCard: React.FC<Props> = ({ resolved, onPick }) => {
+export const HookahOfTheDayCard: React.FC<Props> = ({ resolved, onOrder }) => {
   const { hookah, promoText } = resolved;
 
   return (
@@ -37,9 +37,9 @@ export const HookahOfTheDayCard: React.FC<Props> = ({ resolved, onPick }) => {
           </div>
           <Button
             className="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white"
-            onClick={onPick}
+            onClick={onOrder}
           >
-            Pick
+            Order
           </Button>
         </div>
       </CardContent>

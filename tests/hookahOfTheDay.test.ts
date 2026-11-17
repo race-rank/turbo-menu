@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { MAX_PROMO_TEXT_LENGTH, clampPromoText, resolveHookahOfTheDay } from '../src/services/hookahOfTheDay';
+import {
+  MAX_PROMO_TEXT_LENGTH, clampPromoText, hookahOfTheDayCartItem, resolveHookahOfTheDay,
+} from '../src/services/hookahOfTheDay';
 import type { DatabaseHookah, FeaturedHookah } from '../src/types/database';
 
 const NOW = new Date('2026-01-01T00:00:00.000Z');
@@ -98,5 +100,59 @@ describe('clampPromoText', () => {
     const result = clampPromoText(`   ${'x'.repeat(5000)}   `);
 
     expect(result).toHaveLength(MAX_PROMO_TEXT_LENGTH);
+  });
+});
+
+describe('hookahOfTheDayCartItem', () => {
+  const darkblend = hookah({ id: 'hk-dark', name: 'Darkblend', price: 80, image: '/img/dark.webp' });
+  const recipe = 'Red Tea | Blackberry | Passion Fruit | Spices';
+
+  test('orders the day\'s mix as one item, like a recommended mix', () => {
+    const item = hookahOfTheDayCartItem({ hookah: darkblend, promoText: recipe }, 'darkblend', '7');
+
+    // A mix line, not a custom build: the bar prepares the recipe, so there
+    // are no flavour ids for the customer to pick.
+    expect(item).toMatchObject({
+      type: 'mix',
+      name: `Hookah of the day: Darkblend (${recipe})`,
+      comboLabel: `Hookah of the day: Darkblend (${recipe})`,
+      price: 80,
+      image: '/img/dark.webp',
+      hookahId: 'hk-dark',
+      hookah: 'Darkblend',
+      tobaccoType: 'darkblend',
+      table: '7',
+    });
+    expect(item.flavorIds).toBeUndefined();
+    expect(item.mixId).toBeUndefined();
+  });
+
+  test('without a promo line it is still orderable, named after the hookah', () => {
+    const item = hookahOfTheDayCartItem({ hookah: darkblend }, 'darkblend', '7');
+
+    expect(item.name).toBe('Hookah of the day: Darkblend');
+  });
+
+  test('ordering it twice adds to the same cart line', () => {
+    const first = hookahOfTheDayCartItem({ hookah: darkblend, promoText: recipe }, 'darkblend', '7');
+    const second = hookahOfTheDayCartItem({ hookah: darkblend, promoText: recipe }, 'darkblend', '7');
+
+    expect(second.id).toBe(first.id);
+    expect(second.comboId).toBe(first.comboId);
+  });
+
+  test('a new recipe on the same hookah is a different combo', () => {
+    // Ratings are filed by comboId; Tuesday's mix must not inherit Monday's.
+    const monday = hookahOfTheDayCartItem({ hookah: darkblend, promoText: recipe }, 'darkblend', '7');
+    const tuesday = hookahOfTheDayCartItem({ hookah: darkblend, promoText: 'Mint | Lemon' }, 'darkblend', '7');
+
+    expect(tuesday.comboId).not.toBe(monday.comboId);
+    expect(tuesday.id).not.toBe(monday.id);
+  });
+
+  test('a hookah whose tier is unknown is ordered without a tobacco type', () => {
+    const item = hookahOfTheDayCartItem({ hookah: hookah() }, null, '7');
+
+    expect(item.tobaccoType).toBeUndefined();
   });
 });
