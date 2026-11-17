@@ -219,7 +219,7 @@ export const isSaveFavoriteMode = (pathname: string): boolean => pathname === SA
 - [ ] **Step 4: Run it and watch it pass**
 
 Run: `npx vitest run tests/favoriteLimit.test.ts`
-Expected: PASS, 10 tests.
+Expected: PASS, 9 tests.
 
 - [ ] **Step 5: Commit**
 
