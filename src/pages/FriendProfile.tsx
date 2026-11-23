@@ -7,7 +7,10 @@ import { NavigationSidebar } from '@/components/NavigationSidebar';
 import { PokeButton } from '@/components/PokeButton';
 import { FavoritesList, RatingsList } from '@/components/ComboLists';
 import { getPublicProfile, type PublicProfile } from '@/services/profileService';
-import { listFavorites, type FavoriteCombo } from '@/services/favoritesService';
+import { addFavorite, listFavorites, type FavoriteCombo } from '@/services/favoritesService';
+import { FAVORITES_FULL_MESSAGE, FavoritesFullError } from '@/services/favoriteLimit';
+import { useAuth } from '@/contexts/AuthContext';
+import { successHaptic, errorHaptic } from '@/utils/haptics';
 import { listRatings, type ComboRating } from '@/services/ratingsService';
 import { getNowSmoking } from '@/services/nowSmokingService';
 import { isNowSmokingFresh, nowSmokingItemToFavorite, type NowSmoking } from '@/services/nowSmoking';
@@ -35,6 +38,10 @@ const FriendProfile: React.FC = () => {
   const [nowSmoking, setNowSmoking] = useState<NowSmoking | null>(null);
   const [menu, setMenu] = useState<MenuSnapshot | null>(null);
   const orderFavorite = useOrderFavorite(menu);
+  const { user } = useAuth();
+  // The viewer's own favourites, so "Save to mine" can show what they have.
+  const [myFavoriteIds, setMyFavoriteIds] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
 
   // With no published snapshot the menu costs dozens of reads, so it is only
   // fetched when something here can actually be ordered: eagerly for a live
@@ -78,6 +85,39 @@ const FriendProfile: React.FC = () => {
     }
     setPendingOrder(favorite);
     setMenuWanted(true);
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    listFavorites(user.uid)
+      .then((mine) => setMyFavoriteIds(new Set(mine.map((f) => f.comboId))))
+      // Only costs the "Saved" marks; saving still refuses to overwrite.
+      .catch(() => setMyFavoriteIds(new Set()));
+  }, [user]);
+
+  /**
+   * Copies the friend's exact build into the viewer's own list. keepExisting:
+   * a combo the viewer already has is their own, personalised build, and a
+   * friend's must not replace it.
+   */
+  const saveToMine = async (favorite: FavoriteCombo) => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      const result = await addFavorite(user.uid, favorite, { keepExisting: true });
+      setMyFavoriteIds((prev) => new Set(prev).add(favorite.comboId));
+      successHaptic();
+      toast({ title: result === 'kept' ? 'Already in your favourites' : 'Saved to your favourites' });
+    } catch (error) {
+      errorHaptic();
+      if (error instanceof FavoritesFullError) {
+        toast({ title: 'Favourites full', description: FAVORITES_FULL_MESSAGE, variant: 'destructive' });
+      } else {
+        toast({ title: 'Could not save', description: 'Check your connection and try again.', variant: 'destructive' });
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -185,6 +225,11 @@ const FriendProfile: React.FC = () => {
               favorites={favorites}
               heading="Favourites"
               emptyText="Nothing saved yet."
+              onReorder={orderSame}
+              reorderLabel="Order"
+              onSave={user ? saveToMine : undefined}
+              savedIds={myFavoriteIds}
+              busy={pendingOrder !== null || saving}
             />
 
             <RatingsList

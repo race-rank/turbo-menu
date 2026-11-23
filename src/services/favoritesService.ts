@@ -39,6 +39,8 @@ const counterRef = (uid: string) => doc(firestore, 'users', uid, 'counters', 'fa
 const readCount = (data: { count?: unknown } | undefined): number =>
   (typeof data?.count === 'number' ? data.count : 0);
 
+export type AddFavoriteResult = 'added' | 'updated' | 'kept';
+
 /**
  * Deliberately stores ids and never prices. Re-ordering re-prices from the live
  * menu; a stored price would let a saved favourite quietly undercharge after a
@@ -51,8 +53,15 @@ const readCount = (data: { count?: unknown } | undefined): number =>
  * another device is caught here too.
  *
  * Needs a connection: a transaction is not queued offline the way setDoc was.
+ * Resolves with what happened: 'kept' only with keepExisting.
  */
-export const addFavorite = async (uid: string, favorite: FavoriteCombo): Promise<void> => {
+export const addFavorite = async (
+  uid: string,
+  favorite: FavoriteCombo,
+  // Saving someone else's favourite: an existing one of the customer's own is
+  // their build, personalised, and must not be swapped for a friend's.
+  { keepExisting = false }: { keepExisting?: boolean } = {},
+): Promise<AddFavoriteResult> => {
   const { createdAt, ...rest } = favorite;
   const payload = {
     ...Object.fromEntries(Object.entries(rest).filter(([, value]) => value !== undefined)),
@@ -61,17 +70,19 @@ export const addFavorite = async (uid: string, favorite: FavoriteCombo): Promise
   };
   const favoriteRef = doc(favoritesRef(uid), favorite.comboId);
 
-  await runTransaction(firestore, async (tx) => {
+  return runTransaction(firestore, async (tx): Promise<AddFavoriteResult> => {
     const existing = await tx.get(favoriteRef);
     const counter = await tx.get(counterRef(uid));
     if (existing.exists()) {
+      if (keepExisting) return 'kept';
       tx.set(favoriteRef, payload);
-      return;
+      return 'updated';
     }
     const count = readCount(counter.data());
     if (!hasRoomForFavorite(count)) throw new FavoritesFullError();
     tx.set(favoriteRef, payload);
     tx.set(counterRef(uid), { count: count + 1, changed: favorite.comboId });
+    return 'added';
   });
 };
 
