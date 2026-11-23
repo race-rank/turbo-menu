@@ -25,13 +25,19 @@ interface FavoritesListProps {
   // "7/20" on the customer's own list. Friends see a plain count.
   countLabel?: string;
   footer?: React.ReactNode;
-  // Omitted entirely on FriendProfile - re-ordering someone else's favourite
-  // is not part of this feature, and the row simply renders without a
-  // control rather than a page having to disable one.
   onReorder?: (favorite: FavoriteCombo) => void;
-  // Same as onReorder: FriendProfile does not pass this, so the remove
-  // control is structurally impossible to reach for someone else's list
-  // rather than merely hidden by a page-level check.
+  // "Order again" on the customer's own list; "Order" on a friend's, which
+  // they have never ordered.
+  reorderLabel?: string;
+  // FriendProfile only: copy a friend's favourite into the viewer's own list.
+  onSave?: (favorite: FavoriteCombo) => void;
+  // The viewer's own comboIds, so a combo they already have reads "Saved".
+  savedIds?: ReadonlySet<string>;
+  // Disables every Order / Save button while one of them is in flight.
+  busy?: boolean;
+  // FriendProfile does not pass this, so the remove control is structurally
+  // impossible to reach for someone else's list rather than merely hidden by
+  // a page-level check.
   onRemove?: (favorite: FavoriteCombo) => void;
   // Account's signed-in list only. Rendered for custom builds - a curated
   // mix is already on the menu.
@@ -39,7 +45,8 @@ interface FavoritesListProps {
 }
 
 export const FavoritesList: React.FC<FavoritesListProps> = ({
-  favorites, heading, emptyText, countLabel, footer, onReorder, onRemove, onShare,
+  favorites, heading, emptyText, countLabel, footer, onReorder, reorderLabel = 'Order again',
+  onSave, savedIds, busy = false, onRemove, onShare,
 }) => (
   <Card className="bg-turbo-card border-border">
     <CardContent className="p-4">
@@ -53,18 +60,34 @@ export const FavoritesList: React.FC<FavoritesListProps> = ({
         // only "Darkblend · Lapt…" on a phone.
         <div key={favorite.comboId} className="border-b border-border py-2 last:border-b-0">
           <p className="break-words text-sm">{favorite.label}</p>
-          {(onReorder || onShare || onRemove) && (
+          {(onReorder || onSave || onShare || onRemove) && (
             <div className="mt-1 flex flex-wrap items-center justify-end gap-1">
               {onReorder && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="shrink-0 text-xs"
+                  disabled={busy}
                   onClick={() => onReorder(favorite)}
                 >
-                  Order again
+                  {reorderLabel}
                 </Button>
               )}
+              {onSave && (savedIds?.has(favorite.comboId) ? (
+                <Button variant="ghost" size="sm" className="shrink-0 text-xs" disabled>
+                  Saved
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 text-xs"
+                  disabled={busy}
+                  onClick={() => onSave(favorite)}
+                >
+                  Save to mine
+                </Button>
+              ))}
               {onShare && favorite.kind === 'custom' && (
                 <Button
                   variant="ghost"
