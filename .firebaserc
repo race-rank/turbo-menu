@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "production": "turbo-menu-30079",
+    "staging": "turbo-menu-staging"
+  }
+}

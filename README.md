@@ -90,5 +90,8 @@ command reports no runtime, install a JDK via your platform's usual package mana
 and make sure its `bin` directory is on your `PATH`.
 
 Use `npm run test:watch` to re-run the suite as you edit rules, and
-`npm run rules:deploy` to publish `firestore.rules` and `firestore.indexes.json`
-to the production project.
+`npm run rules:deploy:staging` to publish `firestore.rules` and
+`firestore.indexes.json` to the staging project (`turbo-menu-staging`).
+`npm run rules:deploy:production` publishes the rules only to production
+(`turbo-menu-30079`); deploy production indexes deliberately and never with
+`--force`.
