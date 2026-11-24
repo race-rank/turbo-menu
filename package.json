@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "firebase emulators:exec --only firestore --project demo-turbo-menu \"vitest run\"",
     "test:watch": "firebase emulators:exec --only firestore --project demo-turbo-menu \"vitest\"",
-    "rules:deploy": "firebase deploy --only firestore:rules,firestore:indexes --project turbo-menu-30079"
+    "rules:deploy:staging": "firebase deploy --only firestore:rules,firestore:indexes --project staging",
+    "rules:deploy:production": "firebase deploy --only firestore:rules --project production"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
