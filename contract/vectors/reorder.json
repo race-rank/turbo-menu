@@ -1,0 +1,601 @@
+{
+  "description": "Turning a favourite back into a cart item against the current menu (input.menu applies to every case). Prices always come from the menu. A custom item id is \"custom-<epoch millis>\"; vectors carry \"custom-<now>\" and clients compare everything else.",
+  "functions": {
+    "resolveReorder": [
+      {
+        "name": "mix never ordered defaults to category mix",
+        "input": {
+          "favorite": {
+            "comboId": "mix:mx-turbo",
+            "label": "Turbo Mix",
+            "kind": "mix",
+            "mixId": "mx-turbo"
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "mix-mx-turbo-mix",
+            "type": "mix",
+            "name": "Turbo Mix (Mix)",
+            "price": 100,
+            "image": "t.webp",
+            "comboId": "mix:mx-turbo",
+            "comboLabel": "Turbo Mix",
+            "mixId": "mx-turbo",
+            "tobaccoType": "mix",
+            "table": "/table-7"
+          }
+        }
+      },
+      {
+        "name": "mix with last-ordered category",
+        "input": {
+          "favorite": {
+            "comboId": "mix:mx-turbo",
+            "label": "Turbo Mix",
+            "kind": "mix",
+            "mixId": "mx-turbo",
+            "tobaccoType": "darkblend"
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "mix-mx-turbo-darkblend",
+            "type": "mix",
+            "name": "Turbo Mix (Darkblend)",
+            "price": 100,
+            "image": "t.webp",
+            "comboId": "mix:mx-turbo",
+            "comboLabel": "Turbo Mix",
+            "mixId": "mx-turbo",
+            "tobaccoType": "darkblend",
+            "table": "/table-7"
+          }
+        }
+      },
+      {
+        "name": "mix with unknown category falls back to mix",
+        "input": {
+          "favorite": {
+            "comboId": "mix:mx-turbo",
+            "label": "Turbo Mix",
+            "kind": "mix",
+            "mixId": "mx-turbo",
+            "tobaccoType": "cigarleaf"
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "mix-mx-turbo-mix",
+            "type": "mix",
+            "name": "Turbo Mix (Mix)",
+            "price": 100,
+            "image": "t.webp",
+            "comboId": "mix:mx-turbo",
+            "comboLabel": "Turbo Mix",
+            "mixId": "mx-turbo",
+            "tobaccoType": "mix",
+            "table": "/table-7"
+          }
+        }
+      },
+      {
+        "name": "inactive mix",
+        "input": {
+          "favorite": {
+            "comboId": "mix:mx-off",
+            "label": "Old Mix",
+            "kind": "mix",
+            "mixId": "mx-off"
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "unavailable",
+          "missing": [
+            "Old Mix"
+          ]
+        }
+      },
+      {
+        "name": "deleted mix",
+        "input": {
+          "favorite": {
+            "comboId": "mix:nope",
+            "label": "Vanished",
+            "kind": "mix",
+            "mixId": "nope"
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "unavailable",
+          "missing": [
+            "Vanished"
+          ]
+        }
+      },
+      {
+        "name": "custom, one flavour",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "Virginia · Mint",
+            "kind": "custom",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-mint:virginia"
+            ],
+            "tobaccoStrength": 3
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "custom-<now>",
+            "type": "custom",
+            "name": "Custom Mix",
+            "price": 70,
+            "image": "v.webp",
+            "comboId": "custom:f1b07fb2955648eb",
+            "comboLabel": "Virginia · Mint",
+            "hookahId": "hk-virginia",
+            "flavorIds": [
+              "fl-mint:virginia"
+            ],
+            "hookah": "Virginia",
+            "tobaccoType": "virginia",
+            "tobaccoStrength": 3,
+            "flavors": [
+              "Mint"
+            ],
+            "table": "/table-7"
+          }
+        }
+      },
+      {
+        "name": "custom, two flavours with current percentage keys",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-mint:virginia",
+              "fl-lemon:virginia"
+            ],
+            "flavorPercentages": {
+              "fl-mint:virginia": 60,
+              "fl-lemon:virginia": 40
+            }
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "custom-<now>",
+            "type": "custom",
+            "name": "Custom Mix",
+            "price": 70,
+            "image": "v.webp",
+            "comboId": "custom:f80d4df116d3a560",
+            "comboLabel": "Virginia · Mint 60%, Lemon 40%",
+            "hookahId": "hk-virginia",
+            "flavorIds": [
+              "fl-mint:virginia",
+              "fl-lemon:virginia"
+            ],
+            "hookah": "Virginia",
+            "tobaccoType": "virginia",
+            "flavors": [
+              "Mint 60%",
+              "Lemon 40%"
+            ],
+            "flavorPercentages": {
+              "fl-mint:virginia": 60,
+              "fl-lemon:virginia": 40
+            },
+            "table": "/table-7"
+          }
+        }
+      },
+      {
+        "name": "custom, legacy percentage keys",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-mint:virginia",
+              "fl-lemon:virginia"
+            ],
+            "flavorPercentages": {
+              "fl-mint-virginia": 70,
+              "fl-lemon": 30
+            }
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "custom-<now>",
+            "type": "custom",
+            "name": "Custom Mix",
+            "price": 70,
+            "image": "v.webp",
+            "comboId": "custom:f80d4df116d3a560",
+            "comboLabel": "Virginia · Mint 70%, Lemon 30%",
+            "hookahId": "hk-virginia",
+            "flavorIds": [
+              "fl-mint:virginia",
+              "fl-lemon:virginia"
+            ],
+            "hookah": "Virginia",
+            "tobaccoType": "virginia",
+            "flavors": [
+              "Mint 70%",
+              "Lemon 30%"
+            ],
+            "flavorPercentages": {
+              "fl-mint:virginia": 70,
+              "fl-lemon:virginia": 30
+            },
+            "table": "/table-7"
+          }
+        }
+      },
+      {
+        "name": "custom with ice: share derived from the rest",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-mint:virginia",
+              "fl-lemon:virginia"
+            ],
+            "flavorPercentages": {
+              "fl-mint:virginia": 50,
+              "fl-lemon:virginia": 30
+            },
+            "withIce": true
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "custom-<now>",
+            "type": "custom",
+            "name": "Custom Mix",
+            "price": 70,
+            "image": "v.webp",
+            "comboId": "custom:f80d4df116d3a560",
+            "comboLabel": "Virginia · Mint 50%, Lemon 30%, Ice (20%)",
+            "hookahId": "hk-virginia",
+            "flavorIds": [
+              "fl-mint:virginia",
+              "fl-lemon:virginia"
+            ],
+            "hookah": "Virginia",
+            "tobaccoType": "virginia",
+            "flavors": [
+              "Mint 50%",
+              "Lemon 30%",
+              "Ice (20%)"
+            ],
+            "flavorPercentages": {
+              "fl-mint:virginia": 50,
+              "fl-lemon:virginia": 30
+            },
+            "table": "/table-7"
+          }
+        }
+      },
+      {
+        "name": "custom with ice, share unknown",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-mint:virginia"
+            ],
+            "withIce": true
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "custom-<now>",
+            "type": "custom",
+            "name": "Custom Mix",
+            "price": 70,
+            "image": "v.webp",
+            "comboId": "custom:f1b07fb2955648eb",
+            "comboLabel": "Virginia · Mint, Ice",
+            "hookahId": "hk-virginia",
+            "flavorIds": [
+              "fl-mint:virginia"
+            ],
+            "hookah": "Virginia",
+            "tobaccoType": "virginia",
+            "flavors": [
+              "Mint",
+              "Ice"
+            ],
+            "table": "/table-7"
+          }
+        }
+      },
+      {
+        "name": "custom on mix tobacco shows variants",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-darkblend",
+            "tobaccoType": "mix",
+            "flavorIds": [
+              "fl-mint:virginia",
+              "fl-cola:darkblend"
+            ],
+            "flavorPercentages": {
+              "fl-mint:virginia": 50,
+              "fl-cola:darkblend": 50
+            }
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "custom-<now>",
+            "type": "custom",
+            "name": "Custom Mix",
+            "price": 80,
+            "image": "d.webp",
+            "comboId": "custom:5fdd78997b1fecfd",
+            "comboLabel": "Darkblend · Mint (Virginia) 50%, Cola (Darkblend) 50%",
+            "hookahId": "hk-darkblend",
+            "flavorIds": [
+              "fl-mint:virginia",
+              "fl-cola:darkblend"
+            ],
+            "hookah": "Darkblend",
+            "tobaccoType": "mix",
+            "flavors": [
+              "Mint (Virginia) 50%",
+              "Cola (Darkblend) 50%"
+            ],
+            "flavorPercentages": {
+              "fl-mint:virginia": 50,
+              "fl-cola:darkblend": 50
+            },
+            "table": "/table-7"
+          }
+        }
+      },
+      {
+        "name": "custom with every add-on",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-darkblend",
+            "tobaccoType": "darkblend",
+            "flavorIds": [
+              "fl-cola:darkblend"
+            ],
+            "hasLED": true,
+            "hasColoredWater": true,
+            "hasAlcohol": true,
+            "hasFruits": true
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "custom-<now>",
+            "type": "custom",
+            "name": "Custom Mix",
+            "price": 180,
+            "image": "d.webp",
+            "comboId": "custom:947a1bbf4ceff938",
+            "comboLabel": "Darkblend · Cola",
+            "hookahId": "hk-darkblend",
+            "flavorIds": [
+              "fl-cola:darkblend"
+            ],
+            "hookah": "Darkblend",
+            "tobaccoType": "darkblend",
+            "flavors": [
+              "Cola"
+            ],
+            "table": "/table-7",
+            "hasLED": true,
+            "hasColoredWater": true,
+            "hasAlcohol": true,
+            "hasFruits": true
+          }
+        }
+      },
+      {
+        "name": "custom on a free hookah with one add-on",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-free",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-mint:virginia"
+            ],
+            "hasLED": true
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "ok",
+          "item": {
+            "id": "custom-<now>",
+            "type": "custom",
+            "name": "Custom Mix",
+            "price": 30,
+            "image": "f.webp",
+            "comboId": "custom:aee81e9d7df7db4e",
+            "comboLabel": "Free · Mint",
+            "hookahId": "hk-free",
+            "flavorIds": [
+              "fl-mint:virginia"
+            ],
+            "hookah": "Free",
+            "tobaccoType": "virginia",
+            "flavors": [
+              "Mint"
+            ],
+            "table": "/table-7",
+            "hasLED": true
+          }
+        }
+      },
+      {
+        "name": "inactive hookah and inactive flavour are both named",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-retired",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-gone:virginia",
+              "fl-mint:virginia"
+            ]
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "unavailable",
+          "missing": [
+            "hk-retired",
+            "Peach"
+          ]
+        }
+      },
+      {
+        "name": "deleted flavour is named by id",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-deleted:virginia"
+            ]
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "unavailable",
+          "missing": [
+            "fl-deleted"
+          ]
+        }
+      },
+      {
+        "name": "flavour no longer compatible with the variant",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-lemon:darkblend"
+            ]
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "unavailable",
+          "missing": [
+            "Lemon"
+          ]
+        }
+      },
+      {
+        "name": "flavour id without a variant",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "l",
+            "kind": "custom",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-mint"
+            ]
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "unavailable",
+          "missing": [
+            "Mint"
+          ]
+        }
+      },
+      {
+        "name": "custom missing its hookah id",
+        "input": {
+          "favorite": {
+            "comboId": "custom:x",
+            "label": "Broken build",
+            "kind": "custom",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-mint:virginia"
+            ]
+          },
+          "table": "/table-7"
+        },
+        "expected": {
+          "status": "unavailable",
+          "missing": [
+            "Broken build"
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,347 @@
+{
+  "description": "What an order shares with friends. At most 5 items, deduplicated by comboId, flavorIds capped at 10, never any personalisation.",
+  "functions": {
+    "buildNowSmokingItems": [
+      {
+        "name": "a mix",
+        "input": [
+          {
+            "type": "mix",
+            "comboId": "mix:mx-turbo",
+            "comboLabel": "Turbo Mix",
+            "name": "Turbo Mix (Virginia)",
+            "tobaccoType": "virginia"
+          }
+        ],
+        "expected": [
+          {
+            "comboId": "mix:mx-turbo",
+            "label": "Turbo Mix"
+          }
+        ]
+      },
+      {
+        "name": "a custom build shares its recipe",
+        "input": [
+          {
+            "type": "custom",
+            "comboId": "custom:abc",
+            "comboLabel": "Virginia · Mint, Lemon",
+            "name": "Custom Mix",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-mint:virginia",
+              "fl-lemon:virginia"
+            ]
+          }
+        ],
+        "expected": [
+          {
+            "comboId": "custom:abc",
+            "label": "Virginia · Mint, Lemon",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "fl-mint:virginia",
+              "fl-lemon:virginia"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "label falls back to name",
+        "input": [
+          {
+            "type": "mix",
+            "comboId": "mix:x",
+            "name": "Only Name"
+          }
+        ],
+        "expected": [
+          {
+            "comboId": "mix:x",
+            "label": "Only Name"
+          }
+        ]
+      },
+      {
+        "name": "no comboId is skipped; duplicates collapse",
+        "input": [
+          {
+            "type": "mix",
+            "name": "Legacy"
+          },
+          {
+            "type": "mix",
+            "comboId": "mix:a",
+            "name": "A"
+          },
+          {
+            "type": "mix",
+            "comboId": "mix:a",
+            "name": "A again"
+          }
+        ],
+        "expected": [
+          {
+            "comboId": "mix:a",
+            "label": "A"
+          }
+        ]
+      },
+      {
+        "name": "custom without flavours shares no recipe",
+        "input": [
+          {
+            "type": "custom",
+            "comboId": "custom:nof",
+            "name": "Custom Mix",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia",
+            "flavorIds": []
+          }
+        ],
+        "expected": [
+          {
+            "comboId": "custom:nof",
+            "label": "Custom Mix"
+          }
+        ]
+      },
+      {
+        "name": "hookah of the day (type mix) shares no recipe",
+        "input": [
+          {
+            "type": "mix",
+            "comboId": "hotd:0123456789abcdef",
+            "comboLabel": "Hookah of the day: Virginia",
+            "name": "Hookah of the day: Virginia",
+            "hookahId": "hk-virginia",
+            "tobaccoType": "virginia"
+          }
+        ],
+        "expected": [
+          {
+            "comboId": "hotd:0123456789abcdef",
+            "label": "Hookah of the day: Virginia"
+          }
+        ]
+      },
+      {
+        "name": "six items keeps five",
+        "input": [
+          {
+            "type": "mix",
+            "comboId": "mix:1",
+            "name": "M1"
+          },
+          {
+            "type": "mix",
+            "comboId": "mix:2",
+            "name": "M2"
+          },
+          {
+            "type": "mix",
+            "comboId": "mix:3",
+            "name": "M3"
+          },
+          {
+            "type": "mix",
+            "comboId": "mix:4",
+            "name": "M4"
+          },
+          {
+            "type": "mix",
+            "comboId": "mix:5",
+            "name": "M5"
+          },
+          {
+            "type": "mix",
+            "comboId": "mix:6",
+            "name": "M6"
+          }
+        ],
+        "expected": [
+          {
+            "comboId": "mix:1",
+            "label": "M1"
+          },
+          {
+            "comboId": "mix:2",
+            "label": "M2"
+          },
+          {
+            "comboId": "mix:3",
+            "label": "M3"
+          },
+          {
+            "comboId": "mix:4",
+            "label": "M4"
+          },
+          {
+            "comboId": "mix:5",
+            "label": "M5"
+          }
+        ]
+      },
+      {
+        "name": "twelve flavours keeps ten",
+        "input": [
+          {
+            "type": "custom",
+            "comboId": "custom:many",
+            "name": "Custom Mix",
+            "hookahId": "h",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "f0:virginia",
+              "f1:virginia",
+              "f2:virginia",
+              "f3:virginia",
+              "f4:virginia",
+              "f5:virginia",
+              "f6:virginia",
+              "f7:virginia",
+              "f8:virginia",
+              "f9:virginia",
+              "f10:virginia",
+              "f11:virginia"
+            ]
+          }
+        ],
+        "expected": [
+          {
+            "comboId": "custom:many",
+            "label": "Custom Mix",
+            "hookahId": "h",
+            "tobaccoType": "virginia",
+            "flavorIds": [
+              "f0:virginia",
+              "f1:virginia",
+              "f2:virginia",
+              "f3:virginia",
+              "f4:virginia",
+              "f5:virginia",
+              "f6:virginia",
+              "f7:virginia",
+              "f8:virginia",
+              "f9:virginia"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "long label is truncated",
+        "input": [
+          {
+            "type": "mix",
+            "comboId": "mix:long",
+            "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        ],
+        "expected": [
+          {
+            "comboId": "mix:long",
+            "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…"
+          }
+        ]
+      }
+    ],
+    "isNowSmokingFresh": [
+      {
+        "name": "missing",
+        "input": {
+          "sinceMs": null,
+          "nowMs": 1800000000000
+        },
+        "expected": false
+      },
+      {
+        "name": "just now",
+        "input": {
+          "sinceMs": 1800000000000,
+          "nowMs": 1800000000000
+        },
+        "expected": true
+      },
+      {
+        "name": "one millisecond before expiry",
+        "input": {
+          "sinceMs": 1800000000000,
+          "nowMs": 1800007199999
+        },
+        "expected": true
+      },
+      {
+        "name": "exactly two hours is stale",
+        "input": {
+          "sinceMs": 1800000000000,
+          "nowMs": 1800007200000
+        },
+        "expected": false
+      },
+      {
+        "name": "server time ahead of device",
+        "input": {
+          "sinceMs": 1800000030000,
+          "nowMs": 1800000000000
+        },
+        "expected": true
+      }
+    ],
+    "nowSmokingItemToFavorite": [
+      {
+        "name": "mix",
+        "input": {
+          "comboId": "mix:mx-turbo",
+          "label": "Turbo Mix"
+        },
+        "expected": {
+          "comboId": "mix:mx-turbo",
+          "label": "Turbo Mix",
+          "kind": "mix",
+          "mixId": "mx-turbo"
+        }
+      },
+      {
+        "name": "custom with recipe",
+        "input": {
+          "comboId": "custom:abc",
+          "label": "Virginia · Mint",
+          "hookahId": "hk-virginia",
+          "tobaccoType": "virginia",
+          "flavorIds": [
+            "fl-mint:virginia"
+          ]
+        },
+        "expected": {
+          "comboId": "custom:abc",
+          "label": "Virginia · Mint",
+          "kind": "custom",
+          "hookahId": "hk-virginia",
+          "tobaccoType": "virginia",
+          "flavorIds": [
+            "fl-mint:virginia"
+          ]
+        }
+      },
+      {
+        "name": "custom without recipe",
+        "input": {
+          "comboId": "custom:abc",
+          "label": "Virginia · Mint"
+        },
+        "expected": null
+      },
+      {
+        "name": "hookah of the day cannot be re-ordered",
+        "input": {
+          "comboId": "hotd:0123456789abcdef",
+          "label": "Hookah of the day: Virginia"
+        },
+        "expected": null
+      }
+    ]
+  }
+}

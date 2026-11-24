@@ -1,0 +1,25 @@
+{
+  "description": "Numbers every client must share. firestore.rules enforces several of them.",
+  "functions": {
+    "constants": [
+      {
+        "name": "all",
+        "input": null,
+        "expected": {
+          "MAX_LABEL_LENGTH": 200,
+          "MAX_FAVORITES": 20,
+          "POKE_COOLDOWN_MS": 600000,
+          "NOW_SMOKING_MAX_ITEMS": 5,
+          "NOW_SMOKING_TTL_MS": 7200000,
+          "MAX_PROMO_TEXT_LENGTH": 140,
+          "ADDON_PRICES": {
+            "hasLED": 30,
+            "hasColoredWater": 10,
+            "hasAlcohol": 40,
+            "hasFruits": 20
+          }
+        }
+      }
+    ]
+  }
+}

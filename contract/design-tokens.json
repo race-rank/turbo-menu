@@ -1,0 +1,48 @@
+{
+  "description": "Shared look for web, iOS and Android. Source: the CSS variables in src/index.css (dark theme, the only one the customer pages use). Colours are sRGB hex. Sizes are points (iOS) / dp (Android) / px (web).",
+  "color": {
+    "background": "#0F131A",
+    "card": "#161C27",
+    "surface": "#1E2634",
+    "border": "#252F41",
+    "text": "#F2F2F2",
+    "textMuted": "#A6A6A6",
+    "accent": "#33D4E6",
+    "onAccent": "#0D0D0D",
+    "destructive": "#EF4444",
+    "onDestructive": "#F2F2F2"
+  },
+  "radius": {
+    "sm": 4,
+    "md": 6,
+    "lg": 8
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 32
+  },
+  "typography": {
+    "family": "system",
+    "title": {
+      "size": 24,
+      "weight": "bold",
+      "letterSpacing": 1.2
+    },
+    "heading": {
+      "size": 14,
+      "weight": "bold",
+      "uppercase": true
+    },
+    "body": {
+      "size": 16,
+      "weight": "regular"
+    },
+    "caption": {
+      "size": 12,
+      "weight": "regular"
+    }
+  }
+}

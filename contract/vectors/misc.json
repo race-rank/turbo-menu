@@ -1,0 +1,150 @@
+{
+  "description": "Small shared rules: table ids from the QR code, friendship document ids, and the order-item shape (never the image, never the table).",
+  "functions": {
+    "isValidTableId": [
+      {
+        "name": "null",
+        "input": null,
+        "expected": false
+      },
+      {
+        "name": "empty",
+        "input": "",
+        "expected": false
+      },
+      {
+        "name": "table path",
+        "input": "/table-7",
+        "expected": true
+      },
+      {
+        "name": "bare table",
+        "input": "table-12",
+        "expected": true
+      },
+      {
+        "name": "bar",
+        "input": "/bar",
+        "expected": true
+      },
+      {
+        "name": "garbage",
+        "input": "/menu",
+        "expected": false
+      },
+      {
+        "name": "table without a dash",
+        "input": "table7",
+        "expected": false
+      }
+    ],
+    "pairIdFor": [
+      {
+        "name": "already ordered",
+        "input": {
+          "a": "alice",
+          "b": "bob"
+        },
+        "expected": "alice_bob"
+      },
+      {
+        "name": "reversed gives the same id",
+        "input": {
+          "a": "bob",
+          "b": "alice"
+        },
+        "expected": "alice_bob"
+      },
+      {
+        "name": "uppercase sorts before lowercase",
+        "input": {
+          "a": "aUid",
+          "b": "Zuid"
+        },
+        "expected": "Zuid_aUid"
+      },
+      {
+        "name": "firebase uids",
+        "input": {
+          "a": "x9Kq2LmN8pQrStUvWxYz01234567",
+          "b": "A1b2C3d4E5f6G7h8I9j0K1l2M3n4"
+        },
+        "expected": "A1b2C3d4E5f6G7h8I9j0K1l2M3n4_x9Kq2LmN8pQrStUvWxYz01234567"
+      }
+    ],
+    "convertCartItemToDbItem": [
+      {
+        "name": "custom build",
+        "input": {
+          "id": "custom-1",
+          "type": "custom",
+          "name": "Custom Mix",
+          "price": 110,
+          "quantity": 2,
+          "image": "data:image/webp;base64,AAAA",
+          "comboId": "custom:abc",
+          "comboLabel": "Virginia · Mint",
+          "hookahId": "hk-virginia",
+          "flavorIds": [
+            "fl-mint:virginia"
+          ],
+          "table": "/table-7",
+          "tobaccoType": "virginia",
+          "tobaccoStrength": 3,
+          "hookah": "Virginia",
+          "flavors": [
+            "Mint"
+          ],
+          "hasLED": true
+        },
+        "expected": {
+          "id": "custom-1",
+          "type": "custom",
+          "name": "Custom Mix",
+          "price": 110,
+          "quantity": 2,
+          "comboId": "custom:abc",
+          "comboLabel": "Virginia · Mint",
+          "hookahId": "hk-virginia",
+          "flavorIds": [
+            "fl-mint:virginia"
+          ],
+          "hookah": "Virginia",
+          "tobaccoType": "virginia",
+          "tobaccoStrength": 3,
+          "flavors": [
+            "Mint"
+          ],
+          "hasLED": true
+        }
+      },
+      {
+        "name": "mix",
+        "input": {
+          "id": "mix-mx-turbo-mix",
+          "type": "mix",
+          "name": "Turbo Mix (Mix)",
+          "price": 100,
+          "quantity": 1,
+          "image": "t.webp",
+          "comboId": "mix:mx-turbo",
+          "comboLabel": "Turbo Mix",
+          "mixId": "mx-turbo",
+          "table": "/table-7",
+          "tobaccoType": "mix"
+        },
+        "expected": {
+          "id": "mix-mx-turbo-mix",
+          "type": "mix",
+          "name": "Turbo Mix (Mix)",
+          "price": 100,
+          "quantity": 1,
+          "comboId": "mix:mx-turbo",
+          "comboLabel": "Turbo Mix",
+          "mixId": "mx-turbo",
+          "tobaccoType": "mix"
+        }
+      }
+    ]
+  }
+}
