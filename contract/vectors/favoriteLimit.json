@@ -1,0 +1,171 @@
+{
+  "description": "The cap of 20 favourites. favoritesThatFit: newest first, undated sorts as oldest (createdAtMs absent), stable for ties.",
+  "functions": {
+    "hasRoomForFavorite": [
+      {
+        "name": "count 0",
+        "input": 0,
+        "expected": true
+      },
+      {
+        "name": "count 19",
+        "input": 19,
+        "expected": true
+      },
+      {
+        "name": "count 20",
+        "input": 20,
+        "expected": false
+      },
+      {
+        "name": "count 23",
+        "input": 23,
+        "expected": false
+      }
+    ],
+    "formatFavoriteCount": [
+      {
+        "name": "count 0",
+        "input": 0,
+        "expected": "0/20"
+      },
+      {
+        "name": "count 7",
+        "input": 7,
+        "expected": "7/20"
+      },
+      {
+        "name": "count 20",
+        "input": 20,
+        "expected": "20/20"
+      },
+      {
+        "name": "count 23",
+        "input": 23,
+        "expected": "23/20"
+      }
+    ],
+    "describeFavoritesThatDidNotFit": [
+      {
+        "name": "count 0",
+        "input": 0,
+        "expected": null
+      },
+      {
+        "name": "count 1",
+        "input": 1,
+        "expected": "1 favourite from this device didn't fit - your account is full (20)."
+      },
+      {
+        "name": "count 2",
+        "input": 2,
+        "expected": "2 favourites from this device didn't fit - your account is full (20)."
+      },
+      {
+        "name": "count -1",
+        "input": -1,
+        "expected": null
+      }
+    ],
+    "favoritesThatFit": [
+      {
+        "name": "all fit",
+        "input": {
+          "count": 0,
+          "candidates": [
+            {
+              "id": "a",
+              "createdAtMs": 1800000000000
+            },
+            {
+              "id": "b",
+              "createdAtMs": 1800000000001
+            }
+          ]
+        },
+        "expected": {
+          "fit": [
+            "b",
+            "a"
+          ],
+          "left": []
+        }
+      },
+      {
+        "name": "room for one: newest wins",
+        "input": {
+          "count": 19,
+          "candidates": [
+            {
+              "id": "old",
+              "createdAtMs": 1800000000000
+            },
+            {
+              "id": "new",
+              "createdAtMs": 1800000000005
+            },
+            {
+              "id": "undated"
+            }
+          ]
+        },
+        "expected": {
+          "fit": [
+            "new"
+          ],
+          "left": [
+            "old",
+            "undated"
+          ]
+        }
+      },
+      {
+        "name": "full account",
+        "input": {
+          "count": 20,
+          "candidates": [
+            {
+              "id": "a",
+              "createdAtMs": 1800000000000
+            }
+          ]
+        },
+        "expected": {
+          "fit": [],
+          "left": [
+            "a"
+          ]
+        }
+      },
+      {
+        "name": "over the limit already",
+        "input": {
+          "count": 23,
+          "candidates": [
+            {
+              "id": "a",
+              "createdAtMs": 1800000000000
+            }
+          ]
+        },
+        "expected": {
+          "fit": [],
+          "left": [
+            "a"
+          ]
+        }
+      },
+      {
+        "name": "none",
+        "input": {
+          "count": 5,
+          "candidates": []
+        },
+        "expected": {
+          "fit": [],
+          "left": []
+        }
+      }
+    ]
+  }
+}

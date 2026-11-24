@@ -1,0 +1,156 @@
+{
+  "description": "Flavour display names and the combo label. Percentages show with 2+ flavours or with ice; the variant tag shows only when tobaccoType is \"mix\".",
+  "functions": {
+    "buildFlavorDisplayNames": [
+      {
+        "name": "single flavour, no ice: bare name",
+        "input": {
+          "flavors": [
+            {
+              "name": "Mint",
+              "variantType": "virginia",
+              "percentage": 100
+            }
+          ],
+          "tobaccoType": "virginia",
+          "withIce": false
+        },
+        "expected": [
+          "Mint"
+        ]
+      },
+      {
+        "name": "two flavours show percentages",
+        "input": {
+          "flavors": [
+            {
+              "name": "Mint",
+              "variantType": "virginia",
+              "percentage": 60
+            },
+            {
+              "name": "Lemon",
+              "variantType": "virginia",
+              "percentage": 40
+            }
+          ],
+          "tobaccoType": "virginia",
+          "withIce": false
+        },
+        "expected": [
+          "Mint 60%",
+          "Lemon 40%"
+        ]
+      },
+      {
+        "name": "mix tobacco shows variant tags",
+        "input": {
+          "flavors": [
+            {
+              "name": "Mint",
+              "variantType": "virginia",
+              "percentage": 50
+            },
+            {
+              "name": "Cola",
+              "variantType": "darkblend",
+              "percentage": 50
+            }
+          ],
+          "tobaccoType": "mix",
+          "withIce": false
+        },
+        "expected": [
+          "Mint (Virginia) 50%",
+          "Cola (Darkblend) 50%"
+        ]
+      },
+      {
+        "name": "single flavour with ice",
+        "input": {
+          "flavors": [
+            {
+              "name": "Mint",
+              "variantType": "virginia",
+              "percentage": 80
+            }
+          ],
+          "tobaccoType": "virginia",
+          "withIce": true,
+          "icePercentage": 20
+        },
+        "expected": [
+          "Mint 80%",
+          "Ice (20%)"
+        ]
+      },
+      {
+        "name": "ice with unknown share",
+        "input": {
+          "flavors": [
+            {
+              "name": "Mint",
+              "variantType": "virginia"
+            }
+          ],
+          "tobaccoType": "virginia",
+          "withIce": true
+        },
+        "expected": [
+          "Mint",
+          "Ice"
+        ]
+      },
+      {
+        "name": "unknown percentages are left off",
+        "input": {
+          "flavors": [
+            {
+              "name": "Mint"
+            },
+            {
+              "name": "Lemon",
+              "percentage": 40
+            }
+          ],
+          "tobaccoType": "virginia",
+          "withIce": false
+        },
+        "expected": [
+          "Mint",
+          "Lemon 40%"
+        ]
+      },
+      {
+        "name": "no flavours",
+        "input": {
+          "flavors": [],
+          "tobaccoType": "virginia",
+          "withIce": false
+        },
+        "expected": []
+      }
+    ],
+    "buildComboLabel": [
+      {
+        "name": "two flavours",
+        "input": {
+          "hookahName": "Darkblend",
+          "flavorNames": [
+            "Mint 60%",
+            "Lemon 40%"
+          ]
+        },
+        "expected": "Darkblend · Mint 60%, Lemon 40%"
+      },
+      {
+        "name": "no flavours",
+        "input": {
+          "hookahName": "Virginia",
+          "flavorNames": []
+        },
+        "expected": "Virginia · "
+      }
+    ]
+  }
+}

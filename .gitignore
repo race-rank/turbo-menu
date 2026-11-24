@@ -27,3 +27,6 @@ dist-ssr
 
 # Firebase service account - never commit
 serviceAccountKey.json
+
+# Staging service account - never commit
+stagingServiceAccountKey.json

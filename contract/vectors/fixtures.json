@@ -1,0 +1,96 @@
+{
+  "description": "Shared menu fixture for reorder.json and hookahOfTheDay.json.",
+  "menu": {
+    "hookahs": [
+      {
+        "id": "hk-virginia",
+        "name": "Virginia",
+        "price": 70,
+        "image": "v.webp",
+        "isActive": true
+      },
+      {
+        "id": "hk-darkblend",
+        "name": "Darkblend",
+        "price": 80,
+        "image": "d.webp",
+        "isActive": true
+      },
+      {
+        "id": "hk-retired",
+        "name": "Retired",
+        "price": 60,
+        "image": "r.webp",
+        "isActive": false
+      },
+      {
+        "id": "hk-free",
+        "name": "Free",
+        "price": 0,
+        "image": "f.webp",
+        "isActive": true
+      }
+    ],
+    "flavors": [
+      {
+        "id": "fl-mint",
+        "name": "Mint",
+        "image": "",
+        "compatibleTobaccoTypes": [
+          "virginia",
+          "darkblend"
+        ],
+        "isActive": true
+      },
+      {
+        "id": "fl-lemon",
+        "name": "Lemon",
+        "image": "",
+        "compatibleTobaccoTypes": [
+          "virginia"
+        ],
+        "isActive": true
+      },
+      {
+        "id": "fl-cola",
+        "name": "Cola",
+        "image": "",
+        "compatibleTobaccoTypes": [
+          "darkblend"
+        ],
+        "isActive": true
+      },
+      {
+        "id": "fl-gone",
+        "name": "Peach",
+        "image": "",
+        "compatibleTobaccoTypes": [
+          "virginia"
+        ],
+        "isActive": false
+      }
+    ],
+    "recommendedMixes": [
+      {
+        "id": "mx-turbo",
+        "name": "Turbo Mix",
+        "price": 100,
+        "category": "mix",
+        "mainImage": "t.webp",
+        "flavorImages": [],
+        "bgColor": "#000",
+        "isActive": true
+      },
+      {
+        "id": "mx-off",
+        "name": "Old Mix",
+        "price": 90,
+        "category": "mix",
+        "mainImage": "o.webp",
+        "flavorImages": [],
+        "bgColor": "#000",
+        "isActive": false
+      }
+    ]
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "description": "Combo identity. fnv1a64 hashes UTF-16 code units (not UTF-8 bytes) and returns 16 lowercase hex digits. comboIdForCustom sorts flavorIds by UTF-16 code unit order before joining.",
+  "functions": {
+    "fnv1a64": [
+      {
+        "name": "empty",
+        "input": "",
+        "expected": "cbf29ce484222325"
+      },
+      {
+        "name": "ascii",
+        "input": "hello",
+        "expected": "a430d84680aabd0b"
+      },
+      {
+        "name": "separator characters",
+        "input": "a|b,c:d",
+        "expected": "437088d398c7a6c9"
+      },
+      {
+        "name": "romanian diacritics",
+        "input": "Lămâie și mentă",
+        "expected": "21ff83b16ddb6c54"
+      },
+      {
+        "name": "emoji is two code units",
+        "input": "Mint 🍃",
+        "expected": "fb7c3486cdbb8e92"
+      },
+      {
+        "name": "long",
+        "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "expected": "b6822c71b0501b75"
+      }
+    ],
+    "comboIdForMix": [
+      {
+        "name": "plain id",
+        "input": "mx-turbo",
+        "expected": "mix:mx-turbo"
+      },
+      {
+        "name": "firestore auto id",
+        "input": "Zk3PqLm0aBcD9eFgHiJk",
+        "expected": "mix:Zk3PqLm0aBcD9eFgHiJk"
+      }
+    ],
+    "comboIdForCustom": [
+      {
+        "name": "one flavour",
+        "input": {
+          "hookahId": "hk-virginia",
+          "tobaccoType": "virginia",
+          "flavorIds": [
+            "fl-mint:virginia"
+          ]
+        },
+        "expected": "custom:f1b07fb2955648eb"
+      },
+      {
+        "name": "two flavours",
+        "input": {
+          "hookahId": "hk-virginia",
+          "tobaccoType": "virginia",
+          "flavorIds": [
+            "fl-lemon:virginia",
+            "fl-mint:virginia"
+          ]
+        },
+        "expected": "custom:f80d4df116d3a560"
+      },
+      {
+        "name": "same two flavours, other order, same id",
+        "input": {
+          "hookahId": "hk-virginia",
+          "tobaccoType": "virginia",
+          "flavorIds": [
+            "fl-mint:virginia",
+            "fl-lemon:virginia"
+          ]
+        },
+        "expected": "custom:f80d4df116d3a560"
+      },
+      {
+        "name": "other tobacco is another combo",
+        "input": {
+          "hookahId": "hk-virginia",
+          "tobaccoType": "mix",
+          "flavorIds": [
+            "fl-mint:virginia",
+            "fl-mint:darkblend"
+          ]
+        },
+        "expected": "custom:c87f4350a86ab128"
+      },
+      {
+        "name": "no flavours",
+        "input": {
+          "hookahId": "hk-darkblend",
+          "tobaccoType": "darkblend",
+          "flavorIds": []
+        },
+        "expected": "custom:b7fe50ae38ea3d03"
+      },
+      {
+        "name": "uppercase sorts before lowercase",
+        "input": {
+          "hookahId": "H1",
+          "tobaccoType": "virginia",
+          "flavorIds": [
+            "b:virginia",
+            "B:virginia",
+            "a:virginia",
+            "Z:virginia",
+            "9:virginia"
+          ]
+        },
+        "expected": "custom:ac5d0f3fd1936d86"
+      }
+    ],
+    "truncateLabel": [
+      {
+        "name": "short stays",
+        "input": "Darkblend · Mint, Lemon",
+        "expected": "Darkblend · Mint, Lemon"
+      },
+      {
+        "name": "exactly 200 stays",
+        "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      {
+        "name": "201 becomes 199 + ellipsis",
+        "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…"
+      },
+      {
+        "name": "very long",
+        "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx · xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx · xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…"
+      },
+      {
+        "name": "emoji well before the cut",
+        "input": "🍃xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "expected": "🍃xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…"
+      }
+    ]
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "description": "Poke cooldown (10 minutes, also enforced by firestore.rules) and the unseen test.",
+  "functions": {
+    "pokeCooldownRemainingMs": [
+      {
+        "name": "never poked",
+        "input": {
+          "lastAtMs": null,
+          "nowMs": 1800000000000
+        },
+        "expected": 0
+      },
+      {
+        "name": "just poked",
+        "input": {
+          "lastAtMs": 1800000000000,
+          "nowMs": 1800000000000
+        },
+        "expected": 600000
+      },
+      {
+        "name": "four minutes in",
+        "input": {
+          "lastAtMs": 1800000000000,
+          "nowMs": 1800000240000
+        },
+        "expected": 360000
+      },
+      {
+        "name": "exactly ten minutes",
+        "input": {
+          "lastAtMs": 1800000000000,
+          "nowMs": 1800000600000
+        },
+        "expected": 0
+      },
+      {
+        "name": "long ago",
+        "input": {
+          "lastAtMs": 1800000000000,
+          "nowMs": 1800003600000
+        },
+        "expected": 0
+      },
+      {
+        "name": "device clock behind server",
+        "input": {
+          "lastAtMs": 1800000005000,
+          "nowMs": 1800000000000
+        },
+        "expected": 605000
+      }
+    ],
+    "isPokeUnseen": [
+      {
+        "name": "never seen",
+        "input": {
+          "atMs": 1800000000000
+        },
+        "expected": true
+      },
+      {
+        "name": "seen after",
+        "input": {
+          "atMs": 1800000000000,
+          "seenAtMs": 1800000000001
+        },
+        "expected": false
+      },
+      {
+        "name": "seen at the same instant",
+        "input": {
+          "atMs": 1800000000000,
+          "seenAtMs": 1800000000000
+        },
+        "expected": false
+      },
+      {
+        "name": "poked again since seen",
+        "input": {
+          "atMs": 1800000000010,
+          "seenAtMs": 1800000000000
+        },
+        "expected": true
+      }
+    ]
+  }
+}

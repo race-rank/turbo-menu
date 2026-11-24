@@ -1,0 +1,171 @@
+{
+  "description": "The promoted hookah. input.hookahs for resolve cases is the reorder menu's hookah list. The cart item is type \"mix\" with a \"hotd:\" combo id covering hookah id and promo text.",
+  "functions": {
+    "clampPromoText": [
+      {
+        "name": "absent",
+        "input": null,
+        "expected": null
+      },
+      {
+        "name": "blank",
+        "input": "   ",
+        "expected": null
+      },
+      {
+        "name": "trimmed",
+        "input": "  Red Tea | Blackberry  ",
+        "expected": "Red Tea | Blackberry"
+      },
+      {
+        "name": "exactly 140",
+        "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      {
+        "name": "141 is cut to 140",
+        "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+      }
+    ],
+    "resolveHookahOfTheDay": [
+      {
+        "name": "no pointer",
+        "input": {
+          "featured": null
+        },
+        "expected": null
+      },
+      {
+        "name": "active hookah with promo",
+        "input": {
+          "featured": {
+            "hookahId": "hk-virginia",
+            "promoText": " Red Tea | Blackberry "
+          }
+        },
+        "expected": {
+          "hookahId": "hk-virginia",
+          "promoText": "Red Tea | Blackberry"
+        }
+      },
+      {
+        "name": "active hookah, blank promo",
+        "input": {
+          "featured": {
+            "hookahId": "hk-darkblend",
+            "promoText": "  "
+          }
+        },
+        "expected": {
+          "hookahId": "hk-darkblend"
+        }
+      },
+      {
+        "name": "inactive hookah",
+        "input": {
+          "featured": {
+            "hookahId": "hk-retired"
+          }
+        },
+        "expected": null
+      },
+      {
+        "name": "dangling pointer",
+        "input": {
+          "featured": {
+            "hookahId": "nope"
+          }
+        },
+        "expected": null
+      }
+    ],
+    "hookahOfTheDayCartItem": [
+      {
+        "name": "with promo and tobacco",
+        "input": {
+          "hookahId": "hk-virginia",
+          "promoText": "Red Tea | Blackberry",
+          "tobaccoType": "virginia",
+          "table": "/table-7"
+        },
+        "expected": {
+          "id": "hotd-ce166c1701df342e",
+          "type": "mix",
+          "name": "Hookah of the day: Virginia (Red Tea | Blackberry)",
+          "price": 70,
+          "image": "v.webp",
+          "comboId": "hotd:ce166c1701df342e",
+          "comboLabel": "Hookah of the day: Virginia (Red Tea | Blackberry)",
+          "hookahId": "hk-virginia",
+          "hookah": "Virginia",
+          "tobaccoType": "virginia",
+          "table": "/table-7"
+        }
+      },
+      {
+        "name": "no promo, no tobacco",
+        "input": {
+          "hookahId": "hk-darkblend",
+          "tobaccoType": null,
+          "table": "/bar"
+        },
+        "expected": {
+          "id": "hotd-e5a0849a7b9ada82",
+          "type": "mix",
+          "name": "Hookah of the day: Darkblend",
+          "price": 80,
+          "image": "d.webp",
+          "comboId": "hotd:e5a0849a7b9ada82",
+          "comboLabel": "Hookah of the day: Darkblend",
+          "hookahId": "hk-darkblend",
+          "hookah": "Darkblend",
+          "table": "/bar"
+        }
+      },
+      {
+        "name": "same hookah, new promo, new combo id",
+        "input": {
+          "hookahId": "hk-virginia",
+          "promoText": "Lămâie | Mentă 🍃",
+          "tobaccoType": "mix",
+          "table": "/table-7"
+        },
+        "expected": {
+          "id": "hotd-b9c9b5fa0621ba0a",
+          "type": "mix",
+          "name": "Hookah of the day: Virginia (Lămâie | Mentă 🍃)",
+          "price": 70,
+          "image": "v.webp",
+          "comboId": "hotd:b9c9b5fa0621ba0a",
+          "comboLabel": "Hookah of the day: Virginia (Lămâie | Mentă 🍃)",
+          "hookahId": "hk-virginia",
+          "hookah": "Virginia",
+          "tobaccoType": "mix",
+          "table": "/table-7"
+        }
+      },
+      {
+        "name": "promo long enough to truncate the label",
+        "input": {
+          "hookahId": "hk-virginia",
+          "promoText": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "tobaccoType": null,
+          "table": "/table-7"
+        },
+        "expected": {
+          "id": "hotd-a5fc86bb67aba3e8",
+          "type": "mix",
+          "name": "Hookah of the day: Virginia (xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)",
+          "price": 70,
+          "image": "v.webp",
+          "comboId": "hotd:a5fc86bb67aba3e8",
+          "comboLabel": "Hookah of the day: Virginia (xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…",
+          "hookahId": "hk-virginia",
+          "hookah": "Virginia",
+          "table": "/table-7"
+        }
+      }
+    ]
+  }
+}
