@@ -30,3 +30,6 @@ serviceAccountKey.json
 
 # Staging service account - never commit
 stagingServiceAccountKey.json
+
+# Originals saved by scripts/move-menu-images-to-storage.mjs
+menu-image-backup/

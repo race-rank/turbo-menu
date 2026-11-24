@@ -16,6 +16,7 @@ import {
 import { firestore } from '@/lib/firebase';
 import { DatabaseHookah, DatabaseTobaccoType, DatabaseFlavor, DatabaseRecommendedMix, FeaturedHookah } from '@/types/database';
 import { clampPromoText } from './hookahOfTheDay';
+import { externaliseMenuImages } from './menuImageUpload';
 import { safeConvertTimestamp, cleanObject } from './firebaseService';
 import { listCommunityMixes } from './userMixService';
 import type { CommunityMix } from './userMixes';
@@ -52,7 +53,7 @@ export interface MenuData {
 export const createHookah = async (hookahData: Omit<DatabaseHookah, 'id' | 'createdAt' | 'updatedAt'>) => {
   try {
     const cleanedData = cleanObject({
-      ...hookahData,
+      ...(await externaliseMenuImages(MENU_COLLECTIONS.HOOKAHS, hookahData)),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -90,7 +91,7 @@ export const getHookahs = async (): Promise<DatabaseHookah[]> => {
 export const createTobaccoType = async (tobaccoData: Omit<DatabaseTobaccoType, 'id' | 'createdAt' | 'updatedAt'>) => {
   try {
     const cleanedData = cleanObject({
-      ...tobaccoData,
+      ...(await externaliseMenuImages(MENU_COLLECTIONS.TOBACCO_TYPES, tobaccoData)),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -127,7 +128,7 @@ export const getTobaccoTypes = async (): Promise<DatabaseTobaccoType[]> => {
 export const createFlavor = async (flavorData: Omit<DatabaseFlavor, 'id' | 'createdAt' | 'updatedAt'>) => {
   try {
     const cleanedData = cleanObject({
-      ...flavorData,
+      ...(await externaliseMenuImages(MENU_COLLECTIONS.FLAVORS, flavorData)),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -173,7 +174,7 @@ export const getFlavors = async (tobaccoType?: 'virginia' | 'darkblend' | 'cigar
 export const createRecommendedMix = async (mixData: Omit<DatabaseRecommendedMix, 'id' | 'createdAt' | 'updatedAt'>) => {
   try {
     const cleanedData = cleanObject({
-      ...mixData,
+      ...(await externaliseMenuImages(MENU_COLLECTIONS.RECOMMENDED_MIXES, mixData)),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
@@ -317,7 +318,7 @@ export const updateHookah = async (id: string, updates: Partial<DatabaseHookah>)
   try {
     const hookahRef = doc(firestore, MENU_COLLECTIONS.HOOKAHS, id);
     await updateDoc(hookahRef, {
-      ...cleanObject(updates),
+      ...cleanObject(await externaliseMenuImages(MENU_COLLECTIONS.HOOKAHS, updates)),
       updatedAt: serverTimestamp()
     });
   } catch (error) {
@@ -330,7 +331,7 @@ export const updateTobaccoType = async (id: string, updates: Partial<DatabaseTob
   try {
     const tobaccoRef = doc(firestore, MENU_COLLECTIONS.TOBACCO_TYPES, id);
     await updateDoc(tobaccoRef, {
-      ...cleanObject(updates),
+      ...cleanObject(await externaliseMenuImages(MENU_COLLECTIONS.TOBACCO_TYPES, updates)),
       updatedAt: serverTimestamp()
     });
   } catch (error) {
@@ -343,7 +344,7 @@ export const updateFlavor = async (id: string, updates: Partial<DatabaseFlavor>)
   try {
     const flavorRef = doc(firestore, MENU_COLLECTIONS.FLAVORS, id);
     await updateDoc(flavorRef, {
-      ...cleanObject(updates),
+      ...cleanObject(await externaliseMenuImages(MENU_COLLECTIONS.FLAVORS, updates)),
       updatedAt: serverTimestamp()
     });
   } catch (error) {
@@ -356,7 +357,7 @@ export const updateRecommendedMix = async (id: string, updates: Partial<Database
   try {
     const mixRef = doc(firestore, MENU_COLLECTIONS.RECOMMENDED_MIXES, id);
     await updateDoc(mixRef, {
-      ...cleanObject(updates),
+      ...cleanObject(await externaliseMenuImages(MENU_COLLECTIONS.RECOMMENDED_MIXES, updates)),
       updatedAt: serverTimestamp()
     });
   } catch (error) {

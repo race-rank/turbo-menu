@@ -1,0 +1,24 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Menu pictures. The menu itself is public (see firestore.rules), so its
+    // pictures are too: guests fetch them by plain URL with no sign-in.
+    // Files are named by content hash or random id and never overwritten, so
+    // clients may cache them forever.
+    match /menu/{allPaths=**} {
+      allow read: if true;
+      // Admins only - the same custom claim firestore.rules checks. Bounded,
+      // so a compromised admin session cannot fill the bucket with video.
+      // resource == null: stated outright, not left to `create`, so an
+      // existing picture can never be replaced under a URL clients cache.
+      allow create: if request.auth != null
+        && request.auth.token.get('admin', false) == true
+        && resource == null
+        && request.resource.size < 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      // No update: a changed picture is a new file. No client delete: an old
+      // menu snapshot or a cached page may still point at the file.
+    }
+  }
+}
